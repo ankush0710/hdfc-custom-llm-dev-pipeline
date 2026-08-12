@@ -15,6 +15,8 @@ import {
     ChartColumn,
     Box,
     SquareTerminal,
+    X,
+    LogOut,
 } from "lucide-react";
 
 const pipelineItems = [
@@ -54,8 +56,16 @@ const eveluationItems = [
     }
 ]
 
+const bottomItems = [
+    {
+        name: "Logout",
+        href: "/login",
+        icon: LogOut,
+    }
+]
 
-//======================= side bar function ==============================================//
+
+//======================= side bar item function ==============================================//
 function SidebarItem({ item, pathname }) {
     const Icon = item.icon;
     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -74,57 +84,82 @@ function SidebarItem({ item, pathname }) {
 
 
 //============================ side bar starts from here ==================================//
-export default function sidebar() {
-    const pathname = usePathname()
+export default function Sidebar({ isOpen, onClose }) {
+    const pathname = usePathname();
 
     return (
-        <div className="fixed left-0 top-0 z-40 h-screen w-[280px] bg-[#002B55]">
-            <div className="px-6 pt-8 pb-12">
-                <Link href="/" className="flex items-center gap-4">
+        <>
+            {isOpen && (
+                <div
+                    onClick={onClose}
+                    className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+                />
+            )}
+            <div className={`fixed left-0 top-0 z-40 h-screen w-[280px] bg-[#002B55] transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:z-40`}>
+                <button
+                    onClick={onClose}
+                    className="absolute right-4 top-4 text-white lg:hidden"
+                >
+                    <X size={24} />
+                </button>
+                <div className="px-6 pt-8 pb-12">
+                    <Link href="/" className="flex items-center gap-4">
 
-                    {/* logo  */}
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#003A70]">
-                        <img src="/HDFC_Forge_logo.png" alt="HDFC Forge" className="h-9 w-9 object-contain" />
-                    </div>
+                        {/* logo  */}
+                        <div className="flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-lg bg-[#003A70]">
+                            <img src="/HDFC_Forge_logo.png" alt="HDFC Forge" className="h-10 w-10 lg:h-12 lg:w-12 object-contain" />
+                        </div>
 
-                    {/* Brand  */}
+                        {/* Brand  */}
+                        <div>
+                            <h1 className="text-[17px] lg:text-[24px] font-bold leading-none tracking-tight text-gray-300">HDFC Bank</h1>
+                            <p className="mt-2 text-xs lg:text-sm font-medium text-gray-300">AI Enterprise</p>
+                        </div>
+                    </Link>
+                </div>
+
+                {/* ============== Navigation ================  */}
+                <nav className="px-4">
+
+                    {/* pipeline managment routes */}
                     <div>
-                        <h1 className="text-[25px] font-bold leading-none tracking-tight text-gray-300">HDFC Bank</h1>
-                        <p className="mt-2 text-sm font-medium text-gray-300">AI Enterprise</p>
+                        <h2 className="mb-3 px-5 text-sm lg:text-md font-semibold tracking-wide text-gray-400">PIPELINE MANAGEMENT</h2>
+
+                        {pipelineItems.map((items) => {
+                            return (
+                                <div key={items.name} className="lg:space-y-1">
+                                    <SidebarItem key={items.href} item={items} pathname={pathname} />
+                                </div>
+                            )
+                        })}
                     </div>
-                </Link>
+
+                    {/* evaluation and tracking routes  */}
+                    <div className="mt-5 lg:mt-8">
+                        <h2 className="mb-3 px-5 text-sm lg:text-md font-semibold tracking-wide text-gray-400">MODEL EVALUATION</h2>
+
+                        {eveluationItems.map((items) => {
+                            return (
+                                <div key={items.name} className="lg:space-y-1">
+                                    <SidebarItem key={items.href} item={items} pathname={pathname} />
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {/* logout button  */}
+                    <div className="absolute bottom-2">
+                        {bottomItems.map((items) => {
+                            return (
+                                <div key={items.name} className="space-y-2">
+                                    <SidebarItem key={items.href} item={items} pathname={pathname} />
+                                </div>
+                            )
+                        })}
+                    </div>
+                </nav>
             </div>
-
-            {/* ============== Navigation ================  */}
-            <nav className="px-4">
-
-                {/* pipeline managment routes */}
-                <div>
-                    <h2 className="mb-4 px-5 text-md font-semibold tracking-wide text-gray-400">PIPELINE MANAGEMENT</h2>
-
-                    {pipelineItems.map((items) => {
-                        return (
-                            <div key={items.name} className="space-y-2">
-                                <SidebarItem key={items.href} item={items} pathname={pathname} />
-                            </div>
-                        )
-                    })}
-                </div>
-
-                {/* evaluation and tracking routes  */}
-                <div className="mt-8">
-                    <h2 className="mb-4 px-5 text-md font-semibold tracking-wide text-gray-400">MODEL EVALUATION</h2>
-
-                    {eveluationItems.map((items) => {
-                        return (
-                            <div key={items.name} className="space-y-2">
-                                <SidebarItem key={items.href} item={items} pathname={pathname} />
-                            </div>
-                        )
-                    })}
-                </div>
-            </nav>
-        </div>
+        </>
     )
 }
 
