@@ -12,7 +12,9 @@ import ActivityCard from "@/components/ui/ActivityCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
 import { ChartData } from "@/sampleData/DashboardChartData";
+import { DashboardStatData } from "@/sampleData/DashboardStatData";
 import { DashboardTableData } from "@/sampleData/DashboardTableData";
+import { ModelColumns } from "@/sampleData/DashboardTableData";
 import LineChart from "@/components/charts/LineChart";
 import { useState } from "react";
 import { Download, Plus } from "lucide-react";
@@ -33,7 +35,7 @@ export default function Dashboard() {
           {/* Header row containing title and actions section */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="px-5">
-              <h1 className="text-blue-900 font-bold text-3xl">
+              <h1 className="text-[#002B55] font-bold text-3xl">
                 LLM Pipeline Overview
               </h1>
               <p className="pt-1 lg:pt-3 text-gray-600">
@@ -51,7 +53,7 @@ export default function Dashboard() {
 
           {/* stat cards for displaying all info about trained model section */}
           <div className="my-6 px-5">
-            <StatCard />
+            <StatCard statData={DashboardStatData} />
           </div>
 
           {/* tarining performance data and recent activity section  */}
@@ -82,7 +84,12 @@ export default function Dashboard() {
 
           {/* model table section will show the all the information relates to the registered models  */}
           <div className="min-w-0 my-6 px-5">
-            <ModelsTable data={DashboardTableData} />
+            <ModelsTable
+              title="Deployed Models Overview"
+              columns={ModelColumns}
+              data={DashboardTableData}
+              pageSize={5}
+            />
           </div>
         </main>
 

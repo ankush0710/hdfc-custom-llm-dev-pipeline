@@ -16,7 +16,7 @@ export default function Button({
   return (
     <button
       className={`
-        w-full lg:w-auto
+        w-full text-sm lg:text-md lg:w-auto
         flex items-center justify-center gap-2
         px-3 py-2
         font-semibold

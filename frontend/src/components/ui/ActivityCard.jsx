@@ -95,7 +95,7 @@ export default function ActivityCard() {
       {/* Footer */}
       <button
         type="button"
-        className="w-full px-4 py-4 text-center text-xs font-semibold text-blue-600 transition hover:bg-gray-50 hover:text-blue-700 cursor-pointer"
+        className="w-full px-4 py-4 text-center text-xs font-semibold text-[#002B55] transition hover:bg-gray-50 hover:text-blue-700 cursor-pointer"
       >
         View All Activity
       </button>
