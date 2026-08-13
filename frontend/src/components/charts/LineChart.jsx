@@ -55,7 +55,7 @@ export default function LineChart({
             <option value="today">Today</option>
             <option value="yesterday">Yesterday</option>
             <option value="last7">Last 7 Days</option>
-            <option value="last8">Last 8 Days</option>
+            <option value="last10">Last 10 Days</option>
           </select>
         </div>
       }

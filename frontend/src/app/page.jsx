@@ -3,14 +3,17 @@
 The main dashboard that shows the all information aout the deployed models
 */
 //=======================================================================================//
-"use client"
-import Navbar from '@/components/layout/Navbar';
-import Sidebar from '@/components/layout/Sidebar';
+"use client";
+import Navbar from "@/components/layout/Navbar";
+import Sidebar from "@/components/layout/Sidebar";
 import StatCard from "@/components/ui/StatCard";
-import { ChartData } from '@/sampleData/ChartData';
+import ActivityCard from "@/components/ui/ActivityCard";
+import ModelsTable from "@/components/tables/ModelsTable";
+import { ChartData } from "@/sampleData/DashboardChartData";
+import { DashboardTableData } from "@/sampleData/DashboardTableData";
 import LineChart from "@/components/charts/LineChart";
-import { useState } from 'react';
-import { Download, Plus } from 'lucide-react';
+import { useState } from "react";
+import { Download, Plus } from "lucide-react";
 
 export default function Dashboard() {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,7 +21,6 @@ export default function Dashboard() {
   return (
     <>
       <div className="min-h-screen bg-gray-50">
-
         {/* side bar consists -> all routes section */}
         <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
 
@@ -29,41 +31,62 @@ export default function Dashboard() {
           {/* Header row containing title and actions section */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="px-5">
-              <h1 className="text-blue-900 font-bold text-3xl">LLM Pipeline Overview</h1>
-              <p className="pt-1 lg:pt-3 text-gray-600">System performance and model metrics</p>
+              <h1 className="text-blue-900 font-bold text-3xl">
+                LLM Pipeline Overview
+              </h1>
+              <p className="pt-1 lg:pt-3 text-gray-600">
+                System performance and model metrics
+              </p>
             </div>
             <div className="flex items-center gap-2 px-5 lg:px-0">
-              <button className='w-full lg:w-auto flex items-center justify-center gap-2 px-3 py-2 font-semibold hover:bg-gray-200 hover:text-blue-900 transition-colors duration-300 rounded-md cursor-pointer border border-gray-400 '><Download className='w-5 h-5 mr-2 font-semibold' />Export Report</button>
-              <button className='w-full lg:w-auto flex items-center justify-center gap-2 px-3 py-2 font-semibold bg-[#002B55] text-white transition-colors duration-300 rounded-md cursor-pointer border border-gray-400'><Plus className='w-5 h-5 mr-2 font-semibold' />New Pipeline</button>
+              <button className="w-full lg:w-auto flex items-center justify-center gap-2 px-3 py-2 font-semibold hover:bg-gray-200 hover:text-blue-900 transition-colors duration-300 rounded-md cursor-pointer border border-gray-400 ">
+                <Download className="w-5 h-5 mr-2 font-semibold" />
+                Export Report
+              </button>
+              <button className="w-full lg:w-auto flex items-center justify-center gap-2 px-3 py-2 font-semibold bg-[#002B55] text-white transition-colors duration-300 rounded-md cursor-pointer border border-gray-400">
+                <Plus className="w-5 h-5 mr-2 font-semibold" />
+                New Pipeline
+              </button>
             </div>
           </div>
 
           {/* stat cards for displaying all info about trained model section */}
-          <div className='my-10 px-5'>
+          <div className="my-6 px-5">
             <StatCard />
           </div>
 
           {/* tarining performance data and recent activity section  */}
-          <div className='my-10 px-5'>
-            <LineChart
-              title="Training Performance"
-              data={ChartData}
-              xKey="epoch"
-              lines={[
-                {
-                  dataKey: "trainingLoss",
-                  name: "Training Loss",
-                  color: "#2563eb",
-                },
-                {
-                  dataKey: "validationLoss",
-                  name: "Validation Loss",
-                  color: "#dc2626",
-                },
-              ]} />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3.5fr_1.5fr] my-10 px-5">
+            <div className="min-w-0">
+              <LineChart
+                title="Training Performance"
+                data={ChartData}
+                xKey="epoch"
+                lines={[
+                  {
+                    dataKey: "trainingLoss",
+                    name: "Training Loss",
+                    color: "#2563eb",
+                  },
+                  {
+                    dataKey: "validationLoss",
+                    name: "Validation Loss",
+                    color: "#dc2626",
+                  },
+                ]}
+              />
+            </div>
+            <div className="min-w-0">
+              <ActivityCard />
+            </div>
+          </div>
+
+          {/* model table section will show the all the information relates to the registered models  */}
+          <div className="min-w-0 my-6 px-5">
+            <ModelsTable data={DashboardTableData} />
           </div>
         </main>
       </div>
     </>
-  )
+  );
 }
