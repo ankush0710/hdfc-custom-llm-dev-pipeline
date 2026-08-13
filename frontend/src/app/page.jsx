@@ -7,6 +7,8 @@ The main dashboard that shows the all information aout the deployed models
 import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
 import StatCard from "@/components/ui/StatCard";
+import { ChartData } from '@/sampleData/ChartData';
+import LineChart from "@/components/charts/LineChart";
 import { useState } from 'react';
 import { Download, Plus } from 'lucide-react';
 
@@ -17,14 +19,14 @@ export default function Dashboard() {
     <>
       <div className="min-h-screen bg-gray-50">
 
-        {/* side bar consists -> all routes  */}
+        {/* side bar consists -> all routes section */}
         <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
 
-        {/* navbar consists -> profile image and search bar  */}
+        {/* navbar consists -> profile image and search bar section  */}
         <Navbar onMenuClick={() => setIsOpen((prev) => !prev)} />
 
         <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px]">
-          {/* Header row containing title and actions */}
+          {/* Header row containing title and actions section */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="px-5">
               <h1 className="text-blue-900 font-bold text-3xl">LLM Pipeline Overview</h1>
@@ -36,13 +38,32 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* stat cards for displaying all info about trained model  */}
+          {/* stat cards for displaying all info about trained model section */}
           <div className='my-10 px-5'>
             <StatCard />
           </div>
+
+          {/* tarining performance data and recent activity section  */}
+          <div className='my-10 px-5'>
+            <LineChart
+              title="Training Performance"
+              data={ChartData}
+              xKey="epoch"
+              lines={[
+                {
+                  dataKey: "trainingLoss",
+                  name: "Training Loss",
+                  color: "#2563eb",
+                },
+                {
+                  dataKey: "validationLoss",
+                  name: "Validation Loss",
+                  color: "#dc2626",
+                },
+              ]} />
+          </div>
         </main>
       </div>
-
     </>
   )
 }
