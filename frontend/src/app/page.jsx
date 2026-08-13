@@ -6,9 +6,11 @@ The main dashboard that shows the all information aout the deployed models
 "use client";
 import Navbar from "@/components/layout/Navbar";
 import Sidebar from "@/components/layout/Sidebar";
+import Footer from "@/components/layout/Footer";
 import StatCard from "@/components/ui/StatCard";
 import ActivityCard from "@/components/ui/ActivityCard";
 import ModelsTable from "@/components/tables/ModelsTable";
+import Button from "@/components/ui/Button";
 import { ChartData } from "@/sampleData/DashboardChartData";
 import { DashboardTableData } from "@/sampleData/DashboardTableData";
 import LineChart from "@/components/charts/LineChart";
@@ -39,14 +41,11 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2 px-5 lg:px-0">
-              <button className="w-full lg:w-auto flex items-center justify-center gap-2 px-3 py-2 font-semibold hover:bg-gray-200 hover:text-blue-900 transition-colors duration-300 rounded-md cursor-pointer border border-gray-400 ">
-                <Download className="w-5 h-5 mr-2 font-semibold" />
-                Export Report
-              </button>
-              <button className="w-full lg:w-auto flex items-center justify-center gap-2 px-3 py-2 font-semibold bg-[#002B55] text-white transition-colors duration-300 rounded-md cursor-pointer border border-gray-400">
-                <Plus className="w-5 h-5 mr-2 font-semibold" />
+              <Button icon={Download}>Export Report</Button>
+
+              <Button icon={Plus} variant="primary">
                 New Pipeline
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -86,6 +85,11 @@ export default function Dashboard() {
             <ModelsTable data={DashboardTableData} />
           </div>
         </main>
+
+        {/* Footer here  */}
+        <div className="mt-12 lg:ml-[280px]">
+          <Footer />
+        </div>
       </div>
     </>
   );

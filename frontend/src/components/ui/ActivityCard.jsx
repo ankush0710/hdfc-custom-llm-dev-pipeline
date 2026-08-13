@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  CheckCircle2,
-  RefreshCw,
-  CircleAlert,
-  Rocket,
-} from "lucide-react";
+import { CheckCircle2, RefreshCw, CircleAlert, Rocket } from "lucide-react";
 
 const activities = [
   {
@@ -50,7 +45,6 @@ const activities = [
 export default function ActivityCard() {
   return (
     <div className="w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      
       {/* Header */}
       <div className="border-b border-gray-200 px-4 py-4">
         <h2 className="text-base font-semibold text-gray-900">
@@ -87,9 +81,7 @@ export default function ActivityCard() {
 
                 <p
                   className={`mt-0.5 text-[10px] ${
-                    activity.error
-                      ? "text-red-500"
-                      : "text-gray-500"
+                    activity.error ? "text-red-500" : "text-gray-500"
                   }`}
                 >
                   {activity.time} • {activity.description}
