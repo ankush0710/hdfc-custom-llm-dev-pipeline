@@ -9,7 +9,6 @@ The main dashboard that shows the all information aout the deployed models
 */
 //=======================================================================================//
 "use client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import Sidebar from "@/components/layout/Sidebar";
@@ -23,7 +22,7 @@ import { ModelColumns } from "@/sampleData/Dataset/DatasetTableData";
 import { useState } from "react";
 import { Upload } from "lucide-react";
 
-export default function Dashboard() {
+export default function Dataset() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
