@@ -37,7 +37,9 @@ export default function StatCard({ statData }) {
 
             {/* Lower section: Name and Value */}
             <div className="mt-3">
-              <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">
+              <p
+                className={`text-sm font-semibold uppercase tracking-wider ${item.valueColor}`}
+              >
                 {item.statName}
               </p>
               <h3 className="text-2xl font-extrabold text-blue-900 mt-1 tracking-tight">
