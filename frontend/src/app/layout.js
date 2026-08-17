@@ -1,4 +1,5 @@
 import { Merriweather } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const merriweather = Merriweather({
@@ -14,6 +15,7 @@ export default function RootLayout({ children }) {
         className={`${merriweather.variable}  font-merriweather min-h-full flex flex-col`}
       >
         {children}
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

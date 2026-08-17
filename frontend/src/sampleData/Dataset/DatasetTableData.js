@@ -153,11 +153,11 @@ export const ModelColumns = [
 
       return (
         <span
-          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${status.bg} ${status.text}`}
+          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusStyles.bg} ${statusStyles.text}`}
         >
-          {status.icon && <status.icon size={18} />}
+          {statusStyles.icon && <statusStyles.icon size={18} />}
           <span className={`h-2 w-2 rounded-full`} />
-          {status.label}
+          {statusStyles.label}
         </span>
       );
     },

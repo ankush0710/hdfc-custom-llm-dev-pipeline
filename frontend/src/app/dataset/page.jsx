@@ -17,14 +17,33 @@ import StatCard from "@/components/ui/StatCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
 import { DatasetStatData } from "@/sampleData/Dataset/DatasetStatData";
-import { DatasetTableData } from "@/sampleData/Dataset/DatasetTableData";
 import { ModelColumns } from "@/sampleData/Dataset/DatasetTableData";
-import { useState } from "react";
+import { getDataset } from "../services/datasetServices";
+import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Dataset() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [datasets, setDatasets] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDatasets = async () => {
+    try {
+      setLoading(true);
+      const data = await getDataset();
+      setDatasets(data);
+    } catch (err) {
+      toast.error("Failed to upload data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDatasets();
+  }, []);
 
   return (
     <>
@@ -64,12 +83,18 @@ export default function Dataset() {
 
           {/* model table section will show the all the information relates to the registered models  */}
           <div className="min-w-0 my-6 px-5">
-            <ModelsTable
-              title="Recent Datasets"
-              columns={ModelColumns}
-              data={DatasetTableData}
-              pageSize={5}
-            />
+            {loading ? (
+              <div>Loading datasets...</div>
+            ) : datasets.length === 0 ? (
+              <div>No datasets found.</div>
+            ) : (
+              <ModelsTable
+                title="Recent Datasets"
+                columns={ModelColumns}
+                data={datasets}
+                pageSize={5}
+              />
+            )}
           </div>
         </main>
 
