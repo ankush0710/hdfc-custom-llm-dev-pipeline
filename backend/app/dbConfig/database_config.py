@@ -10,7 +10,7 @@ engine = create_engine(
     echo= True
 )
 
-sessionLocal = sessionmaker(
+SessionLocal = sessionmaker(
     autocommit = False,
     autoflush = False,
     bind = engine,

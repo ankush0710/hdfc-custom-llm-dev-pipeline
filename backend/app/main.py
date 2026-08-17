@@ -1,24 +1,30 @@
 from fastapi import FastAPI
-
-from app.db.database import Base, engine
-from app.db import model
+from fastapi.middleware.cors import CORSMiddleware
+from app.dbConfig.database_config import Base, engine
+from app.routes.dataset_routes.dataset_routes import router as dataset_router
 
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title = "HDFC Custom llm Development Pipeline API",
-    version = "1.0.0"
+    version = "1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = ["*"],
+    allow_methods = ["*"],
+    allow_headers = ["*"],
+    allow_credentials = True
+)
+
+app.include_router(dataset_router)
 
 @app.get("/")
 def root():
-    return{
-        "message": "HDFC Bank Custom LL Pipeline API is running...."
-    }
-
-@app.get("/health")
-def get_health():
     return {
-        "status":"health ok"
+        "message": "HDFC Custom LLM Pipeline API is running"
     }
