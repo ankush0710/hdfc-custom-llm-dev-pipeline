@@ -88,7 +88,7 @@ const FileUpload = ({ onFileSelect }) => {
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,.jsonl"
+          accept=".csv,.jsonl,.pdf,.xlsx"
           onChange={handleBrowse}
           className="hidden"
         />

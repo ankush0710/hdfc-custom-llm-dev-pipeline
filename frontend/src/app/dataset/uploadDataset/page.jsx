@@ -55,6 +55,26 @@ export default function UploadDataset() {
 
   const router = useRouter();
 
+  // FastAPI returns validation errors as an array of objects. Toast content
+  // must be a string (or React element), otherwise Sonner attempts to render
+  // those objects and React throws "Objects are not valid as a React child".
+  const getUploadErrorMessage = (error) => {
+    const detail = error?.response?.data?.detail;
+
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) => {
+          const location = item.loc?.filter((part) => part !== "body").join(".");
+          return location ? `${location}: ${item.msg}` : item.msg;
+        })
+        .filter(Boolean)
+        .join("; ");
+    }
+
+    if (typeof detail === "string") return detail;
+    return "Failed to upload dataset. Please check the form and try again.";
+  };
+
   // Handle text/select fields
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -77,7 +97,23 @@ export default function UploadDataset() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    //basic validation if any field is empty
+    // Validate required multipart fields before sending the request. FastAPI
+    // otherwise responds with a 422 validation-error array.
+    const requiredFields = [
+      ["datasetName", "dataset name"],
+      ["category", "category"],
+      ["version", "version"],
+      ["source", "source"],
+    ];
+    const missingField = requiredFields.find(
+      ([field]) => !String(formData[field] ?? "").trim(),
+    );
+
+    if (missingField) {
+      toast.error(`Please enter the ${missingField[1]}.`);
+      return;
+    }
+
     if (!formData.file) {
       toast.error("Please select a dataset file.");
       return;
@@ -103,10 +139,7 @@ export default function UploadDataset() {
     } catch (err) {
       console.error("upload failed: ", err);
 
-      toast.error(
-        err.response?.data?.detail ||
-          "Failed to upload dataset. Please try again",
-      );
+      toast.error(getUploadErrorMessage(err));
     } finally {
       setIsUploading(false);
     }
@@ -220,7 +253,12 @@ export default function UploadDataset() {
                 Cancel
               </Button>
 
-              <Button type="submit" icon={Upload} variant="primary" disabled={isUploading}>
+              <Button
+                type="submit"
+                icon={Upload}
+                variant="primary"
+                disabled={isUploading}
+              >
                 {isUploading ? "Uploading..." : "Upload"}
               </Button>
             </div>

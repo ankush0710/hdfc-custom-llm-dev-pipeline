@@ -15,7 +15,7 @@ export default function RootLayout({ children }) {
         className={`${merriweather.variable}  font-merriweather min-h-full flex flex-col`}
       >
         {children}
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
   );
