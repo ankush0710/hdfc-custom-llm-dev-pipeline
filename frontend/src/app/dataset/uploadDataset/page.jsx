@@ -19,6 +19,9 @@ import TextAreaField from "@/components/form/TextAreaField";
 import FileUpload from "@/components/form/FileUpload";
 import { useState } from "react";
 import { Upload } from "lucide-react";
+import { uploadDataset } from "../../services/datasetServices";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 // category data which can easily change later if required
 
@@ -41,13 +44,18 @@ export default function UploadDataset() {
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({
     datasetName: "",
-    category: "fine-tuning",
+    category: "",
     version: "",
     source: "",
     description: "",
     file: null,
   });
 
+  const [isUploading, setIsUploading] = useState(false);
+
+  const router = useRouter();
+
+  // Handle text/select fields
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -57,37 +65,65 @@ export default function UploadDataset() {
     }));
   };
 
-  const handleFileSelect = (file) => {
+  // Handle file
+  const handleFileSelect = (selectedFile) => {
     setFormData((prev) => ({
       ...prev,
-      file,
+      file: selectedFile,
     }));
   };
 
-  const handleSubmit = (e) => {
+  // Submit form
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log("Dataset:", formData);
+    //basic validation if any field is empty
+    if (!formData.file) {
+      toast.error("Please select a dataset file.");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const uploadFormData = new FormData();
+      uploadFormData.append("datasetName", formData.datasetName);
+      uploadFormData.append("category", formData.category);
+      uploadFormData.append("version", formData.version);
+      uploadFormData.append("source", formData.source);
+      uploadFormData.append("description", formData.description);
+      uploadFormData.append("file", formData.file);
+
+      await uploadDataset(uploadFormData);
+
+      toast.success("Dataset uploaded successfully !", {
+        description: "Your dataset has been saved successfully.",
+      });
+
+      router.push("/dataset");
+    } catch (err) {
+      console.error("upload failed: ", err);
+
+      toast.error(
+        err.response?.data?.detail ||
+          "Failed to upload dataset. Please try again",
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
+  // reset form when click on cancel
   const handleCancel = () => {
     setFormData({
       datasetName: "",
-      category: "fine-tuning",
+      category: "finetunning",
+      version: "",
+      source: "",
       description: "",
       file: null,
     });
   };
   // Later:
-  // const formDataToSend = new FormData();
-  // formDataToSend.append("datasetName", formData.datasetName);
-  // formDataToSend.append("category", formData.category);
-  // formDataToSend.append("category", formData.version);
-  // formDataToSend.append("category", formData.source);
-  // formDataToSend.append("description", formData.description);
-  // formDataToSend.append("file", formData.file);
-  //
-  // axios.post("/api/datasets", formDataToSend);
 
   return (
     <>
@@ -158,7 +194,7 @@ export default function UploadDataset() {
                   label="Dataset Source"
                   name="source"
                   placeholder="e.g. Internal CRM"
-                  value={formData.version}
+                  value={formData.source}
                   onChange={handleChange}
                   required
                 />
@@ -180,10 +216,12 @@ export default function UploadDataset() {
 
             {/* Footer */}
             <div className="flex justify-end gap-3 border-t border-slate-200 bg-[#FAFBFE] px-4 py-3">
-              <Button onClick={handleCancel}>Cancel</Button>
+              <Button type="button" onClick={handleCancel}>
+                Cancel
+              </Button>
 
-              <Button icon={Upload} variant="primary">
-                Upload
+              <Button type="submit" icon={Upload} variant="primary" disabled={isUploading}>
+                {isUploading ? "Uploading..." : "Upload"}
               </Button>
             </div>
           </form>

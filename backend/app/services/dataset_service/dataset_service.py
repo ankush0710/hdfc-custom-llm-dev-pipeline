@@ -4,7 +4,7 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.model.dataset_model import Dataset_Model
 
-UPLOAD_FILE = "Uploads/datasets"
+UPLOAD_FILE = "uploads/datasets"
 
 #========= function implementation to create the dataset table in the databse ===========#
 async def create_dataset(
@@ -19,10 +19,7 @@ async def create_dataset(
     os.makedirs(UPLOAD_FILE, exist_ok=True)
     original_filename = file.filename or "uploaded_file"
 
-    extension = os.path.splitext(
-        original_filename
-    )[1].lower()
-
+    extension = os.path.splitext(original_filename)[1].lower()
     unique_filename = (
         f"{uuid.uuid4()}{extension}"
     )
@@ -36,7 +33,8 @@ async def create_dataset(
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
     
-    file_size = len(file_content) / (1024*1024)
+    # Store the size in megabytes.
+    file_size = len(file_content) / (1024 * 1024)
 
     dataset = Dataset_Model(
         dataset_name = dataset_name,
@@ -64,10 +62,34 @@ def get_all_datasets(db: Session):
         .all()
     )
 
-#========= function implementation for get the dataset info by id from  =================#
+#========= function implementation for get the dataset info by id from posgres =================#
 def get_dataset_by_id(db: Session, dataset_id: int):
     return(
         db.query(Dataset_Model)
         .filter(Dataset_Model.id == dataset_id)
         .first()
     )
+
+#========= function implementation to delete the dataset info by id from posgres =================#
+def delete_dataset_by_id(
+    db: Session,
+    dataset_id: int
+):
+    dataset = (
+        db.query(Dataset_Model)
+        .filter(Dataset_Model.id == dataset_id)
+        .first()
+    )
+
+    if not dataset:
+        return None
+
+    # Delete physical file
+    if dataset.file_path and os.path.exists(dataset.file_path):
+        os.remove(dataset.file_path)
+
+    # Delete database record
+    db.delete(dataset)
+    db.commit()
+
+    return dataset
