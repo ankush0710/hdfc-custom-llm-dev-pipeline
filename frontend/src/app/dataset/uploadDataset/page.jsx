@@ -64,7 +64,9 @@ export default function UploadDataset() {
     if (Array.isArray(detail)) {
       return detail
         .map((item) => {
-          const location = item.loc?.filter((part) => part !== "body").join(".");
+          const location = item.loc
+            ?.filter((part) => part !== "body")
+            .join(".");
           return location ? `${location}: ${item.msg}` : item.msg;
         })
         .filter(Boolean)
