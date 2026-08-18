@@ -1,69 +1,55 @@
 "use client";
-
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { CheckCircle2, Download, ShieldCheck } from "lucide-react";
-
+import { getDatasetById } from "@/app/services/datasetServices";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import MetadataGrid from "@/components/metaGrid/MetadataGrid";
 import QualityMetric from "@/components/qualityMetrics/QualityMetrics";
 
-const dataset = {
-  name: "Q3_Financial_Transcripts_Cleaned",
-  status: "Validated",
-
-  description:
-    "This dataset contains thoroughly cleaned and anonymized financial earnings call transcripts from Q3 2023. It has been specifically curated for fine-tuning language models on financial sentiment analysis and summarization tasks. All Personal Identifiable Information (PII) has been scrubbed via the automated compliance pipeline.",
-
-  metadata: [
-    {
-      label: "Total Records",
-      value: "1,240,500",
-    },
-    {
-      label: "Format",
-      value: "JSONL",
-    },
-    {
-      label: "Version",
-      value: "v1.2.0",
-      badge: true,
-    },
-    {
-      label: "Created Date",
-      value: "Oct 24, 2023",
-    },
-    {
-      label: "Source",
-      value: "Internal CRM",
-    },
-    {
-      label: "Category",
-      value: "Fine-tuning",
-    },
-  ],
-
-  quality: [
-    {
-      label: "Completeness",
-      value: 96,
-    },
-    {
-      label: "Accuracy",
-      value: 94,
-    },
-    {
-      label: "Consistency",
-      value: 91,
-    },
-    {
-      label: "Validity",
-      value: 98,
-      variant: "success",
-    },
-  ],
-};
-
 export default function DatasetDetailsPage() {
+  const params = useParams();
+  const id = params.id;
+  const [dataset, setDataset] = useState(null);
+  const [loading, setLoading] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const fetchDataset = async () => {
+      try {
+        const dataset = await getDatasetById(id);
+        setDataset(dataset);
+      } catch (error) {
+        setError(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDataset();
+  }, [id]);
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <p className="text-gray-600">Loading dataset...</p>
+      </main>
+    );
+  }
+  if (error || !dataset) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="rounded-lg border border-slate-300 bg-white p-6 shadow-sm">
+          <h1 className="text-xl font-semibold text-slate-900">
+            Dataset not found
+          </h1>
+
+          <p className="mt-2 text-sm text-gray-600">
+            The requested dataset could not be found.
+          </p>
+        </div>
+      </main>
+    );
+  }
   return (
     <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px]">
       {/* Header row containing title and actions section */}

@@ -10,12 +10,11 @@ The main dashboard that shows the all information aout the deployed models
 //=======================================================================================//
 "use client";
 import { useRouter } from "next/navigation";
-import Footer from "@/components/layout/Footer";
 import StatCard from "@/components/ui/StatCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
 import { DatasetStatData } from "@/sampleData/Dataset/DatasetStatData";
-import { ModelColumns } from "@/sampleData/Dataset/DatasetTableData";
+import { ModelColums } from "@/components/tables/ModelColums";
 import { getDataset } from "../services/datasetServices";
 import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
@@ -80,7 +79,7 @@ export default function Dataset() {
           ) : (
             <ModelsTable
               title="Recent Datasets"
-              columns={ModelColumns}
+              columns={ModelColums}
               data={datasets}
               pageSize={5}
             />
