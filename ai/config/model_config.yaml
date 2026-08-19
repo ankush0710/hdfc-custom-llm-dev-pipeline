@@ -1,0 +1,30 @@
+project:
+  name: hdfc-custom-llm-pipeline
+  owner: member_1
+  module: ai
+
+environment:
+  python_version: "3.11"
+  pytorch_version: "2.10.0+cu126"
+  cuda_version: "12.6"
+
+hardware:
+  device: cuda
+  gpu: "NVIDIA GeForce GTX 1650 Ti"
+  vram_gb: 4.0
+  compute_capability: "7.5"
+
+model:
+  status: candidate
+  name: null
+  revision: null
+  tokenizer_revision: null
+
+inference:
+  max_new_tokens: 256
+  temperature: 0.2
+  top_p: 0.9
+  do_sample: false
+
+reproducibility:
+  seed: 42

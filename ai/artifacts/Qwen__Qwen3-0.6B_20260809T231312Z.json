@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-08-09T23:13:12.459861+00:00",
+  "model_name": "Qwen/Qwen3-0.6B",
+  "device": "cuda",
+  "torch_version": "2.10.0+cu126",
+  "cuda_version": "12.6",
+  "gpu_name": "NVIDIA GeForce GTX 1650 Ti",
+  "gpu_memory_gb": 4.0,
+  "prompt": "Explain in two sentences what a savings account is.",
+  "response": "Also, explain in two sentences what a",
+  "generation_config": {
+    "max_new_tokens": 8,
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "do_sample": false,
+    "seed": 42
+  },
+  "latency_seconds": 1.2363,
+  "memory_metrics": {
+    "gpu_allocated_before_mb": 1136.89,
+    "gpu_allocated_after_mb": 1145.01,
+    "gpu_peak_allocated_mb": 1148.44,
+    "gpu_reserved_after_mb": 1162.0
+  },
+  "seed": 42
+}
