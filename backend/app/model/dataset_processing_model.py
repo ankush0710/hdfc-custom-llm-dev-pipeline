@@ -12,7 +12,7 @@ class Processing_Model(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     dataset_id = Column(Integer, 
-    ForeignKey("dataset_id", ondelete="CASACADE"),
+    ForeignKey("dataset.id", ondelete="CASACADE"),
     nullable=False
     )
 
