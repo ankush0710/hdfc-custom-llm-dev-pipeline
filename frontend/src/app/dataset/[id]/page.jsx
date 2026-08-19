@@ -1,7 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CheckCircle2, Download, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  ShieldCheck,
+  Play,
+} from "lucide-react";
 import { getDatasetById } from "@/app/services/datasetServices";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -46,18 +53,34 @@ export default function DatasetDetailsPage() {
           <p className="mt-2 text-sm text-gray-600">
             The requested dataset could not be found.
           </p>
+          <Link
+            href="/dataset"
+            aria-label="Back to datasets"
+            title="Back to datasets"
+            className="mt-5 inline-flex rounded-md border border-gray-400 p-2 text-gray-700 transition-colors hover:bg-gray-200 hover:text-blue-900"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
         </div>
       </main>
     );
   }
   return (
     <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px]">
+      <Link
+        href="/dataset"
+        aria-label="Back to datasets"
+        title="Back to datasets"
+        className="flex items-center gap-2 mb-4 ml-5 self-start rounded-md p-2 text-gray-700 transition-color hover:text-blue-900"
+      >
+        <ArrowLeft className="h-5 w-5" /> Back
+      </Link>
       {/* Header row containing title and actions section */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="px-5">
           <div className="flex flex-col lg:flex-row lg:items-center gap-3">
             <h1 className="text-xl text-[#002B55] font-bold lg:text-3xl">
-              {dataset.name}
+              {dataset.dataset_name}
             </h1>
             <Badge variant="success">
               <CheckCircle2 size={13} className="mr-1" />
@@ -70,6 +93,9 @@ export default function DatasetDetailsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 px-5 lg:px-0">
+          <Button variant="primary" icon={Play}>
+            Start Processing
+          </Button>
           <Button icon={Download}>Download</Button>
         </div>
       </div>

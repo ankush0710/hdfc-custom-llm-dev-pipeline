@@ -13,8 +13,8 @@ export const getDataset = async () => {
   return response.data;
 };
 
-export const getDatasetById = async () => {
-  const response = await API.get(`/dataset/${id}`);
+export const getDatasetById = async (id) => {
+  const response = await API.get(`/datasets/${id}`);
   return response.data;
 };
 

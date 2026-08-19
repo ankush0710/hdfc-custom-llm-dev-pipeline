@@ -26,15 +26,16 @@ const statusStyles = {
 };
 
 // columns here
-export const ModelColums = [
+export const DatasetColumns = [
   {
     key: "name",
-    label: "Model Name",
-    render: (model) => (
+    label: "Dataset Name",
+    render: (dataset) => (
       <div className="flex items-center gap-3">
         <Box size={18} className="text-gray-500" />
         <span className="text-gray-900">
-          {model.name} <p className="text-gray-600">{model.version}</p>
+          {dataset.dataset_name}{" "}
+          <p className="text-gray-600">{dataset.version}</p>
         </span>
       </div>
     ),
@@ -42,18 +43,18 @@ export const ModelColums = [
   {
     key: "Type",
     label: "Type",
-    render: (model) => (
+    render: (dataset) => (
       <div className="flex items-center gap-3">
-        <span className="text-gray-600">{model.type}</span>
+        <span className="text-gray-600">{dataset.file_type}</span>
       </div>
     ),
   },
   {
     key: "Size",
     label: "Size",
-    render: (model) => (
+    render: (dataset) => (
       <div className="flex items-center gap-3">
-        <span className="text-gray-600">{model.size} GB</span>
+        <span className="text-gray-600">{dataset.file_size} GB</span>
       </div>
     ),
   },
@@ -61,25 +62,32 @@ export const ModelColums = [
   {
     key: "date",
     label: "Created on",
-    render: (model) => (
+    render: (dataset) => (
       <div className="flex items-center gap-3">
-        <span className="text-gray-600">{model.date}</span>
+        <span className="text-gray-600">
+          {dataset.created_at
+            ? new Date(dataset.created_at).toLocaleDateString("en-GB")
+            : "-"}
+        </span>
       </div>
     ),
   },
   {
     key: "status",
     label: "Status",
-    render: (model) => {
-      const status = statusStyles[model.status];
+    render: (dataset) => {
+      const status = statusStyles[dataset.status];
+      if (!status) {
+        return <span className="text-gray-500">Unknown</span>;
+      }
+      const StatusIcon = status.icon;
 
       return (
         <span
           className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusStyles.bg} ${statusStyles.text}`}
         >
-          {statusStyles.icon && <statusStyles.icon size={18} />}
-          <span className={`h-2 w-2 rounded-full`} />
-          {statusStyles.label}
+          {StatusIcon && <StatusIcon size={18} />}
+          <span className={`h-2 w-2 rounded-full`}>{statusStyles.label}</span>
         </span>
       );
     },
