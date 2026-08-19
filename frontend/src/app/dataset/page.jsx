@@ -10,12 +10,11 @@ The main dashboard that shows the all information aout the deployed models
 //=======================================================================================//
 "use client";
 import { useRouter } from "next/navigation";
-import Footer from "@/components/layout/Footer";
 import StatCard from "@/components/ui/StatCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
 import { DatasetStatData } from "@/sampleData/Dataset/DatasetStatData";
-import { ModelColumns } from "@/sampleData/Dataset/DatasetTableData";
+import { DatasetColumns } from "@/components/tables/DatasetTableColumns/DatasetColumns";
 import { getDataset } from "../services/datasetServices";
 import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
@@ -26,20 +25,19 @@ export default function Dataset() {
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchDatasets = async () => {
-    try {
-      setLoading(true);
-      const data = await getDataset();
-      setDatasets(data);
-    } catch (err) {
-      toast.error("Failed to upload data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchDatasets();
+    const loadDatasets = async () => {
+      try {
+        const data = await getDataset();
+        setDatasets(data);
+      } catch {
+        toast.error("Failed to upload data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDatasets();
   }, []);
 
   return (
@@ -80,7 +78,7 @@ export default function Dataset() {
           ) : (
             <ModelsTable
               title="Recent Datasets"
-              columns={ModelColumns}
+              columns={DatasetColumns}
               data={datasets}
               pageSize={5}
             />
