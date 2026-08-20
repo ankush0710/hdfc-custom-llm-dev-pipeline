@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.sql import func
 from app.dbConfig.database_config import Base
 
-class Quality_Metrics(Base):
+class Quality_Model(Base):
     __tablename__ = "quality_metrics"
 
     id = Column(Integer, primary_key=True, index=True)
