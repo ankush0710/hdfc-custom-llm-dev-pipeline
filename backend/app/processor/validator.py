@@ -1,7 +1,6 @@
 # ================================================================================== #
 # function for validate the dataset -> supported extension, split text, file_size
-# =================================================================================== #
-
+# ================================================================================== #
 import os
 import pandas as pd
 
@@ -34,7 +33,7 @@ def load_file(file_path: str):
     elif extension == ".pdf":
         df = pd.read_pdf(file_path)
 
-    elif extension in [".xlsx"]:
+    elif extension == ".xlsx":
         df = pd.read_excel(file_path)
 
     elif extension == ".json":

@@ -1,8 +1,6 @@
 # ================================================================================= #
 # function to find and remove wrong, empty values from the dataset
 # ================================================================================= #
-
-
 import pandas as pd
 
 def clean_file(df: pd.DataFrame):

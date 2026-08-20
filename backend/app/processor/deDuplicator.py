@@ -1,7 +1,6 @@
 # ================================================================================= #
 # funtion to remove dupliacate from the dataset 
 # ================================================================================= #
-
 import pandas as pd
 
 def remove_duplicate(df: pd.DataFrame):
