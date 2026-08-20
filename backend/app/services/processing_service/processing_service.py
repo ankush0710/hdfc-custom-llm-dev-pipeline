@@ -9,7 +9,7 @@ from app.model.dataset_model import Dataset_Model
 from app.model.dataset_processing_model import Processing_Model
 from app.model.quality_metrics_model import Quality_Model
 
-# import all processors models
+# import all processors methods
 from app.processor.cleaner import clean_file
 from app.processor.validator import validate_file
 from app.processor.calculate_quality_metrics import calculate_quality_metrics
