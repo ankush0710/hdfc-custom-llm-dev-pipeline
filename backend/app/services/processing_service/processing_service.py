@@ -5,7 +5,6 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 # import all required models 
-from app.model.dataset_model import Dataset_Model
 from app.model.dataset_processing_model import Processing_Model
 from app.model.quality_metrics_model import Quality_Model
 
@@ -13,23 +12,24 @@ from app.model.quality_metrics_model import Quality_Model
 from app.processor.cleaner import clean_file
 from app.processor.validator import load_file
 from app.processor.calculate_quality_metrics import calculate_quality_metrics
+from app.model.dataset_version_model import Dataset_Version_Model
 from app.processor.deDuplicator import remove_duplicate
 from app.utils.file_utils import create_processed_path
 
-def process_dataset(db: Session, dataset_id: int, operations: list[str]):
-    dataset = (
-        db.query(Dataset_Model).filter(Dataset_Model.id == dataset_id).first()
+def process_dataset(db: Session, dataset_version_id: int, operations: list[str]):
+    dataset_version = (
+        db.query(Dataset_Version_Model).filter(Dataset_Version_Model.id == dataset_version_id).first()
     )
 
-    if not dataset:
+    if not dataset_version:
         raise ValueError(
-            "Dataset not found"
+            "Dataset version not found"
         )
     
-    input_file = dataset.file_path
+    input_file = dataset_version.file_path
 
     job = Processing_Model(
-        dataset_id = dataset_id,
+        dataset_version_id = dataset_version_id,
         status = "Running",
         input_file = input_file,
         started_at = datetime.utcnow()
@@ -69,7 +69,7 @@ def process_dataset(db: Session, dataset_id: int, operations: list[str]):
         # TO SAVED PROCCESSED DATA
         # =========================== #
         output_file =  create_processed_path(
-            dataset_id,
+            dataset_version_id,
             input_file
         )
 

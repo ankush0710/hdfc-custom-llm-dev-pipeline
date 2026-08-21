@@ -23,13 +23,13 @@ async def start_processing(
     try:
         job, metrics = process_dataset(
             db=db,
-            dataset_id=request.dataset_id,
+            dataset_version_id=request.dataset_version_id,
             operations=request.operations
         )
 
         return {
             "job_id": job.id,
-            "dataset_id": job.dataset_id,
+            "dataset_version_id": job.dataset_version_id,
             "status": job.status
         }
 
@@ -63,7 +63,7 @@ def get_processing_status(
 
     return{
         "job_id":job.id,
-        "dataset_id":job.dataset_id,
+        "dataset_version_id":job.dataset_version_id,
         "status":job.status,
         "output_file":job.output_file,
         "error_message":job.error_message
