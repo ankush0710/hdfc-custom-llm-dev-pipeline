@@ -47,11 +47,10 @@ const FileUpload = ({ onFileSelect }) => {
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`flex min-h-[176px] flex-col items-center justify-center rounded-md border border-dashed px-4 py-6 transition ${
-          isDragging
-            ? "border-[#004C97] bg-blue-50"
-            : "border-slate-300 bg-[#F8F9FC]"
-        }`}
+        className={`flex min-h-[176px] flex-col items-center justify-center rounded-md border border-dashed px-4 py-6 transition ${isDragging
+          ? "border-[#004C97] bg-blue-50"
+          : "border-slate-300 bg-[#F8F9FC]"
+          }`}
       >
         <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100  cursor-pointer">
           <CloudUpload size={21} className="text-[#004C97]" />
@@ -88,7 +87,7 @@ const FileUpload = ({ onFileSelect }) => {
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,.jsonl,.pdf,.xlsx"
+          accept=".csv,.jsonl,.json,.xlsx"
           onChange={handleBrowse}
           className="hidden"
         />

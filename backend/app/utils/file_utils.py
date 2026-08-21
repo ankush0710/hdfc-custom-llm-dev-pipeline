@@ -8,13 +8,9 @@ def create_processed_path(dataset_id: int, original_path: str):
 
     extension = os.path.splitext(original_path)[-1]
 
-    unique_id = uuid.uuid4.hex[:8]
+    unique_id = uuid.uuid4().hex[:8]
 
-    filename = (
-        f"dataset_{dataset_id}",
-        f"processed_{unique_id}",
-        f"{extension}"
-    )
+    filename = f"dataset_{dataset_id}_processed_{unique_id}{extension}"
 
     return os.path.join(
         processed_dir,

@@ -7,19 +7,19 @@ def clean_file(df: pd.DataFrame):
 
     new_df = df.copy()
 
-    # Remove the empty rows 
-    new_df.dropna(inplace="True", how="all")
+    # Remove empty rows 
+    new_df.dropna(inplace=True, how="all")
 
-    # Remove completely empty rows 
-    df.dropna(inplace="True", axis=1, how="all")
+    # Remove completely empty columns 
+    new_df.dropna(inplace=True, axis=1, how="all")
 
     # strip whitespace from string column 
-    string_columns = df.select_dtypes(
+    string_columns = new_df.select_dtypes(
         include = ["object", "string"]
     ).columns
 
-    for columns in string_columns:
-        df[columns] = df[columns].select_dtypes(
+    for col in string_columns:
+        new_df[col] = new_df[col].apply(
             lambda value: value.strip()
             if isinstance(value, str)
             else value
@@ -36,9 +36,9 @@ def clean_file(df: pd.DataFrame):
         "None"
     ]
 
-    df = df.replace(
+    new_df = new_df.replace(
         missing_value,
         pd.NA
     )
 
-    return df
+    return new_df

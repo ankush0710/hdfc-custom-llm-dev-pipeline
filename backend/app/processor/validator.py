@@ -4,7 +4,7 @@
 import os
 import pandas as pd
 
-supported_extension = ['.csv', '.pdf', 'xlsx', 'jsonl']
+supported_extension = ['.csv', '.xlsx', '.jsonl', '.json']
 
 def validate_file(file_path: str):
 
@@ -16,7 +16,7 @@ def validate_file(file_path: str):
 
     if extension not in supported_extension:
         raise ValueError(
-            f"Unsupportes File Format: {extension}"
+            f"Unsupported File Format: {extension}"
         )
 
     return True
@@ -30,16 +30,13 @@ def load_file(file_path: str):
     if extension == ".csv":
         df = pd.read_csv(file_path)
 
-    elif extension == ".pdf":
-        df = pd.read_pdf(file_path)
-
     elif extension == ".xlsx":
         df = pd.read_excel(file_path)
 
-    elif extension == ".json":
-        df = pd.read_json(file_path)
+    elif extension in [".json", ".jsonl"]:
+        df = pd.read_json(file_path, lines=(extension == ".jsonl"))
     else:
-        raise ValueError("Unsupported File Format.")
+        raise ValueError(f"File format {extension} cannot be loaded into DataFrame.")
 
     if df.empty:
         raise ValueError("Dataset is empty.")
