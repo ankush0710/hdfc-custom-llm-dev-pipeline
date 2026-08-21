@@ -41,7 +41,7 @@ async def upload_dataset(
         ".csv",
         ".xlsx",
         ".jsonl",
-        ".pdf",
+        ".json",
     }
 
     if file_extension not in allowed_extension:

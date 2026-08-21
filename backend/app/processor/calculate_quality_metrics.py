@@ -4,14 +4,14 @@ def calculate_quality_metrics(df: pd.DataFrame, duplicate_rows: int=0):
 
     total_rows = len(df)
 
-    total_columns = len(columns)
+    total_columns = len(df.columns)
 
     missing_values = int(
         df.isna().sum().sum()
     )
 
     empty_rows = int(
-        df.isna.all(axis=1).sum()
+        df.isna().all(axis=1).sum()
     )
 
     # calculate quality score
@@ -21,9 +21,9 @@ def calculate_quality_metrics(df: pd.DataFrame, duplicate_rows: int=0):
         quality_score = 0.0
 
     else:
-        missing_ratio(missing_values / total_cells)
-        quality_score = (100*(1-missing_ratio))
-        quality_score = round(max(0, min(100, quality_score)), 2)
+        missing_ratio = missing_values / total_cells
+        quality_score = (100 * (1 - missing_ratio))
+        quality_score = round(max(0.0, min(100.0, float(quality_score))), 2)
 
     return {
         "total_rows": total_rows,

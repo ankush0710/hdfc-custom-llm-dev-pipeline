@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.dbConfig.database_config import Base, engine
 from app.routes.dataset_routes.dataset_routes import router as dataset_router
+from app.routes.processing_routes.processing_routes import router as processing_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -15,13 +16,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins = "http://localhost:3000",
+    allow_origins = ["http://localhost:3000"],
     allow_methods = ["*"],
     allow_headers = ["*"],
     allow_credentials = True
 )
 
 app.include_router(dataset_router)
+app.include_router(processing_router)
 
 @app.get("/")
 def root():

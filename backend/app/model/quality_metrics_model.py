@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.sql import func
 from app.dbConfig.database_config import Base
 
@@ -19,6 +19,6 @@ class Quality_Model(Base):
 
     empty_rows = Column(Integer, default=0)
 
-    quality_check = Column(Integer, default=0.0)
+    quality_score = Column(Float, default=0.0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

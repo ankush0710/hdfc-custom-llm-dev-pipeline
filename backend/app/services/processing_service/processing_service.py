@@ -11,13 +11,14 @@ from app.model.quality_metrics_model import Quality_Model
 
 # import all processors methods
 from app.processor.cleaner import clean_file
-from app.processor.validator import validate_file
+from app.processor.validator import load_file
 from app.processor.calculate_quality_metrics import calculate_quality_metrics
 from app.processor.deDuplicator import remove_duplicate
+from app.utils.file_utils import create_processed_path
 
-def process_dataset(db: Session, dataset_id: int, operation: list[str]):
+def process_dataset(db: Session, dataset_id: int, operations: list[str]):
     dataset = (
-        db.query(Dataset_Model).filter(Dataset_Model.id == dataset.id).first()
+        db.query(Dataset_Model).filter(Dataset_Model.id == dataset_id).first()
     )
 
     if not dataset:
@@ -43,14 +44,21 @@ def process_dataset(db: Session, dataset_id: int, operation: list[str]):
         # =========================== #
         # TO LOAD DATASET
         # =========================== #
-        df = load_dataset(input_file)
+        df = load_file(input_file)
         duplicate_count = 0
 
         # =========================== #
         # TO CLEAN DATASET
         # =========================== #
-        if "clean" in operation:
-            df = clean_dataset(df)
+        if "clean" in operations:
+            df = clean_file(df)
+
+        # =========================== #
+        # TO REMOVE DUPLICATE
+        # =========================== #
+
+        if "remove_duplicate" in operations:
+            df, duplicate_count = remove_duplicate(df)
 
         # =========================== #
         # TO CHECK QUALITY METRICS
@@ -88,7 +96,7 @@ def process_dataset(db: Session, dataset_id: int, operation: list[str]):
         # ============================ #
         # SAVE METRICS
         # ============================ #
-        quality = QualityMetrics(
+        quality = Quality_Model(
             job_id=job.id,
             total_rows=metrics["total_rows"],
             total_columns=metrics["total_columns"],
