@@ -3,6 +3,7 @@ import uuid
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.model.dataset_model import Dataset_Model
+from app.model.dataset_version_model import Dataset_Version_Model
 
 UPLOAD_FILE = "uploads/datasets"
 
@@ -36,20 +37,60 @@ async def create_dataset(
     # Store the size in megabytes.
     file_size = len(file_content) / (1024 * 1024)
 
-    dataset = Dataset_Model(
-        dataset_name = dataset_name,
-        category = category,
+    dataset = (db.query(Dataset_Model).filter(Dataset_Model.dataset_name == dataset_name).first())
+
+    
+# ================ create dataset ========================================== #
+
+    if not dataset:
+
+        dataset = Dataset_Model(
+            dataset_name = dataset_name,
+            category = category,
+            source = source,
+            description = description,
+        )
+        db.add(dataset)
+        db.flush()
+
+    
+
+# ================== check dataset version already exists ==================================
+    existing_version = (
+        db.query(Dataset_Version_Model)
+        .filter(
+            Dataset_Version_Model.dataset_id == dataset.id,
+            Dataset_Version_Model.version == version
+        )
+        .first()
+    )
+
+    if existing_version:
+
+        # Remove uploaded physical file
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        raise ValueError(
+            f"Dataset version '{version}' already exists."
+            f"for dataset '{dataset_name}'."
+        )
+
+
+# ============= create dataset versioning ================================================#
+    dataset_version = Dataset_Version_Model(
+        dataset_id = dataset.id,
         version = version,
-        source = source,
-        description = description,
         file_name = original_filename,
         file_path = file_path,
-        file_type = extension.replace(".", "").upper(),
         file_size = file_size,
+        file_type = extension.replace(".", "").upper(),
+        file_hash = None,
         status = "Uploaded"
     )
 
-    db.add(dataset)
+    db.add(dataset_version)
+    
     db.commit()
     db.refresh(dataset)
     return dataset
@@ -85,10 +126,14 @@ def delete_dataset_by_id(
         return None
 
     # Delete physical file
-    if dataset.file_path and os.path.exists(dataset.file_path):
-        os.remove(dataset.file_path)
+    for version in dataset.versions:
 
-    # Delete database record
+        if (
+            version.file_path
+            and os.path.exists(version.file_path)
+        ):
+            os.remove(version.file_path)
+
     db.delete(dataset)
     db.commit()
 

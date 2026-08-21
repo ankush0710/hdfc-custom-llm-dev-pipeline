@@ -38,7 +38,7 @@ class Processing_Model(Base):
 
     dataset_version = relationship(
         "Dataset_Version_Model",
-        back_populates="processing_job"
+        back_populates="processing_jobs"
     )
 
     quality_metrics = relationship(
