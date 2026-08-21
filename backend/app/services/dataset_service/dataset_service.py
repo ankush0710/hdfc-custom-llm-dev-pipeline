@@ -71,9 +71,10 @@ async def create_dataset(
         if os.path.exists(file_path):
             os.remove(file_path)
 
+        db.rollback()
+
         raise ValueError(
-            f"Dataset version '{version}' already exists."
-            f"for dataset '{dataset_name}'."
+            f"Dataset version '{version}' already exists for dataset '{dataset_name}'."
         )
 
 

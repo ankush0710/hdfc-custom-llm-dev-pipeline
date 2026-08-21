@@ -50,15 +50,26 @@ async def upload_dataset(
             detail="Unsupported file type"
         )
 
-    return await create_dataset(
-        db=db,
-        dataset_name=datasetName,
-        category=category,
-        version=version,
-        source=source,
-        description=description,
-        file=file,
-    )
+    try:
+        return await create_dataset(
+            db=db,
+            dataset_name=datasetName,
+            category=category,
+            version=version,
+            source=source,
+            description=description,
+            file=file,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 
 # ======================= route for get the dataset details by id ==========================#
