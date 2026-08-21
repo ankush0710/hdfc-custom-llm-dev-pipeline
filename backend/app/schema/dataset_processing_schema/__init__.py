@@ -1,4 +1,3 @@
-from app.schema.dataset_schema.dataset_scehma import DatasetResponse
 from app.schema.dataset_processing_schema.dataset_processing_schema import (
     ProcessingRequest,
     ProcessingResponse,
@@ -8,7 +7,6 @@ from app.schema.dataset_processing_schema.dataset_processing_schema import (
 )
 
 __all__ = [
-    "DatasetResponse",
     "ProcessingRequest",
     "ProcessingResponse",
     "ProcessResponse",

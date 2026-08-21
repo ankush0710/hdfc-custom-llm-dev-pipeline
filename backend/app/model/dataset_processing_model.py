@@ -11,9 +11,10 @@ class Processing_Model(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    dataset_id = Column(Integer, 
-    ForeignKey("dataset.id", ondelete="CASACADE"),
-    nullable=False
+    dataset_id = Column(
+        Integer, 
+        ForeignKey("dataset.id", ondelete="CASCADE"),
+        nullable=False
     )
 
     status = Column(String(50), nullable=False, default="PENDING")
@@ -24,13 +25,8 @@ class Processing_Model(Base):
 
     error_message = Column(Text, nullable=True)
 
-    started_at = Column(DateTime(timezone=True),nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
 
-    completed_at = Column(DateTime(timezone=True),nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
-
-
-

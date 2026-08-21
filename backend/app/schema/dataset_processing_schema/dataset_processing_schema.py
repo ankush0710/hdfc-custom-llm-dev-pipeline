@@ -1,4 +1,4 @@
-from pydantic import BaseMaodel
+from pydantic import BaseModel
 from typing import List, Optional
 
 # database schema for processing request 
@@ -7,10 +7,13 @@ class ProcessingRequest(BaseModel):
     operations: List[str]
 
 # database schema for processing result as a response 
-class ProcessResponse(BaseModel):
+class ProcessingResponse(BaseModel):
     job_id: int
     dataset_id: int
     status: str
+
+# Alias for backward compatibility
+ProcessResponse = ProcessingResponse
 
 # database schema for status response of dataset processing 
 class ProcessingStatusResponse(BaseModel):
@@ -28,5 +31,3 @@ class QualityMetricesResponse(BaseModel):
     missing_values: int
     empty_rows: int
     quality_scores: float
-
-

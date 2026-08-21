@@ -7,7 +7,7 @@ class Quality_Model(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    job_id = Column(Integer, ForeignKey("processing_job.id", ondelete="CASCADE"), nullable==False)
+    job_id = Column(Integer, ForeignKey("processing_job.id", ondelete="CASCADE"), nullable=False)
 
     total_rows = Column(Integer, default=0)
 
@@ -22,5 +22,3 @@ class Quality_Model(Base):
     quality_check = Column(Integer, default=0.0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
