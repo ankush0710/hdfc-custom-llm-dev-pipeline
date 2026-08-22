@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.model.training_model.training_model import Training_Model
-from app.model.training_job_model.training_job_model import TrainingJobModel
+from app.model.training_model import Training_Model
+from app.model.training_job_model import TrainingJobModel
 from app.constants.training_status import training_status
 
 # ============================== To create the training jobs ============================ #
