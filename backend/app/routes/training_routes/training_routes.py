@@ -46,9 +46,10 @@ def start_run(
 
     except ValueError as error:
         raise HTTPException(
-            status_code = 404,
+            status_code = 400,
             detail = str(error)
         )
+
 
 
 @router.get(

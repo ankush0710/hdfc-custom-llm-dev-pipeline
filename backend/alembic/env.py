@@ -7,10 +7,15 @@ from alembic import context
 
 from app.core.config import DATABASE_URL
 from app.dbConfig.database_config import Base
-from app.model.dataset_model import Dataset_Model
-from app.model.dataset_version_model import Dataset_Version_Model
-from app.model.dataset_processing_model import Processing_Model
-from app.model.quality_metrics_model import Quality_Model
+from app.model import (
+    Dataset_Model,
+    Dataset_Version_Model,
+    Processing_Model,
+    Quality_Model,
+    Training_Model,
+    TrainingJobModel,
+)
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -52,7 +52,8 @@ def start_training_run(db: Session, run_id:int):
         raise ValueError("only Created training runs can be started")
 
     training_run.status = training_status.RUNNING
-    training_status.started_at = datetime.utcnow()
+    training_run.started_at = datetime.utcnow()
+
 
     db.commit()
     db.refresh(training_run)
