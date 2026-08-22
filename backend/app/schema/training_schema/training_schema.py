@@ -22,18 +22,19 @@ class TrainingRunCreate(BaseModel):
 
 class TrainingRunResponse(BaseModel):
 
-    id:int
-    datase_version_id:int
-    base_model:str
-    training_method:str
-    epoch:int
-    learning_rate:float
-    batch_size:int
-    status:str
-    error_message:str | None
+    id: int
+    dataset_version_id: int
+    base_model: str
+    training_method: str
+    epochs: int
+    learning_rate: float
+    batch_size: int
+    status: str
+    error_message: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 

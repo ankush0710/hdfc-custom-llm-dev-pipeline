@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, Flot, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func
+from app.constants.training_status import training_status
 
 
-from app.dbConfig.db_config import Base
+from app.dbConfig.database_config import Base
 
 class Training_Model(Base):
     __tablename__ = "training_run"
@@ -13,7 +14,7 @@ class Training_Model(Base):
 
     base_model = Column(String, nullable=False)
 
-    training_method = Column(String, nullabe=False)
+    training_method = Column(String, nullable=False)
 
     epochs = Column(Integer, nullable=False)
 
@@ -21,13 +22,13 @@ class Training_Model(Base):
 
     batch_size = Column(Integer, nullable=False)
 
-    status = Column(String, nullable=False, default="CREATED")
+    status = Column(String, nullable=False, default=training_status.CREATED)
 
-    error_message = Column(String, nullable=False)
+    error_message = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    started_at = Column(DateTime(timezon=True), nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
 
     completed_at = Column(DateTime(timezone=True), nullable=True)
 

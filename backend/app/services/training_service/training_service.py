@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.model.training_model import Training_Model
 from app.schema.training_schema.training_schema import TrainingRunCreate
+from app.constants.training_status import training_status
 
 def create_training_run(db:Session, data:TrainingRunCreate):
     training_run = Training_Model(
@@ -11,7 +12,7 @@ def create_training_run(db:Session, data:TrainingRunCreate):
         epochs=data.epochs,
         learning_rate=data.learning_rate,
         batch_size=data.batch_size,
-        status="CREATED",
+        status=training_status.CREATED,
     )
 
     db.add(training_run)
