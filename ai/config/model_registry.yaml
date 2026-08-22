@@ -1,0 +1,34 @@
+models:
+
+  - id: qwen2_5_1_5b_instruct
+    name: Qwen/Qwen2.5-1.5B-Instruct
+    family: Qwen2.5
+    parameters_billions: 1.54
+    task: instruction_generation
+    license: Apache-2.0
+    priority: 1
+    enabled: true
+    local_test: true
+    cloud_training: true
+
+  - id: qwen3_0_6b
+    name: Qwen/Qwen3-0.6B
+    family: Qwen3
+    parameters_billions: 0.6
+    task: instruction_generation
+    license: Apache-2.0
+    priority: 2
+    enabled: true
+    local_test: true
+    cloud_training: true
+
+  - id: smollm2_1_7b_instruct
+    name: HuggingFaceTB/SmolLM2-1.7B-Instruct
+    family: SmolLM2
+    parameters_billions: 1.7
+    task: instruction_generation
+    license: Apache-2.0
+    priority: 3
+    enabled: true
+    local_test: true
+    cloud_training: true

@@ -141,3 +141,57 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+# ==================================================
+# HDFC AI / Python / ML additions
+# ==================================================
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Python tooling / local IDE
+.vscode/
+.idea/
+
+# Hugging Face / ML caches
+.cache/
+.cache/huggingface/
+huggingface_cache/
+transformers_cache/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# HDFC project raw datasets - DO NOT COMMIT
+*.xlsx
+cleaned_excel/
+
+# Generated train/validation/test datasets
+hdfc_llm_train.jsonl
+hdfc_llm_val.jsonl
+hdfc_llm_test.jsonl
+
+# Dataset manifest
+data_manifest.json
+
+# Generated evaluation output
+ai/artifacts/evaluation/
+
+# Old / smoke-test fine-tuned artifacts
+ai/artifacts/fine_tuned/
+
+# Local logs / temp files
+*.log
+tmp/
+temp/
+
+# IMPORTANT:
+# Keep the final HDFC adapter:
+# ai/artifacts/full_training/
