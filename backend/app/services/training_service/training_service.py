@@ -21,3 +21,24 @@ def create_training_run(db:Session, data:TrainingRunCreate):
 
     return training_run
 
+# =============== get the all training status ========================= #
+def get_training_runs(
+    db: Session
+):
+    return (
+        db.query(TrainingRun)
+        .order_by(TrainingRun.id.desc())
+        .all()
+    )
+
+
+# =============== get the training status by id ========================= #
+def get_training_run_by_id(
+    db: Session,
+    run_id: int
+):
+    return (
+        db.query(TrainingRun)
+        .filter(TrainingRun.id == run_id)
+        .first()
+    )
