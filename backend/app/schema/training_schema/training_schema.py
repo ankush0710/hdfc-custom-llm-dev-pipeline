@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class TrainingRunCreate(BaseModel):
 
-    dataset_version_id: int
+    dataset_version_id: int = Field(gt=0)
     base_model: str
     training_method:str
     epochs:int = Field(
