@@ -17,8 +17,6 @@ class Pipeline_Run_Model(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
     estimate_completion = Column(DateTime(timezone=True), nullable=True)
     error_code = Column(String(255), nullable=True)
-    # relationships
-    training_run = relationship("Training_Model", back_populates="pipeline_run")
-    evaluation = relationship("Evaluation_Model", back_populates="pipeline_run")
+
 
     

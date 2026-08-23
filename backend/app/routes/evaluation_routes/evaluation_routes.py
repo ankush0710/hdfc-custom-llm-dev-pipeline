@@ -23,7 +23,13 @@ def create_evaluation(
     payload: EvaluationCreate,
     db: Session = Depends(get_db)
 ):
-    return evaluation_service.create_evaluation(db, payload)
+    try:
+        return evaluation_service.create_evaluation(db, payload)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        )
 
 
 # ======================== get method for listing all evaluation runs =============================== #
@@ -68,9 +74,11 @@ def start_evaluation(
     try:
         return evaluation_service.start_evaluation(db, evaluation_id)
     except ValueError as error:
+        err_msg = str(error)
+        status_code = 404 if "not found" in err_msg.lower() else 400
         raise HTTPException(
-            status_code=400,
-            detail=str(error)
+            status_code=status_code,
+            detail=err_msg
         )
 
 
@@ -87,9 +95,11 @@ def save_evaluation_result(
     try:
         return evaluation_service.save_evaluation_result(db, evaluation_id, result)
     except ValueError as error:
+        err_msg = str(error)
+        status_code = 404 if "not found" in err_msg.lower() else 400
         raise HTTPException(
-            status_code=400,
-            detail=str(error)
+            status_code=status_code,
+            detail=err_msg
         )
 
 
@@ -105,7 +115,9 @@ def fail_evaluation(
     try:
         return evaluation_service.fail_evaluation(db, evaluation_id)
     except ValueError as error:
+        err_msg = str(error)
+        status_code = 404 if "not found" in err_msg.lower() else 400
         raise HTTPException(
-            status_code=400,
-            detail=str(error)
+            status_code=status_code,
+            detail=err_msg
         )

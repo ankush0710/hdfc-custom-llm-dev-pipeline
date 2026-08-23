@@ -1,11 +1,21 @@
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.model.evaluation_run_model import Evaluation_Model
+from app.model.training_model import Training_Model
+from app.model.dataset_version_model import Dataset_Version_Model
 from app.schema.evaluation_schema.evaluation_schema import EvaluationCreate, EvaluationResult
 
 
 # ================================ create the evaluation runs ====================================== #
 def create_evaluation(db: Session, payload: EvaluationCreate):
+    training_run = db.query(Training_Model).filter(Training_Model.id == payload.run_id).first()
+    if not training_run:
+        raise ValueError(f"Training run with id {payload.run_id} not found")
+
+    dataset_version = db.query(Dataset_Version_Model).filter(Dataset_Version_Model.id == payload.test_dataset_id).first()
+    if not dataset_version:
+        raise ValueError(f"Dataset version with id {payload.test_dataset_id} not found")
+
     evaluation = Evaluation_Model(
         run_id=payload.run_id,
         model_id=payload.model_id,
@@ -16,6 +26,7 @@ def create_evaluation(db: Session, payload: EvaluationCreate):
     db.commit()
     db.refresh(evaluation)
     return evaluation
+
 
 
 # ================================ get the evaluation run by id ====================================== #
