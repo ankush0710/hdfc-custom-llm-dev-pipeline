@@ -1,7 +1,7 @@
 from datetime import datetime
-from sqlalchemy import (Column, Integer, String, DateTime, Float, ForeignKey)
+from sqlalchemy import (Column, Integer, String, DateTime, Boolean)
 from sqlalchemy.orm import relationship
-from app.dbConfig.databse_config import Base
+from app.dbConfig.database_config import Base
 
 class Model_Model(Base):
     __tablename__ = "model"

@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.dbConfig.database_config import Base, engine
+import app.model
 from app.routes.dataset_routes.dataset_routes import router as dataset_router
 from app.routes.processing_routes.processing_routes import router as processing_router
 from app.routes.training_routes.training_routes import router as training_router
 from app.routes.training_job_routes.training_job_routes import router as training_job_router
+from app.routes.evaluation_routes.evaluation_routes import router as evaluation_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -28,6 +30,7 @@ app.include_router(dataset_router)
 app.include_router(processing_router)
 app.include_router(training_router)
 app.include_router(training_job_router)
+app.include_router(evaluation_router)
 
 @app.get("/")
 def root():
