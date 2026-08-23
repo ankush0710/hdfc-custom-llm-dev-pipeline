@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.constants.training_status import training_status
 
 
@@ -11,6 +12,8 @@ class Training_Model(Base):
     id = Column(Integer, primary_key=True, index=True, nullable=False)
 
     dataset_version_id = Column(Integer, ForeignKey("dataset_version.id"), nullable=False)
+
+    run_id = Column(Integer, ForeignKey("pipeline_run.id"), nullable=False, index=True)
 
     base_model = Column(String, nullable=False)
 
@@ -32,3 +35,8 @@ class Training_Model(Base):
 
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    #relationships
+    pipeline_run = relationship(
+    "Pipeline_Run_Model",
+    back_populates="training_runs"
+)
