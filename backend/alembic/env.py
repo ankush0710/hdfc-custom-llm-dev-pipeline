@@ -14,6 +14,7 @@ from app.model import (
     Quality_Model,
     Training_Model,
     TrainingJobModel,
+    Evaluation_Model,
 )
 
 
