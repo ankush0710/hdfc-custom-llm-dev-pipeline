@@ -1,10 +1,9 @@
-from datetime import datetime
 from sqlalchemy import (Column, Integer, String, DateTime, Float, ForeignKey)
 from sqlalchemy.orm import relationship
 from app.dbConfig.databse_config import Base
 
 
-class pipeline_run_model(Base):
+class Pipeline_Run_Model(Base):
     __tablename__ = "pipeline_run"
 
     run_id = Column(Integer, primary_key=True, index=True)
