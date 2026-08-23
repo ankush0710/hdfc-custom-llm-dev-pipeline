@@ -1,14 +1,15 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.dbConfig.database_config import Base
 
 class Evaluation_Model(Base):
     __tablename__ = "evaluation"
 
     evaluation_id = Column(Integer, primary_key=True, index=True)
-    run_id = Column(Integer, ForeignKey("training_run.id", ondelete="CASCADE"), nullable=False, index=True)
-    model_id = Column(Integer, nullable=False, index=True)
-    test_dataset_id = Column(Integer, ForeignKey("dataset_version.id", ondelete="CASCADE"), nullable=False, index=True)
+    run_id = Column(Integer, ForeignKey("pipeline_run.id", ondelete="CASCADE"), nullable=False, index=True)
+    model_id = Column(Integer, ForeignKey("model.model_id"), nullable=False, index=True)
+    test_dataset_id = Column(Integer, ForeignKey("dataset.id", ondelete="CASCADE"), nullable=False, index=True)
     total_examples = Column(Integer, nullable=False, default=0)
     evaluation_status = Column(String(50), nullable=False, default="QUEUED")
 
@@ -25,8 +26,6 @@ class Evaluation_Model(Base):
     infrastructure_errors = Column(Integer, nullable=True, default=0)
     average_latency_seconds = Column(Float, nullable=True)
 
-    # status tracking & timestamps
-    error_message = Column(Text, nullable=True)
+    # status tracking & timestampe
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    started_at = Column(DateTime(timezone=True), nullable=True)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
+    pipeline_run = relationship("Pipeline_Run_Model", back_populates="evaluations")

@@ -47,9 +47,7 @@ class EvaluationResponse(BaseModel):
     evaluation_status: str
     error_message: Optional[str] = None
     created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
 
     model_config = ConfigDict(
         from_attributes=True
-    )
+    )
