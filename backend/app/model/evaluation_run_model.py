@@ -1,9 +1,9 @@
 from datetime import datetime
-from sqlalchemy import (Column, Integer, String, DateTime, Float, ForeignKey)
+from sqlalchemy import (Column, Integer, DateTime, Float, ForeignKey)
 from sqlalchemy.orm import relationship
 from app.dbConfig.databse_config import Base
 
-class Evaluation_Model(Base):
+class Evaluation_Run_Model(Base):
     __tablename__ = "evaluation"
 
     evaluation_id = Column(Integer, primary_key=True, index=True)
