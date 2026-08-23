@@ -1,6 +1,6 @@
 from sqlalchemy import (Column, Integer, String, DateTime, Float, ForeignKey)
 from sqlalchemy.orm import relationship
-from app.dbConfig.databse_config import Base
+from app.dbConfig.database_config import Base
 
 
 class Pipeline_Run_Model(Base):
@@ -9,7 +9,7 @@ class Pipeline_Run_Model(Base):
     run_id = Column(Integer, primary_key=True, index=True)
     dataset_id = Column(Integer, ForeignKey("dataset.id"), nullable=False, index=True)
     dataset_version_id = Column(Integer, ForeignKey("dataset_version.id"), nullable=False, index=True)
-    model_id = Column(Integer, ForeignKey("model.id"), nullable=False, index=True)
+    model_id = Column(Integer, ForeignKey("model.model_id"), nullable=False, index=True)
     status = Column(String(30), nullable=False, default="QUEUED")
     progress = Column(Float, nullable=True, default=0)
     current_step = Column(String(50), nullable=True)
