@@ -50,7 +50,36 @@ from ai.inference.finetuned import (
     FinetunedModelBundle,
 )
 
-REGISTRY_YAML_PATH = os.path.join("ai", "config", "model", "model_registry.yaml")
+from pathlib import Path
+
+
+# --------------------------------------------------------------------------
+# Project paths
+# --------------------------------------------------------------------------
+
+# service.py:
+# <project-root>/ai/inference/service.py
+#
+# parents[0] -> ai/inference
+# parents[1] -> ai
+# parents[2] -> project-root
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+AI_ROOT = PROJECT_ROOT / "ai"
+
+REGISTRY_YAML_PATH = (
+    AI_ROOT
+    / "config"
+    / "model"
+    / "model_registry.yaml"
+)
+
+FULL_TRAINING_ADAPTER_PATH = (
+    AI_ROOT
+    / "artifacts"
+    / "full_training"
+)
 
 TASK_INTENT_CLASSIFICATION = "intent_classification"
 TASK_SFT_GROUNDED_GENERATION = "sft_grounded_generation"
@@ -73,18 +102,19 @@ _MODEL_MAP: Dict[str, Dict[str, Any]] = {
     "qwen3_0_6b": {
         "base_model": "Qwen/Qwen3-0.6B",
         "fine_tuned": True,
-        "adapter_path": "ai/artifacts/full_training",
+        "adapter_path": str(FULL_TRAINING_ADAPTER_PATH),
     },
+
     "qwen2_5_1_5b_instruct": {
         "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
         "fine_tuned": False,
     },
+
     "smollm2_1_7b_instruct": {
         "base_model": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
         "fine_tuned": False,
     },
 }
-
 
 # ==========================================================================
 # Errors
@@ -252,16 +282,52 @@ def _load_base(model_id: str, entry: Dict[str, Any]) -> _ActiveModel:
     )
 
 
-def _load_finetuned(model_id: str, entry: Dict[str, Any]) -> _ActiveModel:
-    adapter_path = entry["adapter_path"]
-    if not os.path.isdir(adapter_path):
-        raise MissingAdapterError(model_id, adapter_path)
+def _load_finetuned(
+    model_id: str,
+    entry: Dict[str, Any]
+) -> _ActiveModel:
+
+    adapter_path = Path(entry["adapter_path"])
+
+    # Validate adapter directory
+    if not adapter_path.is_dir():
+        raise MissingAdapterError(
+            model_id,
+            str(adapter_path)
+        )
+
+    # Validate required PEFT files
+    required_files = [
+        "adapter_config.json",
+        "adapter_model.safetensors",
+    ]
+
+    missing_files = [
+        filename
+        for filename in required_files
+        if not (adapter_path / filename).is_file()
+    ]
+
+    if missing_files:
+        raise MissingAdapterError(
+            model_id,
+            (
+                f"{adapter_path} "
+                f"(missing: {', '.join(missing_files)})"
+            )
+        )
+
     bundle = load_finetuned_model(
         base_model=entry["base_model"],
         adapter_path=adapter_path,
         device="auto",
     )
-    return _ActiveModel(model_id=model_id, fine_tuned=True, bundle=bundle)
+
+    return _ActiveModel(
+        model_id=model_id,
+        fine_tuned=True,
+        bundle=bundle,
+    )
 
 
 def _get_or_load(model_id: str, entry: Dict[str, Any]) -> _ActiveModel:
@@ -610,6 +676,28 @@ def _cli() -> None:
         traceback.print_exc()
         raise SystemExit(1)
 
+# ================================================================================================ #
+# temparory debugger for path
+# ================================================================================================ #
+def get_ai_paths() -> Dict[str, Any]:
+    adapter_path = Path(
+        _MODEL_MAP["qwen3_0_6b"]["adapter_path"]
+    )
+
+    return {
+        "project_root": str(PROJECT_ROOT),
+        "ai_root": str(AI_ROOT),
+        "registry_path": str(REGISTRY_YAML_PATH),
+        "registry_exists": REGISTRY_YAML_PATH.is_file(),
+        "adapter_path": str(adapter_path),
+        "adapter_exists": adapter_path.is_dir(),
+        "adapter_config_exists": (
+            adapter_path / "adapter_config.json"
+        ).is_file(),
+        "adapter_model_exists": (
+            adapter_path / "adapter_model.safetensors"
+        ).is_file(),
+    }
 
 if __name__ == "__main__":
     _cli()
