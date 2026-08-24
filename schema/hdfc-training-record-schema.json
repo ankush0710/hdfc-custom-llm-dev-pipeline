@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HDFC Final Training Record",
+  "type": "object",
+  "required": [
+    "record_id",
+    "task_type",
+    "response"
+  ],
+  "properties": {
+    "record_id": {
+      "type": "string"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "intent_classification",
+        "sft_grounded_generation",
+        "customer_faq_qa",
+        "domain_concept_qa"
+      ]
+    },
+    "instruction": {
+      "type": "string"
+    },
+    "context": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response": {
+      "type": "string"
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
