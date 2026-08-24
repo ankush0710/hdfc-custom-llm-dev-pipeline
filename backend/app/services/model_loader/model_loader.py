@@ -1,4 +1,8 @@
 from typing import Any
+from app.ai.inference_adapter.inference_adapter import (
+    AIInferenceAdapter,
+)
+
 
 
 class ModelLoader:
@@ -31,10 +35,12 @@ class ModelLoader:
 
     def unload(self):
 
-        self.model = None
-        self.tokenizer = None
-        self.loaded_model_id = None
+        result = AIInferenceAdapter.unload()
 
-        return {
-            "status": "UNLOADED"
-        }
+        self.loaded_model_id = None
+        self.loaded_model_name = None
+
+        return result
+
+    def is_loaded(self, model_id: int) -> bool:
+        return self.loaded_model_id == model_id
