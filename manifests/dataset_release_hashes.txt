@@ -1,0 +1,5 @@
+# HDFC-LLM-DATASET-v2.0.0-expanded
+# SHA-256 hashes computed from the final frozen JSONL release files.
+0aec7e7ef252dd23cb5ddcbb16a57f4b88ac98bbce55827c880e3b707da44db2  data/hdfc_llm_train.jsonl
+6d7f3329c823c71acf9858e6d6fb1d4b146ee33ad1bb12b509b25cfbd35e490d  data/hdfc_llm_val.jsonl
+707d256cc832fed4665d2114c6b1cd593bc91016516abc2a59120e48b7cac944  data/hdfc_llm_test.jsonl
