@@ -7,6 +7,7 @@ from app.model.training_job_model import TrainingJobModel
 from app.model.evaluation_run_model import Evaluation_Model
 from app.model.pipeline_run_model import Pipeline_Run_Model
 from app.model.model_registry import Model_Registry
+from app.model.deployment_model import Deployment
 
 __all__ = [
     "Dataset_Model",
@@ -17,5 +18,6 @@ __all__ = [
     "TrainingJobModel",
     "Evaluation_Model",
     "Pipeline_Run_Model",
-    "Model_Registry"
+    "Model_Registry",
+    "Deployment"
 ]
