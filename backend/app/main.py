@@ -11,6 +11,7 @@ from app.routes.training_job_routes.training_job_routes import router as trainin
 from app.routes.evaluation_routes.evaluation_routes import router as evaluation_router
 from app.routes.model_registry_routes.model_registry_routes import router as model_registry_router
 from app.routes.deployment_routes.deployment_routes import router as deployment_router
+from app.routes.inference_routes.inference_routes import router as inference_router
 from app.routes.ai_routes.ai_routes import router as ai_router
 
 
@@ -38,6 +39,7 @@ app.include_router(training_job_router)
 app.include_router(evaluation_router)
 app.include_router(model_registry_router)
 app.include_router(deployment_router)
+app.include_router(inference_router)
 app.include_router(ai_router)
 
 @app.get("/")
