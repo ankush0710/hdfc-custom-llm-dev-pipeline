@@ -71,7 +71,6 @@ AI_ROOT = PROJECT_ROOT / "ai"
 REGISTRY_YAML_PATH = (
     AI_ROOT
     / "config"
-    / "model"
     / "model_registry.yaml"
 )
 
@@ -211,18 +210,11 @@ def _load_registry_from_yaml() -> Dict[str, Dict[str, Any]]:
 
 def _get_registry() -> Dict[str, Dict[str, Any]]:
     try:
-        from ai.models.registry import load_registry  # type: ignore
+        from ai.models.registry import load_model_registry
 
-        return _normalize_registry(load_registry())
+        return _normalize_registry(load_model_registry())
     except Exception:
-        pass
-    try:
-        from ai.models.registry import get_registry  # type: ignore
-
-        return _normalize_registry(get_registry())
-    except Exception:
-        pass
-    return _load_registry_from_yaml()
+        return _load_registry_from_yaml()
 
 
 def _is_enabled(model_id: str) -> bool:
