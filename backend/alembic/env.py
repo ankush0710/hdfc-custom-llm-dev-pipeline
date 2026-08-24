@@ -15,6 +15,7 @@ from app.model import (
     Training_Model,
     TrainingJobModel,
     Evaluation_Model,
+    Model_Registry, 
 )
 
 

@@ -8,7 +8,7 @@ class Evaluation_Model(Base):
 
     evaluation_id = Column(Integer, primary_key=True, index=True)
     run_id = Column(Integer, ForeignKey("training_run.id", ondelete="CASCADE"), nullable=False, index=True)
-    model_id = Column(Integer, nullable=False, index=True)
+    model_id = Column(Integer, ForeignKey("model_registry.id", ondelete="CASCADE"), nullable=False, index=True)
     test_dataset_id = Column(Integer, ForeignKey("dataset_version.id", ondelete="CASCADE"), nullable=False, index=True)
     total_examples = Column(Integer, nullable=False, default=0)
     evaluation_status = Column(String(50), nullable=False, default="QUEUED")
