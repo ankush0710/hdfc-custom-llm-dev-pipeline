@@ -1,0 +1,49 @@
+{
+  "dataset_name": "HDFC_Custom_LLM_All_11_Datasets_Unified_Suite",
+  "release_version": "v2.0.0-expanded",
+  "total_records": 59346,
+  "splits": {
+    "train": {
+      "count": 47476,
+      "file": "data/hdfc_llm_train.jsonl",
+      "sha256": "0aec7e7ef252dd23cb5ddcbb16a57f4b88ac98bbce55827c880e3b707da44db2"
+    },
+    "validation": {
+      "count": 5934,
+      "file": "data/hdfc_llm_val.jsonl",
+      "sha256": "6d7f3329c823c71acf9858e6d6fb1d4b146ee33ad1bb12b509b25cfbd35e490d"
+    },
+    "test": {
+      "count": 5936,
+      "file": "data/hdfc_llm_test.jsonl",
+      "sha256": "707d256cc832fed4665d2114c6b1cd593bc91016516abc2a59120e48b7cac944"
+    }
+  },
+  "model_lineage": {
+    "current_model": "Qwen/Qwen3-0.6B + HDFC LoRA",
+    "model_training_release": {
+      "name": "Release A",
+      "train": 19476,
+      "validation": 2434,
+      "test": 2436
+    },
+    "current_master_release_is_training_input_for_current_model": false
+  },
+  "current_model_supported_tasks": [
+    "customer_faq_qa",
+    "domain_concept_qa",
+    "intent_classification",
+    "sft_grounded_generation"
+  ],
+  "master_dataset_task_types": [
+    "account_status_inquiry",
+    "card_servicing",
+    "customer_faq_qa",
+    "domain_concept_qa",
+    "intent_classification",
+    "loan_summary",
+    "profile_extraction",
+    "sft_grounded_generation",
+    "transaction_audit"
+  ]
+}
