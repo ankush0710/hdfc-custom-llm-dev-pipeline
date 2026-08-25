@@ -24,6 +24,8 @@ class AIInferenceAdapter:
         top_p: float = 0.9,
         do_sample: bool = False,
         seed: int = 42,
+        adapter_path_override: str | None = None,
+        base_model_override: str | None = None,
     ) -> dict[str, Any]:
 
         return run_model(
@@ -36,6 +38,8 @@ class AIInferenceAdapter:
             top_p=top_p,
             do_sample=do_sample,
             seed=seed,
+            adapter_path_override=adapter_path_override,
+            base_model_override=base_model_override,
         )
 
     @staticmethod
