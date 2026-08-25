@@ -90,7 +90,13 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TEST_JSONL = PROJECT_ROOT / "hdfc_llm_test.jsonl"
+if not TEST_JSONL.exists():
+    data_test = PROJECT_ROOT / "data" / "hdfc_llm_test.jsonl"
+    if data_test.exists():
+        TEST_JSONL = data_test
+
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "ai" / "artifacts" / "evaluation"
+
 
 DEFAULT_MAX_NEW_TOKENS = 128
 DEFAULT_SEED = 42
@@ -141,10 +147,8 @@ def _load_test_records(
     path: Path, limit: Optional[int] = None
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
-    Read hdfc_llm_test.jsonl READ-ONLY. Unlike ai.training.train's loader
-    (which deliberately fails fast on malformed data), a malformed line
-    here is logged and skipped, not raised - a single bad record must
-    never abort a large evaluation run.
+    Read test dataset READ-ONLY (.jsonl, .json, .csv, .xlsx).
+    Normalizes records to include 'record_id', 'task_type', and 'response'.
 
     Returns
     -------
@@ -155,38 +159,79 @@ def _load_test_records(
 
     records: List[Dict[str, Any]] = []
     skipped = 0
-    with path.open("r", encoding="utf-8") as fh:
-        for line_no, raw_line in enumerate(fh, start=1):
-            if limit is not None and len(records) >= limit:
-                break
+    suffix = path.suffix.lower()
 
-            line = raw_line.strip()
-            if not line:
-                continue
+    if suffix == ".jsonl":
+        with path.open("r", encoding="utf-8") as fh:
+            for line_no, raw_line in enumerate(fh, start=1):
+                if limit is not None and len(records) >= limit:
+                    break
 
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                logger.warning(
-                    "Skipping malformed JSON at %s line %d: %s", path, line_no, exc
-                )
-                skipped += 1
-                continue
+                line = raw_line.strip()
+                if not line:
+                    continue
 
-            missing = [f for f in REQUIRED_TEST_FIELDS if f not in record]
-            if missing:
-                logger.warning(
-                    "Skipping record at %s line %d: missing required field(s) %s",
-                    path,
-                    line_no,
-                    missing,
-                )
-                skipped += 1
-                continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    logger.warning("Skipping malformed JSON at %s line %d: %s", path, line_no, exc)
+                    skipped += 1
+                    continue
 
-            records.append(record)
+                # Ensure defaults
+                if "task_type" not in record:
+                    record["task_type"] = "sft_grounded_generation"
+                if "record_id" not in record:
+                    record["record_id"] = str(line_no)
+                if "response" not in record:
+                    record["response"] = record.get("answer") or record.get("output") or ""
+
+                records.append(record)
+
+    elif suffix == ".json":
+        with path.open("r", encoding="utf-8") as fh:
+            raw_data = json.load(fh)
+            items = raw_data if isinstance(raw_data, list) else [raw_data]
+            for idx, item in enumerate(items, start=1):
+                if limit is not None and len(records) >= limit:
+                    break
+                if isinstance(item, dict):
+                    if "task_type" not in item:
+                        item["task_type"] = "sft_grounded_generation"
+                    if "record_id" not in item:
+                        item["record_id"] = str(idx)
+                    if "response" not in item:
+                        item["response"] = item.get("answer") or item.get("output") or ""
+                    records.append(item)
+
+    elif suffix in {".csv", ".xlsx"}:
+        try:
+            import pandas as pd
+            df = pd.read_csv(path) if suffix == ".csv" else pd.read_excel(path)
+            items = df.to_dict(orient="records")
+            for idx, item in enumerate(items, start=1):
+                if limit is not None and len(records) >= limit:
+                    break
+                clean_item = {k: ("" if pd.isna(v) else v) for k, v in item.items()}
+                if "task_type" not in clean_item or not clean_item["task_type"]:
+                    clean_item["task_type"] = "sft_grounded_generation"
+                if "record_id" not in clean_item or not clean_item["record_id"]:
+                    clean_item["record_id"] = str(idx)
+                if "response" not in clean_item or not clean_item["response"]:
+                    clean_item["response"] = str(clean_item.get("answer") or clean_item.get("output") or "")
+                if "instruction" not in clean_item:
+                    clean_item["instruction"] = str(clean_item.get("question") or clean_item.get("prompt") or "")
+
+                records.append(clean_item)
+        except Exception as exc:
+            logger.error("Failed to read tabular dataset %s: %s", path, exc)
+            raise
+
+    else:
+        raise ValueError(f"Unsupported test dataset format: {suffix}")
 
     return records, skipped
+
 
 
 def _extract_user_content(record: Dict[str, Any]) -> str:
@@ -815,6 +860,7 @@ def evaluate(
     device: str = "auto",
     limit: Optional[int] = None,
     output_dir: Union[str, Path] = DEFAULT_OUTPUT_DIR,
+    test_dataset_path: Optional[Union[str, Path]] = None,
 ) -> Dict[str, Any]:
     """
     Run the full task-aware evaluation and write summary.json +
@@ -824,14 +870,17 @@ def evaluate(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Loading test dataset from %s (read-only)...", TEST_JSONL)
-    records, unparseable_lines_skipped = _load_test_records(TEST_JSONL, limit=limit)
+    test_path = Path(test_dataset_path) if test_dataset_path and Path(test_dataset_path).exists() else TEST_JSONL
+
+    logger.info("Loading test dataset from %s (read-only)...", test_path)
+    records, unparseable_lines_skipped = _load_test_records(test_path, limit=limit)
     total_examples = len(records)
     logger.info(
         "Loaded %d test records (%d line(s) skipped as malformed).",
         total_examples,
         unparseable_lines_skipped,
     )
+
 
     logger.info("Loading fine-tuned model once for the entire evaluation run...")
     bundle = load_finetuned_model(base_model=base_model, adapter_path=adapter_path, device=device)

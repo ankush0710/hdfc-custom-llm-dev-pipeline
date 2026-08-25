@@ -428,6 +428,7 @@ def _parse_response_if_json(response_text: str) -> Union[Dict[str, Any], str]:
 
 
 
+def _baseline_prompt(formatted_question: str, context: Optional[str]) -> str:
     """Plain-text fallback prompt, used when a tokenizer has no chat
     template. No HDFC system prompt is applied — these models are not
     HDFC fine-tuned."""
@@ -515,6 +516,8 @@ def run_model(
     top_p: float = 0.9,
     do_sample: bool = False,
     seed: int = 42,
+    adapter_path_override: Optional[str] = None,
+    base_model_override: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run inference for a single (model, task, question) request.
 
@@ -538,7 +541,27 @@ def run_model(
     if task_type not in SUPPORTED_TASKS:
         raise UnsupportedTaskError(task_type, sorted(SUPPORTED_TASKS))
 
-    entry = _get_model_map_entry(model_id)
+    # ------------------------------------------------------------------
+    # Resolve model entry — prefer _MODEL_MAP, apply DB-sourced overrides
+    # ------------------------------------------------------------------
+    if model_id in _MODEL_MAP:
+        entry = dict(_MODEL_MAP[model_id])          # mutable copy
+        if base_model_override:
+            entry["base_model"] = base_model_override
+        if adapter_path_override:
+            entry["adapter_path"] = adapter_path_override
+            entry["fine_tuned"] = True
+    elif base_model_override:
+        # Model not yet in _MODEL_MAP — build from DB-sourced fields
+        entry = {
+            "base_model": base_model_override,
+            "fine_tuned": bool(adapter_path_override),
+        }
+        if adapter_path_override:
+            entry["adapter_path"] = adapter_path_override
+    else:
+        raise UnknownModelError(model_id, sorted(_MODEL_MAP.keys()))
+
     if not _is_enabled(model_id):
         raise ModelDisabledError(model_id)
 
