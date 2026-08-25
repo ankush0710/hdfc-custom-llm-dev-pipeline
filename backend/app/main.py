@@ -13,6 +13,7 @@ from app.routes.model_registry_routes.model_registry_routes import router as mod
 from app.routes.deployment_routes.deployment_routes import router as deployment_router
 from app.routes.inference_routes.inference_routes import router as inference_router
 from app.routes.ai_routes.ai_routes import router as ai_router
+from app.routes.pipeline_routes.pipeline_routes import router as pipeline_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -41,6 +42,7 @@ app.include_router(model_registry_router)
 app.include_router(deployment_router)
 app.include_router(inference_router)
 app.include_router(ai_router)
+app.include_router(pipeline_router)
 
 @app.get("/")
 def root():

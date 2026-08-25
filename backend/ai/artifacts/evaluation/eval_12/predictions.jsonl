@@ -1,0 +1,5 @@
+{"record_id": "1", "task_type": "sft_grounded_generation", "expected": "Hello!", "predicted": "", "latency_seconds": 0.0, "critical_safety_failure": false}
+{"record_id": "2", "task_type": "sft_grounded_generation", "expected": "Sure!", "predicted": "", "latency_seconds": 0.0, "critical_safety_failure": false}
+{"record_id": "3", "task_type": "sft_grounded_generation", "expected": "Any other queries?", "predicted": "", "latency_seconds": 0.0, "critical_safety_failure": false}
+{"record_id": "4", "task_type": "sft_grounded_generation", "expected": "Thank you!", "predicted": "", "latency_seconds": 0.0, "critical_safety_failure": false}
+{"record_id": "5", "task_type": "sft_grounded_generation", "expected": "Sure how can i help you!", "predicted": "", "latency_seconds": 0.0, "critical_safety_failure": false}

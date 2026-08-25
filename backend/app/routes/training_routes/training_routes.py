@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.dbConfig.database_config import get_db
@@ -28,12 +28,15 @@ def create_run(
 )
 def start_run(
     run_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
 
     try:
         training_run = start_training_run(
-            db, run_id
+            db=db,
+            run_id=run_id,
+            background_tasks=background_tasks,
         )
 
         if not training_run:
@@ -49,6 +52,7 @@ def start_run(
             status_code = 400,
             detail = str(error)
         )
+
 
 
 

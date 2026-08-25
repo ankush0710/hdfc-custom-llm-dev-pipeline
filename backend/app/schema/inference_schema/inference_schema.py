@@ -7,7 +7,10 @@ class InferenceRequest(BaseModel):
     model_id: Union[int, str]
     task_type: str = "sft_grounded_generation"
 
-    question: Optional[str] = None
+    question: str = Field(
+        ...,
+        min_length=1,
+    )
     prompt: Optional[str] = None
 
     context: Optional[str] = None
@@ -56,6 +59,6 @@ class InferenceResponse(BaseModel):
     raw_response: str
 
     latency_seconds: Optional[float] = None
-    device: str
+    device: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

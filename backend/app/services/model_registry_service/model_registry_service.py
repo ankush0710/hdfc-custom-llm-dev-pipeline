@@ -47,6 +47,12 @@ def create_model(
         if not evaluation:
             raise ValueError(f"Evaluation with id {payload.evaluation_id} not found")
 
+    init_status = (payload.status or "CREATED").strip().upper()
+    if init_status not in VALID_STATUSES:
+        raise ValueError(
+            f"Invalid initial model status: '{init_status}'. Valid statuses: {sorted(VALID_STATUSES)}"
+        )
+
     model = Model_Registry(
         model_name = payload.model_name,
         version=payload.version,
@@ -55,7 +61,7 @@ def create_model(
         adapter_path=payload.adapter_path,
         training_job_id=payload.training_job_id,
         evaluation_id=payload.evaluation_id,
-        status="CREATED",
+        status=init_status,
     )
 
     db.add(model)
@@ -63,6 +69,7 @@ def create_model(
     db.refresh(model)
 
     return model
+
 
 def get_model(
     db: Session,

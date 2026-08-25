@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = PROJECT_ROOT / "ai" / "config" / "model_registry.yaml"
 
 
-def load_registry():
+def load_model_registry():
     """Load and validate the project's model candidate registry."""
 
     if not REGISTRY_PATH.exists():
@@ -51,8 +51,12 @@ def load_registry():
     return models
 
 
+def load_registry():
+    return load_model_registry
+
+
 if __name__ == "__main__":
-    models = load_registry()
+    models = load_model_registry()
 
     print("\n=== MODEL CANDIDATE REGISTRY ===")
 

@@ -61,3 +61,19 @@ def get_training_job_by_id(
         )
         .first()
     )
+
+
+# ============================= start training job ========================================= #
+def start_training_job(
+    db: Session,
+    job_id: int,
+    background_tasks = None
+):
+    job = get_training_job_by_id(db, job_id)
+    if not job:
+        return None
+
+    from app.services.training_service.training_service import start_training_run
+    start_training_run(db, job.training_run_id, background_tasks)
+    db.refresh(job)
+    return job
