@@ -1,29 +1,21 @@
 //=======================================================================================//
 /*
-The dataset page that shows the all information aout the datasets
+The dataset page that allows uploading and ingesting new datasets
 */
 //=======================================================================================//
-//=======================================================================================//
-/*
-The dataset upload page that alows us to upload any dataset (only in .csv and. jsonl format) for finetuning and training the model
-*/
-//=======================================================================================//
+
 "use client";
-import Navbar from "@/components/layout/Navbar";
-import Sidebar from "@/components/layout/Sidebar";
-import Footer from "@/components/layout/Footer";
 import Button from "@/components/ui/Button";
 import FormField from "@/components/form/FormField";
 import SelectField from "@/components/form/SelectField";
 import TextAreaField from "@/components/form/TextAreaField";
 import FileUpload from "@/components/form/FileUpload";
-import { useState } from "react";
-import { Upload } from "lucide-react";
-import { uploadDataset } from "../../services/datasetServices";
+import Breadcrumbs from "@/components/ui/Breadcrumbs";
+import { useState, useEffect, Suspense } from "react";
+import { Upload, Loader2 } from "lucide-react";
+import { uploadDataset } from "../../services/datasetService/datasetServices";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-
-// category data which can easily change later if required
+import { useRouter, useSearchParams } from "next/navigation";
 
 const categoryOptions = [
   {
@@ -38,26 +30,45 @@ const categoryOptions = [
     value: "validation",
     label: "Validation",
   },
+  {
+    value: "faq_data",
+    label: "FAQ / Q&A",
+  },
+  {
+    value: "banking",
+    label: "Banking Domain",
+  },
+  {
+    value: "rag_corpus",
+    label: "RAG Knowledge Corpus",
+  },
 ];
 
-export default function UploadDataset() {
-  const [isOpen, setIsOpen] = useState(false);
+function UploadDatasetContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialName = searchParams?.get("datasetName") || "";
+
   const [formData, setFormData] = useState({
-    datasetName: "",
-    category: "",
-    version: "",
+    datasetName: initialName,
+    category: "fine-tuning",
+    version: "1.0.0",
     source: "",
     description: "",
     file: null,
   });
 
+  useEffect(() => {
+    if (initialName) {
+      setFormData((prev) => ({
+        ...prev,
+        datasetName: initialName,
+      }));
+    }
+  }, [initialName]);
+
   const [isUploading, setIsUploading] = useState(false);
 
-  const router = useRouter();
-
-  // FastAPI returns validation errors as an array of objects. Toast content
-  // must be a string (or React element), otherwise Sonner attempts to render
-  // those objects and React throws "Objects are not valid as a React child".
   const getUploadErrorMessage = (error) => {
     const detail = error?.response?.data?.detail;
 
@@ -74,20 +85,20 @@ export default function UploadDataset() {
     }
 
     if (typeof detail === "string") return detail;
-    return "Failed to upload dataset. Please check the form and try again.";
+    return (
+      error?.message ||
+      "Failed to upload dataset. Please check the form and try again."
+    );
   };
 
-  // Handle text/select fields
   const handleChange = (e) => {
     const { name, value } = e.target;
-
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  // Handle file
   const handleFileSelect = (selectedFile) => {
     setFormData((prev) => ({
       ...prev,
@@ -95,20 +106,18 @@ export default function UploadDataset() {
     }));
   };
 
-  // Submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate required multipart fields before sending the request. FastAPI
-    // otherwise responds with a 422 validation-error array.
     const requiredFields = [
       ["datasetName", "dataset name"],
       ["category", "category"],
       ["version", "version"],
       ["source", "source"],
     ];
+
     const missingField = requiredFields.find(
-      ([field]) => !String(formData[field] ?? "").trim(),
+      ([field]) => !String(formData[field] ?? "").trim()
     );
 
     if (missingField) {
@@ -117,161 +126,167 @@ export default function UploadDataset() {
     }
 
     if (!formData.file) {
-      toast.error("Please select a dataset file.");
+      toast.error("Please select a dataset file to upload.");
       return;
     }
 
     try {
       setIsUploading(true);
       const uploadFormData = new FormData();
-      uploadFormData.append("datasetName", formData.datasetName);
-      uploadFormData.append("category", formData.category);
-      uploadFormData.append("version", formData.version);
-      uploadFormData.append("source", formData.source);
-      uploadFormData.append("description", formData.description);
+      uploadFormData.append("datasetName", formData.datasetName.trim());
+      uploadFormData.append("category", formData.category.trim());
+      uploadFormData.append("version", formData.version.trim());
+      uploadFormData.append("source", formData.source.trim());
+      uploadFormData.append("description", formData.description?.trim() || "");
       uploadFormData.append("file", formData.file);
 
       await uploadDataset(uploadFormData);
 
-      toast.success("Dataset uploaded successfully !", {
-        description: "Your dataset has been saved successfully.",
+      toast.success("Dataset uploaded successfully!", {
+        description: `"${formData.datasetName}" version ${formData.version} has been registered and added to Recent Datasets.`,
       });
 
       router.push("/dataset");
     } catch (err) {
-      console.error("upload failed: ", err);
-
+      console.error("Upload failed:", err);
       toast.error(getUploadErrorMessage(err));
     } finally {
       setIsUploading(false);
     }
   };
 
-  // reset form when click on cancel
   const handleCancel = () => {
-    setFormData({
-      datasetName: "",
-      category: "finetunning",
-      version: "",
-      source: "",
-      description: "",
-      file: null,
-    });
+    router.push("/dataset");
   };
-  // Later:
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50">
-        {/* side bar consists -> all routes section */}
-        <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
+    <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px] pb-16">
+      {/* 1. Back to Datasets Button - on the left */}
+      <div className="px-5">
+        <Breadcrumbs
+          backHref="/dataset"
+          backLabel="Back to Datasets"
+        />
+      </div>
 
-        {/* navbar consists -> profile image and search bar section  */}
-        <Navbar onMenuClick={() => setIsOpen((prev) => !prev)} />
+      {/* 2. Page Header - on the left, same as dataset details page */}
+      <div className="px-5 mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-[#002B5C]">
+          Upload Dataset
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">
+          Configure metadata and ingest new training, evaluation, or fine-tuning
+          data into the FastAPI pipeline.
+        </p>
+      </div>
 
-        {/* main content of the page -> form to upload dataset  */}
-        <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px]">
-          <div className="mb-6">
-            <h1 className="text-[26px] font-bold text-[#002B5C]">
-              Upload Dataset
-            </h1>
-
-            <p className="mt-1 text-xs text-slate-600">
-              Configure and ingest new training or evaluation data into the
-              platform.
+      {/* 3. Form Card - centered in the middle */}
+      <div className="px-5 flex justify-center">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+        >
+          {/* Card Header */}
+          <div className="border-b border-slate-200 bg-[#FAFBFE] px-6 py-4">
+            <h2 className="text-base font-semibold text-[#002B5C]">
+              Dataset Configuration & Ingestion
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Supported formats: CSV, XLSX, JSONL, JSON
             </p>
           </div>
 
-          {/* Form Card */}
-          <form
-            onSubmit={handleSubmit}
-            className="overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm"
-          >
-            {/* Card Header */}
-            <div className="border-b border-slate-300 px-4 py-3">
-              <h2 className="text-sm font-semibold text-[#002B5C]">
-                Dataset Configuration
-              </h2>
-            </div>
-
-            {/* Form Content */}
-            <div className="space-y-5 p-4">
-              {/* Name + Category */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField
-                  label="Dataset Name"
-                  name="datasetName"
-                  placeholder="e.g., Financial Dataset"
-                  value={formData.datasetName}
-                  onChange={handleChange}
-                  required
-                />
-
-                <SelectField
-                  label="Category"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  options={categoryOptions}
-                  required
-                />
-
-                <FormField
-                  label="Dataset Version"
-                  name="version"
-                  placeholder="e.g. 1.0.0"
-                  value={formData.version}
-                  onChange={handleChange}
-                  required
-                />
-
-                <FormField
-                  label="Dataset Source"
-                  name="source"
-                  placeholder="e.g. Internal CRM"
-                  value={formData.source}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-              {/* Description */}
-              <TextAreaField
-                label="Description (Optional)"
-                name="description"
-                placeholder="Provide context regarding data source and intended use case..."
-                value={formData.description}
+          {/* Form Content */}
+          <div className="space-y-6 p-6">
+            {/* Name + Category */}
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <FormField
+                label="Dataset Name"
+                name="datasetName"
+                placeholder="e.g. HDFC Customer Support FAQ"
+                value={formData.datasetName}
                 onChange={handleChange}
-                rows={4}
+                required
               />
 
-              {/* File */}
-              <FileUpload onFileSelect={handleFileSelect} />
+              <SelectField
+                label="Category"
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                options={categoryOptions}
+                required
+              />
+
+              <FormField
+                label="Dataset Version"
+                name="version"
+                placeholder="e.g. 1.0.0"
+                value={formData.version}
+                onChange={handleChange}
+                required
+              />
+
+              <FormField
+                label="Dataset Source"
+                name="source"
+                placeholder="e.g. Core Banking Logs, CRM Export"
+                value={formData.source}
+                onChange={handleChange}
+                required
+              />
             </div>
 
-            {/* Footer */}
-            <div className="flex justify-end gap-3 border-t border-slate-200 bg-[#FAFBFE] px-4 py-3">
-              <Button type="button" onClick={handleCancel}>
-                Cancel
-              </Button>
+            {/* Description */}
+            <TextAreaField
+              label="Description (Optional)"
+              name="description"
+              placeholder="Provide context regarding data source, schema structure, and intended downstream use case..."
+              value={formData.description}
+              onChange={handleChange}
+              rows={3}
+            />
 
-              <Button
-                type="submit"
-                icon={Upload}
-                variant="primary"
-                disabled={isUploading}
-              >
-                {isUploading ? "Uploading..." : "Upload"}
-              </Button>
-            </div>
-          </form>
-        </main>
+            {/* File Upload */}
+            <FileUpload onFileSelect={handleFileSelect} />
+          </div>
 
-        {/* Footer here  */}
-        <div className="mt-12 lg:ml-[280px]">
-          <Footer />
-        </div>
+          {/* Footer */}
+          <div className="flex justify-end gap-3 border-t border-slate-200 bg-[#FAFBFE] px-6 py-4">
+            <Button
+              type="button"
+              variant="default"
+              onClick={handleCancel}
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              icon={isUploading ? Loader2 : Upload}
+              variant="primary"
+              disabled={isUploading}
+            >
+              {isUploading ? "Uploading Dataset..." : "Upload Dataset"}
+            </Button>
+          </div>
+        </form>
       </div>
-    </>
+    </main>
+  );
+}
+
+export default function UploadDataset() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center lg:ml-[280px]">
+          <Loader2 className="h-8 w-8 animate-spin text-[#002B55]" />
+        </div>
+      }
+    >
+      <UploadDatasetContent />
+    </Suspense>
   );
 }
