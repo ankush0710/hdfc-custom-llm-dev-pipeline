@@ -21,7 +21,7 @@ This document defines the system requirements using a **Projectional Requirement
 ```
 +---------------------------------------------------------------------------------------+
 |                                    FRONTEND LAYER                                     |
-|  [ Next.js (App Router) ]  [ JavaScript (ES6+) ]  [ Tailwind CSS ]  [ Lucide        React ]    |
+|  [ Next.js (App Router) ]  [ JavaScript (ES6+) ]  [ Tailwind CSS ]  [ Lucide-React ]  |
 |                        [ Axios ]                  [ Recharts ]                        |
 +---------------------------------------------------------------------------------------+
                                            | HTTP / REST / WebSockets
