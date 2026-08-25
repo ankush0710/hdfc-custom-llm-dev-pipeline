@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.dbConfig.database_config import get_db
 from app.schema.evaluation_schema.evaluation_schema import (
@@ -69,10 +69,15 @@ def get_evaluation_by_id(
 )
 def start_evaluation(
     evaluation_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     try:
-        return evaluation_service.start_evaluation(db, evaluation_id)
+        return evaluation_service.start_evaluation(
+            db=db,
+            evaluation_id=evaluation_id,
+            background_tasks=background_tasks,
+        )
     except ValueError as error:
         err_msg = str(error)
         status_code = 404 if "not found" in err_msg.lower() else 400
@@ -80,6 +85,7 @@ def start_evaluation(
             status_code=status_code,
             detail=err_msg
         )
+
 
 
 # ====================== post method for saving the evaluation results ================================ #

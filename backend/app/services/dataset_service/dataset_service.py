@@ -138,3 +138,20 @@ def delete_dataset_by_id(
     db.commit()
 
     return dataset
+
+
+def get_dataset_versions(db: Session, dataset_id: int):
+    return (
+        db.query(Dataset_Version_Model)
+        .filter(Dataset_Version_Model.dataset_id == dataset_id)
+        .order_by(Dataset_Version_Model.created_at.desc())
+        .all()
+    )
+
+
+def get_dataset_version_by_id(db: Session, version_id: int):
+    return (
+        db.query(Dataset_Version_Model)
+        .filter(Dataset_Version_Model.id == version_id)
+        .first()
+    )

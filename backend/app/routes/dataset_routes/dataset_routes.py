@@ -135,3 +135,41 @@ def delete_dataset_id(
         "message": "Dataset deleted successfully",
         "dataset_id": dataset_id
     }
+
+
+# ======================= routes for dataset versions ===========================#
+@router.get("/{dataset_id}/versions")
+def list_dataset_versions(
+    dataset_id: int,
+    db: Session = Depends(get_db)
+):
+    from app.services.dataset_service.dataset_service import get_dataset_versions
+    return get_dataset_versions(db, dataset_id)
+
+
+@router.get("/versions/{version_id}/download")
+def download_dataset_version(
+    version_id: int,
+    db: Session = Depends(get_db)
+):
+    from app.services.dataset_service.dataset_service import get_dataset_version_by_id
+    version = get_dataset_version_by_id(db, version_id)
+
+    if not version:
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset version not found"
+        )
+
+    file_path = Path(version.file_path)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset version file not found on disk"
+        )
+
+    return FileResponse(
+        path=str(file_path),
+        filename=version.file_name,
+        media_type="application/octet-stream"
+    )

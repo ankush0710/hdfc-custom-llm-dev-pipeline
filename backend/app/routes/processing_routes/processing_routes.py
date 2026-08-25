@@ -68,6 +68,31 @@ def get_processing_status(
         "output_file":job.output_file,
         "error_message":job.error_message
     }
+
+
+@router.get("/jobs/{job_id}/metrics")
+def get_job_quality_metrics(
+    job_id: int,
+    db: Session = Depends(get_db)
+):
+    from app.services.processing_service.processing_service import get_processing_metrics
+    metrics = get_processing_metrics(db, job_id)
+
+    if not metrics:
+        raise HTTPException(
+            status_code=404,
+            detail="Quality metrics not found for this job"
+        )
+
+    return {
+        "job_id": metrics.job_id,
+        "total_rows": metrics.total_rows,
+        "total_columns": metrics.total_columns,
+        "duplicate_rows": metrics.duplicate_rows,
+        "missing_values": metrics.missing_values,
+        "empty_rows": metrics.empty_rows,
+        "quality_score": metrics.quality_score
+    }
     
 
 

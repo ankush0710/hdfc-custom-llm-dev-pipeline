@@ -1,36 +1,50 @@
 from typing import Any
+
 from app.ai.inference_adapter.inference_adapter import (
     AIInferenceAdapter,
 )
 
 
-
 class ModelLoader:
 
     def __init__(self):
-        self.model = None
-        self.tokenizer = None
-        self.loaded_model_id = None
 
-    def load(
+        self.loaded_model_id: int | None = None
+
+        self.loaded_model_name: str | None = None
+
+    def register_runtime_model(
         self,
         model_id: int,
-        artifact_path: str,
-    ):  
+        model_name: str,
+    ) -> dict[str, Any]:
 
+        models = AIInferenceAdapter.list_models()
 
-        # inference service comes from ai folder to load the model
-        from ai.inference.service import load_model
-
-        self.model, self.tokenizer = load_model(
-            artifact_path
+        ai_model = next(
+            (
+                model
+                for model in models
+                if model.get("id") == model_name
+            ),
+            None,
         )
 
+        if ai_model is None:
+
+            raise RuntimeError(
+                f"AI model '{model_name}' "
+                "was not found in AI registry."
+            )
+
         self.loaded_model_id = model_id
+        self.loaded_model_name = model_name
 
         return {
             "model_id": model_id,
-            "status": "LOADED",
+            "model_name": model_name,
+            "status": "READY_FOR_INFERENCE",
+            "ai_model": ai_model,
         }
 
     def unload(self):
@@ -42,5 +56,9 @@ class ModelLoader:
 
         return result
 
-    def is_loaded(self, model_id: int) -> bool:
+    def is_loaded(
+        self,
+        model_id: int,
+    ) -> bool:
+
         return self.loaded_model_id == model_id

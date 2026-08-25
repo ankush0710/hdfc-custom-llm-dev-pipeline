@@ -12,11 +12,13 @@ from app.schema.inference_schema.inference_schema import (
     InferenceRequest,
     InferenceResponse,
 )
-from app.ai.inference_adapter.inference_adapter import (
-    AIInferenceAdapter,
-)
+
 from app.services.inference_service.inference_service import (
     InferenceService,
+)
+
+from app.ai.inference_adapter.inference_adapter import (
+    AIInferenceAdapter,
 )
 
 
@@ -72,12 +74,15 @@ def predict(
             detail=str(exc),
         )
 
+
 @router.get("/models")
-def list_runtime_models():
+def list_models():
 
     try:
 
-        return AIInferenceAdapter.list_models()
+        return (
+            AIInferenceAdapter.list_models()
+        )
 
     except Exception as exc:
 

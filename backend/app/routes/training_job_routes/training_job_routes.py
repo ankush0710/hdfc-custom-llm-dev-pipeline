@@ -81,3 +81,27 @@ def get_job(
         )
 
     return job
+
+
+@router.post(
+    "/{job_id}/start",
+    response_model=TrainingJobResponse
+)
+def start_job(
+    job_id: int,
+    db: Session = Depends(get_db)
+):
+    from app.services.training_job_service.training_job_service import start_training_job
+    try:
+        job = start_training_job(db, job_id)
+        if not job:
+            raise HTTPException(
+                status_code=404,
+                detail="Training job not found"
+            )
+        return job
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc)
+        )

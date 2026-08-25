@@ -12,6 +12,8 @@ class Model_Create(BaseModel):
     adapter_path: Optional[str] = None
     training_job_id: Optional[int] = None
     evaluation_id: Optional[int] = None
+    status: Optional[str] = "CREATED"
+
 
 
 class Model_Update_Status(BaseModel):
