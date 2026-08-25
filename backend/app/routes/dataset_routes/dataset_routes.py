@@ -50,15 +50,21 @@ async def upload_dataset(
             detail="Unsupported file type"
         )
 
-    return await create_dataset(
-        db=db,
-        dataset_name=datasetName,
-        category=category,
-        version=version,
-        source=source,
-        description=description,
-        file=file,
-    )
+    try:
+        return await create_dataset(
+            db=db,
+            dataset_name=datasetName,
+            category=category,
+            version=version,
+            source=source,
+            description=description,
+            file=file,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
 
 
 # ======================= route for get the dataset details by id ==========================#
@@ -100,17 +106,25 @@ def download_dataset(
             detail="Dataset not found...."
         )
 
-    file_path = Path(dataset.file_path)
+    if not dataset.versions:
+        raise HTTPException(
+            status_code=404,
+            detail="No files available for this dataset"
+        )
+
+    # Sort or pick the latest version
+    latest_version = sorted(dataset.versions, key=lambda v: v.created_at or 0, reverse=True)[0]
+    file_path = Path(latest_version.file_path)
 
     if not file_path.exists():
         raise HTTPException(
             status_code=404,
-            detail="Dataset file not found"
+            detail="Dataset file not found on server"
         )
 
     return FileResponse(
         path=str(file_path),
-        filename=dataset.file_name,
+        filename=latest_version.file_name,
         media_type="application/octet-stream"
     )
 
