@@ -85,12 +85,23 @@ def process_dataset(db: Session, dataset_version_id: int, operations: list[str])
         elif extension == ".json":
             df.to_json(output_file, orient="records")
 
+        elif extension == ".jsonl":
+            df.to_json(output_file, orient="records", lines=True)
+
         # =========================== #
         # TO UPDATE PROCESSING JOB
         # =========================== #
         job.status = "COMPLETED"
         job.output_file = output_file
         job.completed_at = datetime.utcnow()
+
+        # =========================== #
+        # MARK ORIGINAL VERSION AS PROCESSED
+        # This is the critical lineage link: training enforces status="Processed"
+        # on the dataset_version_id passed to it. Without updating here, training
+        # would always be blocked with HTTP 400.
+        # =========================== #
+        dataset_version.status = "Processed"
 
         # ============================ #
         # SAVE METRICS

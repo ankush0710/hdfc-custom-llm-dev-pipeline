@@ -172,7 +172,7 @@ class AIEvaluationAdapter:
             t0 = time.perf_counter()
             try:
                 result = AIInferenceAdapter.generate(
-                    model_name="qwen3_0_6b",
+                    model_id="qwen3_0_6b",
                     task_type=task_type,
                     question=question,
                     context=context,
