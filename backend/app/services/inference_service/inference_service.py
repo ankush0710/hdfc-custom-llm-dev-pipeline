@@ -12,6 +12,8 @@ from app.model.model_registry import Model_Registry
 INFERENCE_ALLOWED_STATUSES = {
     "READY",
     "DEPLOYED",
+    "ACTIVE",
+    "EVALUATED",
 }
 
 

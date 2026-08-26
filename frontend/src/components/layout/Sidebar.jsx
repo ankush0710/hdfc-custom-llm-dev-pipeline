@@ -14,6 +14,7 @@ import {
     BrainCircuit,
     ChartColumn,
     Box,
+    Rocket,
     SquareTerminal,
     X,
     LogOut,
@@ -48,6 +49,11 @@ const eveluationItems = [
         name: "Model",
         href: "/model",
         icon: Box,
+    },
+    {
+        name: "Deployment",
+        href: "/deployment",
+        icon: Rocket,
     },
     {
         name: "Playground",
