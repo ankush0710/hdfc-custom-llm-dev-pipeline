@@ -142,9 +142,7 @@ function UploadDatasetContent() {
 
       await uploadDataset(uploadFormData);
 
-      toast.success("Dataset uploaded successfully!", {
-        description: `"${formData.datasetName}" version ${formData.version} has been registered and added to Recent Datasets.`,
-      });
+      toast.success("Dataset uploaded successfully!");
 
       router.push("/dataset");
     } catch (err) {

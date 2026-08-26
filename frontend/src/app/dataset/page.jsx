@@ -8,11 +8,17 @@ import { useRouter } from "next/navigation";
 import StatCard from "@/components/ui/StatCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
-import { DatasetStatData } from "@/sampleData/Dataset/DatasetStatData";
 import { createDatasetColumns } from "@/components/tables/DatasetTableColumns/DatasetColumns";
 import { getDataset, deleteDataset } from "../services/datasetService/datasetServices";
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { Upload, RefreshCw, Database } from "lucide-react";
+import {
+  Upload,
+  RefreshCw,
+  Database,
+  CircleCheck,
+  RefreshCcwDot,
+  CircleAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export default function Dataset() {
@@ -70,7 +76,7 @@ export default function Dataset() {
     []
   );
 
-  // Use the stat card configuration created in DatasetStatData and update only values
+  // Compute stat cards dynamically from real dataset records
   const statCards = useMemo(() => {
     const total = datasets.length;
     let validated = 0;
@@ -84,32 +90,53 @@ export default function Dataset() {
 
       if (status === "validated" || status === "processed" || status === "uploaded") {
         validated++;
-      } else if (status === "processing") {
+      } else if (status === "processing" || status === "running") {
         processing++;
-      } else if (status === "failed") {
+      } else if (status === "failed" || status === "error") {
         failed++;
       } else {
         validated++;
       }
     });
 
-    return DatasetStatData.map((card) => {
-      let value = card.value;
-      if (card.statName === "Total Datasets") {
-        value = total;
-      } else if (card.statName === "Validated") {
-        value = validated;
-      } else if (card.statName === "Processing") {
-        value = processing;
-      } else if (card.statName === "Failed") {
-        value = failed;
-      }
-
-      return {
-        ...card,
-        value,
-      };
-    });
+    return [
+      {
+        statName: "Total Datasets",
+        value: total,
+        icon: Database,
+        iconBg: "bg-blue-50 text-blue-600 border-blue-100",
+        cardBg:
+          "border-t-5 border-t-[#E0E0E0] px-6 py-4 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 group hover:border-t-[#002B55]",
+        valueColor: "text-[#002B55]",
+      },
+      {
+        statName: "Validated",
+        value: validated,
+        icon: CircleCheck,
+        iconBg: "bg-emerald-50 text-emerald-600 border-emerald-100",
+        cardBg:
+          "border-t-5 border-t-[#A5D6A7] px-6 py-4 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 group hover:border-t-[#266210]",
+        valueColor: "text-[#002B55]",
+      },
+      {
+        statName: "Processing",
+        value: processing,
+        icon: RefreshCcwDot,
+        iconBg: "bg-amber-50 text-amber-600 border-amber-100",
+        cardBg:
+          "border-t-5 border-t-[#FFE082] px-6 py-4 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 group hover:border-t-[#FFA000]",
+        valueColor: "text-[#002B55]",
+      },
+      {
+        statName: "Failed",
+        value: failed,
+        icon: CircleAlert,
+        iconBg: "bg-red-50 text-red-600 border-red-100",
+        cardBg:
+          "border-t-5 border-t-[#FFCDC9] px-6 py-4 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 group hover:border-t-[#D90000]",
+        valueColor: "text-[#D90000]",
+      },
+    ];
   }, [datasets]);
 
   return (

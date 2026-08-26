@@ -10,8 +10,12 @@ export default function ModelsTable({
   title = "Recent Datasets",
   showFilter = true,
   showMenu = true,
+  filterOptions = [],
+  selectedFilter = "ALL",
+  onFilterChange = null,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // Total number of pages (at least 1)
   const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
@@ -71,15 +75,70 @@ export default function ModelsTable({
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 relative">
           {showFilter && (
-            <button
-              type="button"
-              className="text-gray-500 transition hover:text-gray-700 p-1 rounded hover:bg-gray-100"
-              title="Filter"
-            >
-              <Filter size={18} />
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  if (filterOptions && filterOptions.length > 0) {
+                    setIsFilterOpen((prev) => !prev);
+                  } else if (onFilterChange) {
+                    onFilterChange();
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border transition ${
+                  selectedFilter !== "ALL"
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "text-gray-600 border-gray-200 hover:bg-gray-100"
+                }`}
+                title="Filter by status"
+              >
+                <Filter size={14} />
+                <span>
+                  {selectedFilter !== "ALL"
+                    ? filterOptions.find((o) => o.value === selectedFilter)?.label || selectedFilter
+                    : "Filter"}
+                </span>
+              </button>
+
+              {/* Filter Dropdown Popover */}
+              {isFilterOpen && filterOptions.length > 0 && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setIsFilterOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white p-1.5 shadow-lg border border-gray-200 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <p className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                      Filter by Status
+                    </p>
+                    {filterOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          if (onFilterChange) onFilterChange(opt.value);
+                          setIsFilterOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition text-left ${
+                          selectedFilter === opt.value
+                            ? "bg-blue-50 text-blue-700 font-bold"
+                            : "text-gray-700 hover:bg-gray-50 font-medium"
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {opt.count !== undefined && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                            {opt.count}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {showMenu && (
