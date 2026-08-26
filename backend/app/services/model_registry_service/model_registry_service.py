@@ -14,6 +14,7 @@ VALID_STATUSES = {
     "APPROVED",
     "REJECTED",
     "READY",
+    "ACTIVE",
     "DEPLOYED",
     "DEPRECATED",
     "ARCHIVED",
