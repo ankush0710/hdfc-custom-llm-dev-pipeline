@@ -4,6 +4,8 @@ from app.dbConfig.database_config import get_db
 from app.schema.evaluation_schema.evaluation_schema import (
     EvaluationCreate,
     EvaluationResponse,
+    EvaluationStatsResponse,
+    EvaluationDetailResponse,
 )
 import app.services.evaluation_service.evaluation_service as evaluation_service
 
@@ -15,7 +17,7 @@ router = APIRouter(
 
 # ======================== Create a new evaluation record =============================== #
 @router.post(
-    "/",
+    "",
     response_model=EvaluationResponse
 )
 def create_evaluation(
@@ -30,9 +32,20 @@ def create_evaluation(
         raise HTTPException(status_code=status_code, detail=err_msg)
 
 
+# ======================== Evaluation aggregate stats =================================== #
+@router.get(
+    "/stats",
+    response_model=EvaluationStatsResponse
+)
+def get_evaluation_stats(
+    db: Session = Depends(get_db)
+):
+    return evaluation_service.get_evaluation_stats(db)
+
+
 # ======================== List all evaluations (optionally filter by run_id) =========== #
 @router.get(
-    "/",
+    "",
     response_model=list[EvaluationResponse]
 )
 def list_evaluations(
@@ -55,6 +68,21 @@ def get_evaluation_by_id(
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
     return evaluation
+
+
+# ======================== Get rich evaluation detail for UI ============================= #
+@router.get(
+    "/{evaluation_id}/detail",
+    response_model=EvaluationDetailResponse
+)
+def get_evaluation_detail(
+    evaluation_id: int,
+    db: Session = Depends(get_db),
+):
+    detail = evaluation_service.get_evaluation_detail(db, evaluation_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Evaluation not found")
+    return detail
 
 
 # ======================== Start evaluation (runs AI scoring in background) ============= #

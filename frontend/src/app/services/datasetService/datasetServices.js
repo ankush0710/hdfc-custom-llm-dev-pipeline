@@ -20,6 +20,8 @@ export const getDataset = async () => {
   return response.data;
 };
 
+export const getDatasets = getDataset;
+
 export const getDatasetById = async (id) => {
   const response = await API.get(`/datasets/${id}`);
   return response.data;
