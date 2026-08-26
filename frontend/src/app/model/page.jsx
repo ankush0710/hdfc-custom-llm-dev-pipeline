@@ -1,30 +1,156 @@
 //=======================================================================================//
 /*
-The Model page that shows the all information about the Model card
+Model Registry Page: Manage, deploy, and track all language models across the enterprise.
 */
 //=======================================================================================//
-import Navbar from '@/components/layout/Navbar';
-import Sidebar from '@/components/layout/Sidebar';
-export default function Model() {
-    return (
-        <>
-            <div className="min-h-screen bg-gray-50">
-                <Sidebar />
-                {/* navbar here  */}
-                <div className='ml-[280px]'>
-                    <Navbar />
+"use client";
 
-                    <main>
-                        <div className="mx-auto text-center mt-10">
-                            <h1 className="text-blue-900 font-bold text-3xl"> HDFC Bank- custom LLM development pipeline</h1>
-                            <p className="text-black font-bold text-xl">
-                                This is Model page
-                            </p>
-                        </div>
-                    </main>
+import { useEffect, useState, useMemo, useCallback } from "react";
+import ModelsTable from "@/components/tables/ModelsTable";
+import Button from "@/components/ui/Button";
+import NewModelModal from "@/components/model/NewModelModal";
+import ModelDetailsDrawer from "@/components/model/ModelDetailsDrawer";
+import { createModelColumns } from "@/components/tables/ModelTableColumns/ModelColumns";
+import { getModels } from "@/app/services/modelService/modelServices";
+import { Plus, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+
+export default function ModelRegistryPage() {
+    const [models, setModels] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedModel, setSelectedModel] = useState(null);
+    const [statusFilter, setStatusFilter] = useState("ALL");
+
+    // Fetch models from FastAPI backend
+    const fetchModels = useCallback(async (isSilent = false) => {
+        try {
+            if (!isSilent) setLoading(true);
+            else setRefreshing(true);
+
+            const data = await getModels();
+            if (Array.isArray(data)) {
+                setModels(data);
+            } else {
+                setModels([]);
+            }
+        } catch (err) {
+            console.error("Failed to fetch models:")
+            setModels([]);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchModels();
+    }, [fetchModels]);
+
+    // Filter options for ModelsTable filter dropdown
+    const filterOptions = useMemo(
+        () => [
+            { label: "All Statuses", value: "ALL" },
+            { label: "Active", value: "ACTIVE" },
+            { label: "Training", value: "TRAINING" },
+            { label: "Archived", value: "ARCHIVED" },
+            { label: "Created", value: "CREATED" },
+        ],
+        []
+    );
+
+    // Filtered dataset
+    const filteredModels = useMemo(() => {
+        if (statusFilter === "ALL") return models;
+
+        return models.filter((item) => {
+            const itemStatus = (item.status || "").toUpperCase();
+            if (statusFilter === "ACTIVE") {
+                return ["ACTIVE", "APPROVED", "READY", "DEPLOYED"].includes(itemStatus);
+            }
+            if (statusFilter === "TRAINING") {
+                return ["TRAINING", "EVALUATING"].includes(itemStatus);
+            }
+            if (statusFilter === "ARCHIVED") {
+                return ["ARCHIVED", "DEPRECATED", "REJECTED"].includes(itemStatus);
+            }
+            if (statusFilter === "CREATED") {
+                return itemStatus === "CREATED";
+            }
+            return true;
+        });
+    }, [models, statusFilter]);
+
+    const columns = useMemo(
+        () =>
+            createModelColumns({
+                onViewDetails: (model) => setSelectedModel(model),
+            }),
+        []
+    );
+
+    return (
+        <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px] pb-16">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 px-3 lg:px-0">
+                <div>
+                    <h1 className="text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight">
+                        Model Registry
+                    </h1>
+                    <p className="text-xs lg:text-sm text-gray-500 mt-1 font-medium">
+                        Manage, deploy, and track all language models across the enterprise.
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="default"
+                        icon={RefreshCw}
+                        onClick={() => fetchModels(true)}
+                        disabled={refreshing}
+                    >
+                        {refreshing ? "Refreshing..." : "Refresh"}
+                    </Button>
+
+                    <Button
+                        variant="primary"
+                        icon={Plus}
+                        onClick={() => setIsModalOpen(true)}
+                    >
+                        Register New Model
+                    </Button>
                 </div>
             </div>
 
-        </>
-    )
+            {/* Models Table with built-in Status Filter */}
+            <div className="min-w-0">
+                <ModelsTable
+                    title="Registered Enterprise Models"
+                    columns={columns}
+                    data={filteredModels}
+                    pageSize={10}
+                    showFilter={true}
+                    filterOptions={filterOptions}
+                    selectedFilter={statusFilter}
+                    onFilterChange={(val) => setStatusFilter(val)}
+                />
+            </div>
+
+            {/* Register New Model Modal */}
+            <NewModelModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onModelCreated={() => fetchModels(true)}
+            />
+
+            {/* Model Details Drawer / Dialog */}
+            <ModelDetailsDrawer
+                isOpen={!!selectedModel}
+                onClose={() => setSelectedModel(null)}
+                model={selectedModel}
+                onStatusUpdated={() => fetchModels(true)}
+            />
+        </main>
+    );
 }

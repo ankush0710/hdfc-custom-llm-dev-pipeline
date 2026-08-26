@@ -17,12 +17,9 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
     render: (row) => {
       const formattedId = row.display_id || (row.id ? `trn-${String(row.id).padStart(4, "0").toLowerCase()}` : "trn-xxxx");
       return (
-        <Link
-          href={`/training/${row.id}`}
-          className="font-mono text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer"
-        >
+        <span className="font-mono text-xs font-semibold text-slate-700">
           {formattedId}
-        </Link>
+        </span>
       );
     },
   },
@@ -30,12 +27,9 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
     key: "base_model",
     label: "Base Model",
     render: (row) => (
-      <Link
-        href={`/training/${row.id}`}
-        className="text-xs font-semibold text-gray-900 hover:text-blue-700 transition"
-      >
+      <span className="text-xs font-semibold text-gray-900">
         {row.base_model || "Llama-3-8B"}
-      </Link>
+      </span>
     ),
   },
   {
@@ -199,25 +193,16 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
             </button>
           )}
 
-          {rawStatus === "FAILED" && (
+          {rawStatus === "QUEUED" && (
             <button
               type="button"
-              onClick={() => onViewLogs && onViewLogs(row)}
-              className="p-1 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition"
-              title="View Logs"
+              onClick={() => onCancelRun && onCancelRun(row)}
+              className="p-1 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition"
+              title="Cancel Queue"
             >
-              <FileText size={16} />
+              <XCircle size={16} />
             </button>
           )}
-
-          <Link
-            href={`/training/${row.id}`}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors"
-            title="View Live Monitor & Details"
-          >
-            <Eye size={12} />
-            <span>Details</span>
-          </Link>
         </div>
       );
     },
