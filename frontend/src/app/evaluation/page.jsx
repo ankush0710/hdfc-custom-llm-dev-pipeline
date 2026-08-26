@@ -81,9 +81,10 @@ export default function EvaluationPage() {
     [fetchData]
   );
 
+  // Use real backend stats — show '—' when not available, never fabricate
   const totalEvalsDisplay = stats?.total_evaluations ?? evaluations.length;
-  const avgScoreDisplay = stats?.avg_score ?? (evaluations.length > 0 ? "85.4%" : "0.0%");
-  const successRateDisplay = stats?.success_rate ?? (evaluations.length > 0 ? "92.1%" : "0.0%");
+  const avgScoreDisplay = stats?.avg_score_str ?? (stats?.avg_score != null ? `${stats.avg_score}%` : "N/A");
+  const successRateDisplay = stats?.success_rate ?? "N/A";
 
   return (
     <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px] pb-16">
@@ -131,7 +132,7 @@ export default function EvaluationPage() {
               {loading ? "..." : totalEvalsDisplay.toLocaleString()}
             </span>
             <span className="text-xs font-mono font-semibold text-emerald-600">
-              {stats?.evaluations_trend || "+12% this month"}
+              {stats?.evaluations_trend ?? "—"}
             </span>
           </div>
         </div>
@@ -164,7 +165,7 @@ export default function EvaluationPage() {
             </span>
             <span className="text-xs font-mono font-semibold text-emerald-600 flex items-center gap-0.5">
               <TrendingUp size={13} />
-              <span>{stats?.success_trend || "+2.4%"}</span>
+              <span>{stats?.success_trend ?? "—"}</span>
             </span>
           </div>
         </div>

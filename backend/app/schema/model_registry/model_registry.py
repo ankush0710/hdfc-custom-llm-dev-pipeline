@@ -39,14 +39,14 @@ class Model_Response(BaseModel):
 class ModelOverview(BaseModel):
     base_model: str
     total_parameters: str
-    dataset_name: str
-    training_date: str
+    dataset_name: Optional[str] = None     # null when no training job linked
+    training_date: Optional[str] = None    # null when no created_at timestamp
 
 
 class ModelDeploymentInfo(BaseModel):
     environment: str
-    instance_type: str
-    endpoint_url: str
+    instance_type: Optional[str] = None    # not stored in DB
+    endpoint_url: Optional[str] = None     # null when model not deployed yet
     status: str
 
 
@@ -64,9 +64,9 @@ class ModelVersionHistoryItem(BaseModel):
     id: int
     version: str
     status: str
-    deployed_date: str
-    accuracy: str
-    changes: str
+    deployed_date: Optional[str] = None    # null when no created_at
+    accuracy: Optional[str] = None         # null for non-current versions (no eval data)
+    changes: Optional[str] = None          # not stored in DB
 
 
 class ModelDetailResponse(BaseModel):
@@ -74,7 +74,7 @@ class ModelDetailResponse(BaseModel):
     model_name: str
     version: str
     status: str
-    description: str
+    description: Optional[str] = None      # not stored in DB
     overview: ModelOverview
     deployment_info: ModelDeploymentInfo
     performance_metrics: ModelPerformanceMetrics

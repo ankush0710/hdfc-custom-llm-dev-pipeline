@@ -89,19 +89,15 @@ def _enrich_evaluation(db: Session, eval_item: Evaluation_Model) -> Evaluation_M
         eval_item.dataset_name = f"HDFC-KB-v{eval_item.test_dataset_id}"
         eval_item.dataset_version = "v1.0"
 
-    # Score calculation
+    # Score calculation — only use real DB metrics, never fabricate
     acc = eval_item.answer_accuracy or eval_item.intent_structured_accuracy or eval_item.full_structured_match
     if acc is not None:
         pct = acc * 100 if acc <= 1.0 else acc
         eval_item.score_value = round(pct, 1)
         eval_item.score = f"{round(pct, 1)}%"
     else:
-        if eval_item.evaluation_status == "COMPLETED":
-            eval_item.score_value = 88.5
-            eval_item.score = "88.5%"
-        else:
-            eval_item.score_value = None
-            eval_item.score = "-"
+        eval_item.score_value = None
+        eval_item.score = "-"
 
     return eval_item
 
@@ -129,15 +125,20 @@ def list_evaluation(db: Session, run_id: int | None = None):
 
 # ================================ evaluation aggregate stats ======================================= #
 def get_evaluation_stats(db: Session):
+    """
+    Returns real aggregate evaluation stats from PostgreSQL.
+    avg_score and trends are null when no real data exists — no hardcoded fallbacks.
+    """
     evals = db.query(Evaluation_Model).all()
     total_count = len(evals)
     if total_count == 0:
         return {
             "total_evaluations": 0,
-            "avg_score": "0.0%",
+            "avg_score": None,
+            "avg_score_str": "N/A",
             "success_rate": "0.0%",
-            "evaluations_trend": "+0% this month",
-            "success_trend": "+0.0%",
+            "evaluations_trend": None,
+            "success_trend": None,
         }
 
     completed = [e for e in evals if str(e.evaluation_status).upper() == "COMPLETED"]
@@ -151,62 +152,77 @@ def get_evaluation_stats(db: Session):
             pct = acc * 100 if acc <= 1.0 else acc
             scores.append(pct)
 
-    avg_score = (sum(scores) / len(scores)) if scores else 85.4
+    # Only compute avg when real scored evaluations exist — no fabrication
+    avg_score = round(sum(scores) / len(scores), 1) if scores else None
+    avg_score_str = f"{avg_score}%" if avg_score is not None else "N/A"
 
     return {
         "total_evaluations": total_count,
-        "avg_score": f"{round(avg_score, 1)}%",
+        "avg_score": avg_score,
+        "avg_score_str": avg_score_str,
         "success_rate": f"{round(success_rate, 1)}%",
-        "evaluations_trend": "+12% this month",
-        "success_trend": "+2.4%",
+        "evaluations_trend": None,
+        "success_trend": None,
     }
 
 
 # ================================ evaluation detailed breakdown ===================================== #
 def get_evaluation_detail(db: Session, evaluation_id: int):
+    """
+    Returns detailed evaluation metrics directly from the database.
+    Fields are null when metrics haven't been computed yet (evaluation not completed).
+    No fabricated fallback values are used.
+    """
     evaluation = get_evaluation_by_id(db, evaluation_id)
     if not evaluation:
         return None
 
-    # Base values from real evaluation model
-    ans_acc = evaluation.answer_accuracy if evaluation.answer_accuracy is not None else 0.94
-    ans_acc_pct = round(ans_acc * 100 if ans_acc <= 1.0 else ans_acc, 1)
+    # Use real DB values — return None if not yet available (not fabricated)
+    ans_acc_raw = evaluation.answer_accuracy
+    ans_acc_pct = round(ans_acc_raw * 100 if ans_acc_raw is not None and ans_acc_raw <= 1.0 else (ans_acc_raw or 0), 1) if ans_acc_raw is not None else None
 
-    intent_acc = evaluation.intent_structured_accuracy if evaluation.intent_structured_accuracy is not None else 0.92
-    intent_acc_pct = round(intent_acc * 100 if intent_acc <= 1.0 else intent_acc, 1)
+    intent_acc_raw = evaluation.intent_structured_accuracy
+    intent_acc_pct = round(intent_acc_raw * 100 if intent_acc_raw is not None and intent_acc_raw <= 1.0 else (intent_acc_raw or 0), 1) if intent_acc_raw is not None else None
 
-    policy_acc = evaluation.policy_flag_accuracy if evaluation.policy_flag_accuracy is not None else 0.89
-    policy_acc_pct = round(policy_acc * 100 if policy_acc <= 1.0 else policy_acc, 1)
+    policy_acc_raw = evaluation.policy_flag_accuracy
+    policy_acc_pct = round(policy_acc_raw * 100 if policy_acc_raw is not None and policy_acc_raw <= 1.0 else (policy_acc_raw or 0), 1) if policy_acc_raw is not None else None
 
-    f1_val = evaluation.full_structured_match if evaluation.full_structured_match is not None else 0.91
-    f1_pct = round(f1_val * 100 if f1_val <= 1.0 else f1_val, 1)
+    f1_raw = evaluation.full_structured_match
+    f1_pct = round(f1_raw * 100 if f1_raw is not None and f1_raw <= 1.0 else (f1_raw or 0), 1) if f1_raw is not None else None
 
-    # Precision & Recall
-    precision_pct = intent_acc_pct
-    recall_pct = policy_acc_pct
+    precision_pct = intent_acc_pct  # maps to intent accuracy
+    recall_pct = policy_acc_pct    # maps to policy accuracy
 
-    # Overall score
-    overall = round((ans_acc_pct * 0.4 + precision_pct * 0.3 + recall_pct * 0.3), 1)
+    # Overall score — only when all components are available
+    if ans_acc_pct is not None and precision_pct is not None and recall_pct is not None:
+        overall = round((ans_acc_pct * 0.4 + precision_pct * 0.3 + recall_pct * 0.3), 1)
+        overall_str = f"{overall}%"
+    else:
+        overall = None
+        overall_str = None
 
-    date_str = evaluation.created_at.strftime("%b %d, %Y") if evaluation.created_at else "Oct 24, 2024"
+    date_str = evaluation.created_at.strftime("%b %d, %Y") if evaluation.created_at else None
 
-    benchmark_breakdown = [
-        {
+    # Benchmark breakdown — only include tasks with real scores
+    benchmark_breakdown = []
+    if intent_acc_pct is not None:
+        benchmark_breakdown.append({
             "task_name": "Task A (Reasoning / Intent Structured Validity)",
             "score": intent_acc_pct,
             "category": "Intent Reasoning",
-        },
-        {
+        })
+    if ans_acc_pct is not None:
+        benchmark_breakdown.append({
             "task_name": "Task B (Structured Entity Extraction / Generation)",
             "score": ans_acc_pct,
             "category": "Extraction",
-        },
-        {
+        })
+    if policy_acc_pct is not None:
+        benchmark_breakdown.append({
             "task_name": "Task C (Banking Policy & Safety Compliance)",
             "score": policy_acc_pct,
             "category": "Safety Alignment",
-        },
-    ]
+        })
 
     return {
         "evaluation_id": evaluation.evaluation_id,
@@ -221,14 +237,14 @@ def get_evaluation_detail(db: Session, evaluation_id: int):
         "date_formatted": date_str,
         "status": evaluation.evaluation_status,
         "overall_score": overall,
-        "overall_score_str": f"{overall}%",
+        "overall_score_str": overall_str,
         "accuracy": ans_acc_pct,
-        "accuracy_trend": "+1.5% vs prev",
+        "accuracy_trend": None,
         "precision": precision_pct,
         "recall": recall_pct,
-        "recall_trend": "-1.2% vs prev",
+        "recall_trend": None,
         "f1_score": f1_pct,
-        "f1_trend": "+0.8% vs prev",
+        "f1_trend": None,
         "benchmark_breakdown": benchmark_breakdown,
         "average_latency_seconds": evaluation.average_latency_seconds,
         "critical_safety_failures": evaluation.critical_safety_failures or 0,

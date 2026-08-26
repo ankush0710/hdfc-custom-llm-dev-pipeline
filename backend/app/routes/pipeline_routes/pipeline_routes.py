@@ -6,6 +6,11 @@ Returns the complete lineage snapshot for a given dataset version:
                   → model_registry → evaluation → deployment
 
 This gives a single-call view of where the pipeline stands for any version.
+
+GET /pipeline/dashboard/stats
+
+Returns aggregate counts from all tables for the main dashboard.
+All values come directly from PostgreSQL — no hardcoded fallbacks.
 """
 
 from typing import Any, Dict, List, Optional
@@ -110,6 +115,32 @@ class PipelineStatusResponse(BaseModel):
     pipeline_complete: bool      # True when at least one DEPLOYED model exists
 
 
+# ─────────────────────── Dashboard Stats shapes ────────────────────────────── #
+
+class RecentActivityItem(BaseModel):
+    id: str
+    event_type: str         # "training_completed", "training_failed", "training_running",
+                            # "evaluation_completed", "evaluation_failed",
+                            # "model_registered", "model_deployed", "dataset_uploaded"
+    title: str
+    description: str
+    timestamp: Optional[str] = None
+    status: Optional[str] = None
+
+
+class DashboardStatsResponse(BaseModel):
+    total_datasets: int
+    total_models: int
+    active_trainings: int
+    completed_trainings: int
+    failed_trainings: int
+    total_evaluations: int
+    avg_evaluation_score: Optional[float] = None   # None when no completed evaluations
+    avg_evaluation_score_str: str                  # "89.2%" or "N/A"
+    active_deployments: int
+    recent_activity: List[RecentActivityItem]
+
+
 def _resolve_stage(
     dv_status: str,
     has_processing: bool,
@@ -136,7 +167,188 @@ def _resolve_stage(
     return "UPLOADED"
 
 
-# ─────────────────────────────── Route ────────────────────────────────────── #
+# ─────────────────────────────── Routes ───────────────────────────────────── #
+
+@router.get(
+    "/dashboard/stats",
+    response_model=DashboardStatsResponse,
+    summary="Aggregate dashboard statistics from real database records",
+    description=(
+        "Returns live counts and metrics for the main dashboard: "
+        "dataset count, model count, training run counts, evaluation score average, "
+        "deployment count, and recent activity feed. "
+        "All values are computed from PostgreSQL — no hardcoded fallbacks."
+    ),
+)
+def get_dashboard_stats(db: Session = Depends(get_db)):
+    from app.model.dataset_model import Dataset_Model
+
+    # ── Counts ────────────────────────────────────────────────────────────────
+    total_datasets = db.query(Dataset_Model).count()
+    total_models = db.query(Model_Registry).count()
+    active_deployments = (
+        db.query(Deployment).filter(Deployment.status == "ACTIVE").count()
+    )
+
+    all_training_runs = db.query(Training_Model).all()
+    active_trainings = sum(
+        1 for r in all_training_runs
+        if str(r.status or "").upper() in {"RUNNING", "QUEUED", "CREATED"}
+    )
+    completed_trainings = sum(
+        1 for r in all_training_runs
+        if str(r.status or "").upper() == "COMPLETED"
+    )
+    failed_trainings = sum(
+        1 for r in all_training_runs
+        if str(r.status or "").upper() == "FAILED"
+    )
+
+    # ── Avg evaluation score ──────────────────────────────────────────────────
+    completed_evals = (
+        db.query(Evaluation_Model)
+        .filter(Evaluation_Model.evaluation_status == "COMPLETED")
+        .all()
+    )
+    total_evaluations = db.query(Evaluation_Model).count()
+
+    scores = []
+    for e in completed_evals:
+        raw = (
+            e.answer_accuracy
+            if e.answer_accuracy is not None
+            else e.intent_structured_accuracy
+            if e.intent_structured_accuracy is not None
+            else e.full_structured_match
+        )
+        if raw is not None:
+            pct = raw * 100 if raw <= 1.0 else raw
+            scores.append(pct)
+
+    avg_score: Optional[float] = round(sum(scores) / len(scores), 1) if scores else None
+    avg_score_str = f"{avg_score}%" if avg_score is not None else "N/A"
+
+    # ── Recent Activity Feed ──────────────────────────────────────────────────
+    activity: List[RecentActivityItem] = []
+
+    # Last 5 training runs (most recent first)
+    recent_runs = (
+        db.query(Training_Model)
+        .order_by(Training_Model.id.desc())
+        .limit(5)
+        .all()
+    )
+    for run in recent_runs:
+        run_status = str(run.status or "").upper()
+        ts = run.completed_at or run.started_at or run.created_at
+        ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None
+
+        if run_status == "COMPLETED":
+            event_type = "training_completed"
+            title = f"Training Run #{run.id} Completed"
+            desc = f"Base model: {run.base_model} · Method: {run.training_method}"
+        elif run_status == "FAILED":
+            event_type = "training_failed"
+            title = f"Training Run #{run.id} Failed"
+            desc = run.error_message or "Unknown error"
+        elif run_status == "RUNNING":
+            event_type = "training_running"
+            title = f"Training Run #{run.id} In Progress"
+            desc = f"Base model: {run.base_model} · {run.epochs} epochs"
+        else:
+            event_type = "training_queued"
+            title = f"Training Run #{run.id} Queued"
+            desc = f"Base model: {run.base_model}"
+
+        activity.append(RecentActivityItem(
+            id=f"run-{run.id}",
+            event_type=event_type,
+            title=title,
+            description=desc,
+            timestamp=ts_str,
+            status=run.status,
+        ))
+
+    # Last 3 evaluations
+    recent_evals = (
+        db.query(Evaluation_Model)
+        .order_by(Evaluation_Model.evaluation_id.desc())
+        .limit(3)
+        .all()
+    )
+    for ev in recent_evals:
+        ev_status = str(ev.evaluation_status or "").upper()
+        ts = ev.completed_at or ev.started_at or ev.created_at
+        ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None
+
+        if ev_status == "COMPLETED":
+            event_type = "evaluation_completed"
+            title = f"Evaluation #{ev.evaluation_id} Completed"
+            desc = f"Run #{ev.run_id} · {ev.total_examples} examples evaluated"
+        elif ev_status == "FAILED":
+            event_type = "evaluation_failed"
+            title = f"Evaluation #{ev.evaluation_id} Failed"
+            desc = ev.error_message or "Unknown error"
+        else:
+            event_type = "evaluation_running"
+            title = f"Evaluation #{ev.evaluation_id} {(ev.evaluation_status or '').capitalize()}"
+            desc = f"Run #{ev.run_id}"
+
+        activity.append(RecentActivityItem(
+            id=f"eval-{ev.evaluation_id}",
+            event_type=event_type,
+            title=title,
+            description=desc,
+            timestamp=ts_str,
+            status=ev.evaluation_status,
+        ))
+
+    # Last 2 model deployments
+    recent_deployments = (
+        db.query(Deployment)
+        .order_by(Deployment.id.desc())
+        .limit(2)
+        .all()
+    )
+    for dep in recent_deployments:
+        model_rec = (
+            db.query(Model_Registry)
+            .filter(Model_Registry.id == dep.model_id)
+            .first()
+        )
+        model_name = model_rec.model_name if model_rec else f"Model-{dep.model_id}"
+        ts = dep.updated_at or dep.created_at
+        ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None
+
+        activity.append(RecentActivityItem(
+            id=f"dep-{dep.id}",
+            event_type="model_deployed",
+            title=f"{model_name} Deployed",
+            description=f"Version {dep.version} → {dep.environment} · {dep.status}",
+            timestamp=ts_str,
+            status=dep.status,
+        ))
+
+    # Sort activity by timestamp descending, limit to 8 items
+    def _sort_key(item: RecentActivityItem):
+        return item.timestamp or ""
+
+    activity.sort(key=_sort_key, reverse=True)
+    activity = activity[:8]
+
+    return DashboardStatsResponse(
+        total_datasets=total_datasets,
+        total_models=total_models,
+        active_trainings=active_trainings,
+        completed_trainings=completed_trainings,
+        failed_trainings=failed_trainings,
+        total_evaluations=total_evaluations,
+        avg_evaluation_score=avg_score,
+        avg_evaluation_score_str=avg_score_str,
+        active_deployments=active_deployments,
+        recent_activity=activity,
+    )
+
 
 @router.get(
     "/status/{dataset_version_id}",

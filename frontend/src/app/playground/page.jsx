@@ -29,19 +29,9 @@ export default function PlaygroundPage() {
     systemInstruction: SYSTEM_ROLE_PRESETS[0].instruction,
   });
 
-  const [messages, setMessages] = useState([
-    {
-      role: "user",
-      content:
-        "Analyze the recent transaction logs for account #8036-XXXX. Look for any anomalous multi-currency transfers exceeding $50k USD equivalent in the last 72 hours.",
-    },
-    {
-      role: "assistant",
-      content:
-        "I have analyzed the transaction logs for account #8036-XXXX over the past 72 hours. I found 2 anomalous multi-currency transfers exceeding the $50k USD threshold:\n\n• **Txn #4892**: $62,000 USD equivalent originated from a newly whitelisted IP in high-risk jurisdiction.\n• **Txn #4901**: $75,000 USD transfer triggered velocity rule `WARN-420` (rapid cross-border movement).\n\n**Recommendation**: Flag for enhanced compliance verification and initiate manual audit review.",
-      latency: 0.142,
-    },
-  ]);
+  // Start with empty chat — the playground shows real inference results only
+  const [messages, setMessages] = useState([]);
+  const [tokenCount, setTokenCount] = useState(0);
 
   // Fetch only deployed / active models
   const fetchDeployedModels = useCallback(async () => {
@@ -133,8 +123,13 @@ export default function PlaygroundPage() {
           role: "assistant",
           content: assistantText,
           latency: result?.latency_seconds,
+          tokens: result?.tokens_generated,
         },
       ]);
+      // Update token count from real API response
+      if (result?.tokens_generated != null) {
+        setTokenCount((prev) => prev + (result.tokens_generated || 0));
+      }
     } catch (err) {
       console.error("Inference failed:", err);
       toast.error(err?.response?.data?.detail || "Inference call failed");
@@ -154,6 +149,7 @@ export default function PlaygroundPage() {
 
   const handleClearChat = () => {
     setMessages([]);
+    setTokenCount(0);
     toast.success("Chat history cleared");
   };
 
@@ -202,7 +198,7 @@ export default function PlaygroundPage() {
             onSendMessage={handleSendMessage}
             onClearChat={handleClearChat}
             loading={inferencing}
-            tokenCount={482 + messages.length * 40}
+            tokenCount={tokenCount}
           />
         </div>
 

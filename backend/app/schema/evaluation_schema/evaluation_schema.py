@@ -37,10 +37,11 @@ class BenchmarkTaskItem(BaseModel):
 # ============================= evaluation stats ======================================= #
 class EvaluationStatsResponse(BaseModel):
     total_evaluations: int
-    avg_score: str
-    success_rate: str
-    evaluations_trend: str = "+12% this month"
-    success_trend: str = "+2.4%"
+    avg_score: Optional[float] = None       # null when no scored evaluations exist
+    avg_score_str: str = "N/A"              # "89.2%" or "N/A"
+    success_rate: str = "0.0%"
+    evaluations_trend: Optional[str] = None # null when no historical trend data
+    success_trend: Optional[str] = None     # null when no historical trend data
 
 
 # ============================= evaluation response ===================================== #
@@ -83,22 +84,23 @@ class EvaluationDetailResponse(BaseModel):
     display_id: str
     run_id: int
     model_id: int
-    model_name: str
-    base_model: str
+    model_name: Optional[str] = None
+    base_model: Optional[str] = None
     test_dataset_id: int
-    dataset_name: str
-    dataset_version: str
-    date_formatted: str
+    dataset_name: Optional[str] = None
+    dataset_version: Optional[str] = None
+    date_formatted: Optional[str] = None
     status: str
-    overall_score: float
-    overall_score_str: str
-    accuracy: float
-    accuracy_trend: Optional[str] = "+1.5% vs prev"
-    precision: float
-    recall: float
-    recall_trend: Optional[str] = "-1.2% vs prev"
-    f1_score: float
-    f1_trend: Optional[str] = "+0.8% vs prev"
+    # All metric fields are null until evaluation completes
+    overall_score: Optional[float] = None
+    overall_score_str: Optional[str] = None
+    accuracy: Optional[float] = None
+    accuracy_trend: Optional[str] = None
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+    recall_trend: Optional[str] = None
+    f1_score: Optional[float] = None
+    f1_trend: Optional[str] = None
     benchmark_breakdown: list[BenchmarkTaskItem] = []
     average_latency_seconds: Optional[float] = None
     critical_safety_failures: int = 0

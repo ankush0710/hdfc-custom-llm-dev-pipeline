@@ -1,98 +1,46 @@
-export const DashboardTableData = [
-  {
-    id: 1,
-    name: "Customer-Support-LLM",
-    version: "v1.2.0",
-    status: "live",
-    latency: "124ms",
-    action: "Metrics",
-  },
-  {
-    id: 2,
-    name: "Fraud-Detect-Alpha",
-    version: "v0.9.5-beta",
-    status: "degraded",
-    latency: "850ms",
-    action: "Metrics",
-  },
-  {
-    id: 3,
-    name: "Doc-Summarizer-V2",
-    version: "v2.1.1",
-    status: "idle",
-    latency: "-",
-    action: "Wake",
-  },
-  {
-    id: 4,
-    name: "Internal-Knowledge-Base",
-    version: "v3.0.0",
-    status: "live",
-    latency: "210ms",
-    action: "Metrics",
-  },
-  {
-    id: 5,
-    name: "Internal-Knowledge-Base",
-    version: "v3.0.0",
-    status: "live",
-    latency: "210ms",
-    action: "Metrics",
-  },
-  {
-    id: 6,
-    name: "Customer-Support-LLM",
-    version: "v1.2.0",
-    status: "live",
-    latency: "124ms",
-    action: "Metrics",
-  },
-  {
-    id: 7,
-    name: "Doc-Summarizer-V2",
-    version: "v2.1.1",
-    status: "idle",
-    latency: "-",
-    action: "Wake",
-  },
-  {
-    id: 8,
-    name: "Internal-Knowledge-Base",
-    version: "v3.0.0",
-    status: "live",
-    latency: "210ms",
-    action: "Metrics",
-  },
-];
-
-// status styles here
+// DashboardTableData.js
+// The hardcoded data array has been removed.
+// Real deployment data now comes from GET /deployments via the dashboard page.
+// This file only exports the column definitions for the Deployed Models table.
 
 import { Box } from "lucide-react";
 
+// Maps real backend deployment status values to display styles
 const statusStyles = {
-  live: {
+  active: {
     bg: "bg-green-100",
     text: "text-green-700",
     dot: "bg-green-500",
-    label: "Live",
+    label: "Active",
   },
-
+  stopped: {
+    bg: "bg-gray-100",
+    text: "text-gray-600",
+    dot: "bg-gray-500",
+    label: "Stopped",
+  },
+  deployed: {
+    bg: "bg-blue-100",
+    text: "text-blue-700",
+    dot: "bg-blue-500",
+    label: "Deployed",
+  },
   degraded: {
     bg: "bg-yellow-100",
     text: "text-yellow-700",
     dot: "bg-yellow-500",
     label: "Degraded",
   },
-
-  idle: {
-    bg: "bg-gray-100",
-    text: "text-gray-600",
-    dot: "bg-gray-500",
-    label: "Idle",
-  },
 };
 
-// columns here
+const defaultStyle = {
+  bg: "bg-gray-100",
+  text: "text-gray-500",
+  dot: "bg-gray-400",
+  label: "Unknown",
+};
+
+// Column definitions — no business data, only rendering logic
 export const ModelColumns = [
   {
     key: "name",
@@ -114,15 +62,15 @@ export const ModelColumns = [
     key: "status",
     label: "Status",
     render: (model) => {
-      const status = statusStyles[model.status];
-
+      // Normalize backend status (ACTIVE → active) for lookup
+      const key = (model.status || "").toLowerCase();
+      const style = statusStyles[key] || defaultStyle;
       return (
         <span
-          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${status.bg} ${status.text}`}
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${style.bg} ${style.text}`}
         >
-          <span className={`h-2 w-2 rounded-full ${status.dot}`} />
-
-          {status.label}
+          <span className={`h-2 w-2 rounded-full ${style.dot}`} />
+          {style.label}
         </span>
       );
     },
@@ -130,13 +78,9 @@ export const ModelColumns = [
 
   {
     key: "latency",
-    label: "Avg. Latency (ms)",
+    label: "Avg. Latency",
     render: (model) => (
-      <span
-        className={model.latency === "850ms" ? "text-red-500" : "text-gray-700"}
-      >
-        {model.latency}
-      </span>
+      <span className="text-gray-700">{model.latency || "—"}</span>
     ),
   },
 

@@ -115,8 +115,8 @@ def get_model_detail(
             total_params = val
             break
 
-    # 2. Linked Dataset
-    dataset_name = "hdfc-kb-v4"
+    # 2. Linked Dataset — resolved from DB, null if not available
+    dataset_name = None
     if model.training_job_id:
         job = db.query(TrainingJobModel).filter(TrainingJobModel.id == model.training_job_id).first()
         if job and job.training_run_id:
@@ -125,8 +125,10 @@ def get_model_detail(
                 d_ver = db.query(Dataset_Version_Model).filter(Dataset_Version_Model.id == run.dataset_version_id).first()
                 if d_ver and d_ver.dataset:
                     dataset_name = f"{d_ver.dataset.dataset_name} (v{d_ver.version})"
+                elif d_ver:
+                    dataset_name = f"Dataset v{d_ver.version}"
 
-    training_date = model.created_at.strftime("%b %d, %Y") if model.created_at else "Oct 24, 2023"
+    training_date = model.created_at.strftime("%b %d, %Y") if model.created_at else None
 
     overview = ModelOverview(
         base_model=model.base_model,
@@ -144,9 +146,10 @@ def get_model_detail(
     )
     
     env_str = deployment.environment.capitalize() if deployment else "Production"
-    inst_type = "ml.g5.2xlarge" if "70" not in base_lower else "ml.p4d.24xlarge"
+    # Instance type is infrastructure-level info, not in DB — return null
+    inst_type = None
     slug = model.model_name.lower().replace(" ", "-").replace("_", "-")
-    endpoint_url = deployment.endpoint if (deployment and deployment.endpoint) else f"https://api.forge.hdfc.com/v1/models/{slug}-v{model.version.replace('.', '-')}"
+    endpoint_url = deployment.endpoint if (deployment and deployment.endpoint) else None
 
     deployment_info = ModelDeploymentInfo(
         environment=env_str,
@@ -222,7 +225,7 @@ def get_model_detail(
             last_evaluated="Not evaluated yet",
         )
 
-    # 5. Version History (all models with same name or related)
+    # 5. Version History — only real data from DB, no fabricated accuracy/changes
     related_models = (
         db.query(Model_Registry)
         .filter(Model_Registry.model_name == model.model_name)
@@ -231,24 +234,25 @@ def get_model_detail(
     )
 
     version_history: list[ModelVersionHistoryItem] = []
-    current_acc_display = performance_metrics.accuracy or "Pending"
+    current_acc_display = performance_metrics.accuracy  # real value or None
     cur_v = model.version if model.version.startswith("v") else f"v{model.version}"
 
-    if len(related_models) > 1:
-        for rm in related_models:
-            v_date = rm.created_at.strftime("%b %d, %Y") if rm.created_at else "Oct 24, 2023"
-            rm_acc = current_acc_display if rm.id == model.id else "93.0%"
-            version_history.append(
-                ModelVersionHistoryItem(
-                    id=rm.id,
-                    version=f"v{rm.version}" if not rm.version.startswith("v") else rm.version,
-                    status=rm.status,
-                    deployed_date=v_date,
-                    accuracy=rm_acc,
-                    changes="Updated instruction tuning for banking compliance & finance QA" if rm.id == model.id else "Base instruction fine-tuning and safety alignment",
-                )
+    for rm in related_models:
+        v_date = rm.created_at.strftime("%b %d, %Y") if rm.created_at else None
+        # For non-current versions we don't have their eval score — return None
+        rm_acc = current_acc_display if rm.id == model.id else None
+        version_history.append(
+            ModelVersionHistoryItem(
+                id=rm.id,
+                version=f"v{rm.version}" if not rm.version.startswith("v") else rm.version,
+                status=rm.status,
+                deployed_date=v_date,
+                accuracy=rm_acc,
+                changes=None,  # no editorial content; not stored in DB
             )
-    else:
+        )
+
+    if not version_history:
         version_history = [
             ModelVersionHistoryItem(
                 id=model.id,
@@ -256,7 +260,7 @@ def get_model_detail(
                 status=model.status,
                 deployed_date=training_date,
                 accuracy=current_acc_display,
-                changes="Updated instruction tuning for specific banking query resolution & loan terms.",
+                changes=None,
             ),
         ]
 
@@ -267,11 +271,11 @@ def get_model_detail(
     )
 
     logs = [
-        f"[{training_date} 10:00:15] Model '{model.model_name}' (v{model.version}) loaded into registry.",
-        f"[{training_date} 10:00:20] Base architecture: {model.base_model} with {total_params} parameters.",
-        f"[{training_date} 10:01:05] Adapter weights verified: {model.artifact_path or 'Standard safetensors'}.",
-        f"[{training_date} 10:02:11] {eval_status_log}",
-        f"[{training_date} 10:05:00] Deployment health check passed. Serving at {endpoint_url}",
+        f"[{training_date or model.created_at.strftime('%b %d, %Y')} 10:00:15] Model '{model.model_name}' (v{model.version}) loaded into registry.",
+        f"[{training_date or model.created_at.strftime('%b %d, %Y')} 10:00:20] Base architecture: {model.base_model} with {total_params} parameters.",
+        f"[{training_date or model.created_at.strftime('%b %d, %Y')} 10:01:05] Adapter weights verified: {model.artifact_path or 'Standard safetensors'}.",
+        f"[{training_date or model.created_at.strftime('%b %d, %Y')} 10:02:11] {eval_status_log}",
+        f"[{training_date or model.created_at.strftime('%b %d, %Y')} 10:05:00] {'Deployment endpoint: ' + endpoint_url if endpoint_url else 'Model not yet deployed to serving infrastructure.'}",
     ]
 
     return ModelDetailResponse(
@@ -279,7 +283,7 @@ def get_model_detail(
         model_name=model.model_name,
         version=cur_v,
         status=model.status,
-        description="Production language model optimized for financial query resolution and banking assistance.",
+        description=None,  # not stored in DB; callers should handle null
         overview=overview,
         deployment_info=deployment_info,
         performance_metrics=performance_metrics,

@@ -93,43 +93,46 @@ class InferenceService:
         }
         actual_task_type = task_type if task_type in valid_tasks else "sft_grounded_generation"
 
-        resolved_model_id = model.model_name.lower().replace("-", "_").replace(" ", "_")
-        if resolved_model_id not in {"qwen3_0_6b", "qwen2_5_1_5b_instruct", "smollm2_1_7b_instruct"}:
-            if "qwen" in resolved_model_id:
-                resolved_model_id = "qwen3_0_6b"
-            elif "smol" in resolved_model_id:
-                resolved_model_id = "smollm2_1_7b_instruct"
-            else:
-                resolved_model_id = "qwen3_0_6b"
+        # Resolve AI model string ID from base_model in the registry.
+        # base_model holds the HuggingFace model path (e.g. "Qwen/Qwen3-0.6B").
+        # We derive the AI pipeline key from the last path segment, lowercased.
+        raw_base = (model.base_model or "").strip()
+        # Derive slug: take last path component, lower, replace - with _
+        base_slug = raw_base.split("/")[-1].lower().replace("-", "_").replace(".", "_")
+
+        # Map known base_model slugs to AI service model IDs
+        known_model_ids = {"qwen3_0_6b", "qwen2_5_1_5b_instruct", "smollm2_1_7b_instruct"}
+        if base_slug in known_model_ids:
+            resolved_model_id = base_slug
+        elif "qwen3" in base_slug:
+            resolved_model_id = "qwen3_0_6b"
+        elif "qwen2" in base_slug or "qwen" in base_slug:
+            resolved_model_id = "qwen2_5_1_5b_instruct"
+        elif "smol" in base_slug:
+            resolved_model_id = "smollm2_1_7b_instruct"
+        else:
+            # Cannot resolve — raise a real error so the caller knows
+            raise ValueError(
+                f"Cannot resolve AI model ID for base_model '{raw_base}' "
+                f"(registry model: '{model.model_name}'). "
+                f"Supported base models: Qwen/Qwen3-0.6B, Qwen/Qwen2.5-1.5B-Instruct, HuggingFaceTB/SmolLM2-1.7B-Instruct."
+            )
 
         start_time = time.perf_counter()
 
-        try:
-            result = AIInferenceAdapter.generate(
-                model_id=resolved_model_id,
-                task_type=actual_task_type,
-                question=question,
-                context=context,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                do_sample=do_sample,
-                seed=seed,
-                adapter_path_override=model.adapter_path or None,
-                base_model_override=model.base_model or "Qwen/Qwen3-0.6B",
-            )
-        except Exception as gen_err:
-            # Fallback simulated response if torch runtime is unavailable on local CPU/environment
-            result = {
-                "response": (
-                    f"Based on the provided prompt and context, here is the generated response from {model.model_name}:\n\n"
-                    f"• **Query Analysis**: Evaluated input against enterprise knowledge base.\n"
-                    f"• **Findings**: Compliance and policy validation satisfied.\n"
-                    f"• **Output**: Request processed successfully."
-                ),
-                "fine_tuned": bool(model.adapter_path),
-                "device": "cpu",
-            }
+        result = AIInferenceAdapter.generate(
+            model_id=resolved_model_id,
+            task_type=actual_task_type,
+            question=question,
+            context=context,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            do_sample=do_sample,
+            seed=seed,
+            adapter_path_override=model.adapter_path or None,
+            base_model_override=raw_base or "Qwen/Qwen3-0.6B",
+        )
 
         latency = (
             time.perf_counter()
