@@ -86,6 +86,78 @@ def undeploy_model(
         )
 
 
+@router.post(
+    "/{deployment_id}/unload",
+    response_model=Deployment_Response,
+)
+def unload_model(
+    deployment_id: int,
+    db: Session = Depends(get_db),
+):
+    service = DeploymentService(db)
+    try:
+        return service.undeploy_model(deployment_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
+
+
+@router.post(
+    "/{deployment_id}/reload",
+    response_model=Deployment_Response,
+)
+def reload_model(
+    deployment_id: int,
+    db: Session = Depends(get_db),
+):
+    service = DeploymentService(db)
+    try:
+        return service.reload_deployment(deployment_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
+
+
+@router.post(
+    "/{deployment_id}/restart",
+    response_model=Deployment_Response,
+)
+def restart_model(
+    deployment_id: int,
+    db: Session = Depends(get_db),
+):
+    service = DeploymentService(db)
+    try:
+        return service.restart_deployment(deployment_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
+
+
+@router.post(
+    "/{deployment_id}/start",
+    response_model=Deployment_Response,
+)
+def start_model(
+    deployment_id: int,
+    db: Session = Depends(get_db),
+):
+    service = DeploymentService(db)
+    try:
+        return service.start_deployment(deployment_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
+
+
 @router.delete(
     "/{deployment_id}",
     response_model=Deployment_Response,

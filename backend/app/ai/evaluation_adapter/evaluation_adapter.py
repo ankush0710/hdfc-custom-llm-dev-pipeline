@@ -165,6 +165,9 @@ class AIEvaluationAdapter:
 
         for idx, rec in enumerate(records, start=1):
             task_type = rec.get("task_type", "sft_grounded_generation")
+            valid_tasks = {"customer_faq_qa", "domain_concept_qa", "intent_classification", "sft_grounded_generation"}
+            safe_task_type = task_type if task_type in valid_tasks else "sft_grounded_generation"
+
             question = rec.get("instruction") or rec.get("question") or ""
             context = rec.get("context") or ""
             expected_response = str(rec.get("response") or "").strip()
@@ -173,7 +176,7 @@ class AIEvaluationAdapter:
             try:
                 result = AIInferenceAdapter.generate(
                     model_id="qwen3_0_6b",
-                    task_type=task_type,
+                    task_type=safe_task_type,
                     question=question,
                     context=context,
                     max_new_tokens=64,
@@ -186,7 +189,11 @@ class AIEvaluationAdapter:
                 )
                 latency = time.perf_counter() - t0
                 latencies.append(latency)
-                predicted_text = result.get("response", "").strip()
+                raw_resp = result.get("response", "")
+                if isinstance(raw_resp, dict):
+                    predicted_text = json.dumps(raw_resp)
+                else:
+                    predicted_text = str(raw_resp).strip()
 
             except Exception as exc:
                 logger.error("Inference failure on record %d: %s", idx, exc)

@@ -15,6 +15,7 @@ import {
   getVersionQualityMetrics,
   startProcessingJob,
 } from "@/app/services/datasetService/datasetServices";
+import { getTrainingRuns } from "@/app/services/trainingService/trainingServices";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import DetailHeader from "@/components/ui/DetailHeader";
 import MetadataCard from "@/components/ui/MetadataCard";
@@ -57,9 +58,12 @@ export default function DatasetDetailsPage() {
 
   const [dataset, setDataset] = useState(null);
   const [metricsData, setMetricsData] = useState(null);
+  const [trainingRuns, setTrainingRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const [versionFilter, setVersionFilter] = useState("ALL");
 
   const fetchDataset = useCallback(
     async (isSilent = false) => {
@@ -68,14 +72,25 @@ export default function DatasetDetailsPage() {
         if (!isSilent) setLoading(true);
         setError(null);
 
-        const data = await getDatasetById(id);
+        const [data, runsData] = await Promise.all([
+          getDatasetById(id),
+          getTrainingRuns().catch(() => []),
+        ]);
         setDataset(data);
+        setTrainingRuns(Array.isArray(runsData) ? runsData : []);
 
-        // Fetch metrics for latest version if available
+        // Fetch metrics for versions in reverse order until valid metrics are found
         if (data?.versions && data.versions.length > 0) {
-          const latest = data.versions[data.versions.length - 1];
-          const metrics = await getVersionQualityMetrics(latest.id);
-          setMetricsData(metrics);
+          const versions = [...data.versions].reverse();
+          let resolvedMetrics = null;
+          for (const ver of versions) {
+            const m = await getVersionQualityMetrics(ver.id).catch(() => null);
+            if (m && (m.total_rows !== undefined || m.total_records !== undefined || m.quality_score !== undefined)) {
+              resolvedMetrics = m;
+              break;
+            }
+          }
+          setMetricsData(resolvedMetrics);
         }
       } catch (err) {
         console.error("Failed to fetch dataset:", err);
@@ -98,8 +113,10 @@ export default function DatasetDetailsPage() {
     return null;
   }, [dataset]);
 
-  const isProcessed = latestVersion?.status === "Processed";
-  const isRunning = isProcessing || latestVersion?.status === "Running";
+  const isProcessed =
+    String(latestVersion?.status || "").toLowerCase() === "processed" ||
+    String(dataset?.status || "").toLowerCase() === "processed";
+  const isRunning = isProcessing || String(latestVersion?.status || "").toLowerCase() === "running";
 
   const handleStartProcessing = useCallback(async () => {
     if (!latestVersion) {
@@ -148,31 +165,80 @@ export default function DatasetDetailsPage() {
     return dataset?.versions ? [...dataset.versions].reverse() : [];
   }, [dataset]);
 
+  // Version Filter Options
+  const versionFilterOptions = useMemo(() => [
+    { label: "All Versions", value: "ALL" },
+    { label: "Valid (Processed)", value: "Processed" },
+    { label: "Processing (Running)", value: "Running" },
+    { label: "Pending (Uploaded)", value: "Uploaded" },
+  ], []);
+
+  // Filtered versions data for ModelsTable
+  const filteredVersions = useMemo(() => {
+    if (!versionsList) return [];
+    if (versionFilter === "ALL") return versionsList;
+
+    return versionsList.filter((ver) => {
+      const s = (ver.status || "").toLowerCase();
+      if (versionFilter === "Processed") {
+        return s === "processed" || s === "valid";
+      }
+      if (versionFilter === "Running") {
+        return s === "running" || s === "processing";
+      }
+      if (versionFilter === "Uploaded") {
+        return s === "uploaded" || s === "pending";
+      }
+      return s === versionFilter.toLowerCase();
+    });
+  }, [versionsList, versionFilter]);
+
   const latestVerName = latestVersion?.version || "1.0.0";
 
-  // Real data metrics from backend
-  const recordsCount = metricsData?.total_rows
-    ? formatRecordCount(metricsData.total_rows)
-    : isProcessed
-    ? "1.2M"
-    : "-";
-  const columnsCount = metricsData?.total_columns || (isProcessed ? 24 : "-");
-  const qualityScoreDisplay =
-    metricsData?.quality_score !== undefined
-      ? `${metricsData.quality_score}%`
-      : isProcessed
-      ? "100%"
-      : "-";
-  const fileSizeDisplay = latestVersion
+  // Robust field mapping handling all naming variants (total_records, total_rows, record_count, total_columns, quality_score, qualityScore)
+  const rawRecords =
+    metricsData?.total_records ??
+    metricsData?.total_rows ??
+    metricsData?.record_count ??
+    dataset?.total_records ??
+    dataset?.total_rows ??
+    dataset?.record_count;
+
+  const rawColumns =
+    metricsData?.total_columns ??
+    metricsData?.column_count ??
+    dataset?.total_columns ??
+    dataset?.column_count;
+
+  const rawQuality =
+    metricsData?.quality_score ??
+    metricsData?.qualityScore ??
+    dataset?.quality_score ??
+    dataset?.qualityScore;
+
+  const recordsCount = rawRecords !== undefined && rawRecords !== null
+    ? formatRecordCount(rawRecords)
+    : "—";
+
+  const columnsCount = rawColumns !== undefined && rawColumns !== null
+    ? String(rawColumns)
+    : "—";
+
+  const qualityScoreDisplay = rawQuality !== undefined && rawQuality !== null
+    ? `${typeof rawQuality === "number" ? Math.round(rawQuality * 10) / 10 : rawQuality}%`
+    : "—";
+
+  const fileSizeDisplay = latestVersion?.file_size !== undefined && latestVersion?.file_size !== null
     ? formatFileSize(latestVersion.file_size)
-    : "0 MB";
+    : "—";
+
   const createdDateDisplay = dataset?.created_at
     ? new Date(dataset.created_at).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
       })
-    : "Oct 20, 2024";
+    : "—";
 
   // Reusable metadata items
   const metadataItems = useMemo(() => [
@@ -284,14 +350,16 @@ export default function DatasetDetailsPage() {
     ];
   }, [isProcessed, isRunning, metricsData, latestVersion]);
 
-  // Reusable lineage links
-  const lineageItems = useMemo(
-    () => [
-      { label: "Training Run #42", href: "/training" },
-      { label: "Training Run #45", href: "/training" },
-    ],
-    []
-  );
+  // Reusable lineage links from real training runs
+  const lineageItems = useMemo(() => {
+    if (!trainingRuns || trainingRuns.length === 0 || !dataset?.versions) return [];
+    const versionIds = new Set(dataset.versions.map((v) => v.id));
+    const matchingRuns = trainingRuns.filter((r) => versionIds.has(r.dataset_version_id));
+    return matchingRuns.map((r) => ({
+      label: `Training Run #${r.id} (${r.base_model} - ${r.status})`,
+      href: "/training",
+    }));
+  }, [trainingRuns, dataset]);
 
   // Version table columns for common ModelsTable
   const versionColumns = useMemo(
@@ -315,7 +383,7 @@ export default function DatasetDetailsPage() {
                 day: "2-digit",
                 year: "numeric",
               })
-            : "Oct 20, 2024";
+            : "—";
           return (
             <span className="text-slate-600 font-medium text-xs">
               {verDate}
@@ -356,8 +424,8 @@ export default function DatasetDetailsPage() {
           const desc =
             dataset?.description ||
             (isLatest
-              ? "Added PII masking and standardized date formats."
-              : "Initial batch upload from Q3 support logs.");
+              ? `Dataset version v${ver.version} (${ver.status || "Ready"})`
+              : `Uploaded dataset version v${ver.version}`);
           return (
             <span
               className="text-slate-600 text-xs line-clamp-1 max-w-md block"
@@ -511,8 +579,13 @@ export default function DatasetDetailsPage() {
         <ModelsTable
           title="Version History"
           columns={versionColumns}
-          data={versionsList}
+          data={filteredVersions}
           pageSize={5}
+          showFilter={true}
+          filterOptions={versionFilterOptions}
+          selectedFilter={versionFilter}
+          onFilterChange={(val) => setVersionFilter(val)}
+          emptyMessage="No dataset versions match the selected filter."
         />
       </div>
     </main>

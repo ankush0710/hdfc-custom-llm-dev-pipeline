@@ -49,6 +49,12 @@ from ai.inference.finetuned import (
     generate_finetuned,
     FinetunedModelBundle,
 )
+from ai.utils.path_utils import (
+    resolve_artifact_path,
+    validate_artifact_directory,
+    PROJECT_ROOT,
+    AI_ROOT,
+)
 
 from pathlib import Path
 
@@ -56,17 +62,6 @@ from pathlib import Path
 # --------------------------------------------------------------------------
 # Project paths
 # --------------------------------------------------------------------------
-
-# service.py:
-# <project-root>/ai/inference/service.py
-#
-# parents[0] -> ai/inference
-# parents[1] -> ai
-# parents[2] -> project-root
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-AI_ROOT = PROJECT_ROOT / "ai"
 
 REGISTRY_YAML_PATH = (
     AI_ROOT
@@ -154,7 +149,7 @@ class MissingAdapterError(InferenceServiceError):
     def __init__(self, model_id: str, adapter_path: Optional[str]) -> None:
         super().__init__(
             f"HDFC adapter for model '{model_id}' not found at "
-            f"'{adapter_path}'. Fine-tuned models require a valid adapter."
+            f"'{adapter_path}'. Fine-tuned models require a valid adapter directory."
         )
         self.model_id = model_id
         self.adapter_path = adapter_path
@@ -239,6 +234,7 @@ def _get_model_map_entry(model_id: str) -> Dict[str, Any]:
 # ==========================================================================
 @dataclass
 class _ActiveModel:
+    cache_key: str
     model_id: str
     fine_tuned: bool
     # Populated for base (non-fine-tuned) models:
@@ -262,10 +258,11 @@ def _device_str(resolved_device: Any) -> str:
     return str(resolved_device)
 
 
-def _load_base(model_id: str, entry: Dict[str, Any]) -> _ActiveModel:
+def _load_base(model_id: str, entry: Dict[str, Any], cache_key: str) -> _ActiveModel:
     loader = ModelLoader(model_name=entry["base_model"], device="auto")
     tokenizer, model, resolved = loader.load()
     return _ActiveModel(
+        cache_key=cache_key,
         model_id=model_id,
         fine_tuned=False,
         tokenizer=tokenizer,
@@ -276,46 +273,30 @@ def _load_base(model_id: str, entry: Dict[str, Any]) -> _ActiveModel:
 
 def _load_finetuned(
     model_id: str,
-    entry: Dict[str, Any]
+    entry: Dict[str, Any],
+    cache_key: str,
 ) -> _ActiveModel:
 
-    adapter_path = Path(entry["adapter_path"])
+    raw_adapter = entry.get("adapter_path")
+    validation = validate_artifact_directory(raw_adapter)
 
-    # Validate adapter directory
-    if not adapter_path.is_dir():
+    if not validation["is_valid"]:
         raise MissingAdapterError(
             model_id,
-            str(adapter_path)
+            validation["error_message"]
         )
 
-    # Validate required PEFT files
-    required_files = [
-        "adapter_config.json",
-        "adapter_model.safetensors",
-    ]
-
-    missing_files = [
-        filename
-        for filename in required_files
-        if not (adapter_path / filename).is_file()
-    ]
-
-    if missing_files:
-        raise MissingAdapterError(
-            model_id,
-            (
-                f"{adapter_path} "
-                f"(missing: {', '.join(missing_files)})"
-            )
-        )
+    resolved_path = validation["resolved_path"]
+    base_model = entry.get("base_model") or validation.get("base_model") or "Qwen/Qwen3-0.6B"
 
     bundle = load_finetuned_model(
-        base_model=entry["base_model"],
-        adapter_path=adapter_path,
+        base_model=base_model,
+        adapter_path=resolved_path,
         device="auto",
     )
 
     return _ActiveModel(
+        cache_key=cache_key,
         model_id=model_id,
         fine_tuned=True,
         bundle=bundle,
@@ -325,17 +306,19 @@ def _load_finetuned(
 def _get_or_load(model_id: str, entry: Dict[str, Any]) -> _ActiveModel:
     global _active
 
-    if _active is not None and _active.model_id == model_id:
+    cache_key = f"{model_id}::{entry.get('adapter_path', '')}::{entry.get('base_model', '')}"
+
+    if _active is not None and _active.cache_key == cache_key:
         return _active
 
-    if _active is not None and _active.model_id != model_id:
+    if _active is not None:
         unload_model()
 
     try:
         if entry["fine_tuned"]:
-            loaded = _load_finetuned(model_id, entry)
+            loaded = _load_finetuned(model_id, entry, cache_key)
         else:
-            loaded = _load_base(model_id, entry)
+            loaded = _load_base(model_id, entry, cache_key)
     except MissingAdapterError:
         raise
     except torch.cuda.OutOfMemoryError as exc:  # type: ignore[attr-defined]

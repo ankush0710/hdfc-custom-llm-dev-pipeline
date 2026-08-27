@@ -63,6 +63,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenize
 
 from ai.inference.generator import GenerationConfig, generate
 from ai.inference.loader import ResolvedDevice, resolve_device
+from ai.utils.path_utils import resolve_artifact_path, validate_artifact_directory
 
 logger = logging.getLogger(__name__)
 
@@ -109,28 +110,31 @@ class FinetunedModelBundle:
     resolved_device: ResolvedDevice
 
 
-def _validate_adapter_path(adapter_path: Path) -> None:
+def _validate_adapter_path(adapter_path: Path) -> Path:
     """
     Verify the adapter directory and its required PEFT files exist,
     failing with a clear, specific error rather than an obscure
     downstream exception from PeftModel.from_pretrained().
     """
-    if not adapter_path.exists() or not adapter_path.is_dir():
+    resolved = resolve_artifact_path(adapter_path)
+    if not resolved or not resolved.is_dir():
         raise AdapterNotFoundError(
             f"Adapter directory not found: {adapter_path}. This should be "
-            "the output directory of ai/training/train.py (containing "
+            "the output directory of the training pipeline (containing "
             "adapter_config.json and adapter_model.safetensors)."
         )
 
     missing = [
-        name for name in REQUIRED_ADAPTER_FILES if not (adapter_path / name).exists()
+        name for name in REQUIRED_ADAPTER_FILES if not (resolved / name).exists()
     ]
     if missing:
         raise AdapterNotFoundError(
-            f"Adapter directory {adapter_path} is missing required file(s): "
+            f"Adapter directory '{resolved}' is missing required file(s): "
             f"{missing}. A valid PEFT LoRA adapter directory must contain "
             "both adapter_config.json and adapter_model.safetensors."
         )
+
+    return resolved
 
 
 def load_finetuned_model(
@@ -167,8 +171,18 @@ def load_finetuned_model(
         If the base model, adapter, or tokenizer fail to load (including
         GPU out-of-memory, translated into a clear message).
     """
-    adapter_path = Path(adapter_path)
-    _validate_adapter_path(adapter_path)
+    adapter_path = _validate_adapter_path(Path(adapter_path))
+
+    # Read base model from adapter_config.json if not explicitly customized
+    adapter_cfg = adapter_path / "adapter_config.json"
+    if adapter_cfg.is_file() and (not base_model or base_model == DEFAULT_BASE_MODEL):
+        try:
+            with adapter_cfg.open("r", encoding="utf-8") as f:
+                cfg_dict = json.load(f)
+                if cfg_dict.get("base_model_name_or_path"):
+                    base_model = cfg_dict["base_model_name_or_path"]
+        except Exception:
+            pass
 
     resolved = resolve_device(device)
     logger.info(

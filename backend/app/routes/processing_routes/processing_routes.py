@@ -70,31 +70,92 @@ def get_processing_status(
     }
 
 
+from app.model.dataset_version_model import Dataset_Version_Model
+from app.processor.validator import load_file, resolve_file_path
+from app.processor.calculate_quality_metrics import calculate_quality_metrics
+import os
+
+
 @router.get("/versions/{version_id}/metrics")
 def get_version_quality_metrics(
     version_id: int,
     db: Session = Depends(get_db)
 ):
+    version = db.query(Dataset_Version_Model).filter(Dataset_Version_Model.id == version_id).first()
+    if not version:
+        return None
+
+    # 1. Check if a completed processing job exists for this version (as input or output)
     job = (
         db.query(Processing_Model)
         .filter(Processing_Model.dataset_version_id == version_id)
         .order_by(Processing_Model.id.desc())
         .first()
     )
-    if not job:
-        return None
+    if job:
+        from app.services.processing_service.processing_service import get_processing_metrics
+        metrics = get_processing_metrics(db, job.id)
+        if metrics:
+            return {
+                "job_id": metrics.job_id,
+                "total_rows": metrics.total_rows,
+                "total_records": metrics.total_rows,
+                "record_count": metrics.total_rows,
+                "total_columns": metrics.total_columns,
+                "column_count": metrics.total_columns,
+                "duplicate_rows": metrics.duplicate_rows,
+                "missing_values": metrics.missing_values,
+                "empty_rows": metrics.empty_rows,
+                "quality_score": metrics.quality_score,
+                "qualityScore": metrics.quality_score,
+            }
 
-    from app.services.processing_service.processing_service import get_processing_metrics
-    metrics = get_processing_metrics(db, job.id)
-    if not metrics:
-        return None
+    # 2. Check if this version was produced by another version's processing job
+    parent_job = (
+        db.query(Processing_Model)
+        .filter(Processing_Model.output_file == version.file_path)
+        .order_by(Processing_Model.id.desc())
+        .first()
+    )
+    if parent_job:
+        from app.services.processing_service.processing_service import get_processing_metrics
+        metrics = get_processing_metrics(db, parent_job.id)
+        if metrics:
+            return {
+                "job_id": metrics.job_id,
+                "total_rows": metrics.total_rows,
+                "total_records": metrics.total_rows,
+                "record_count": metrics.total_rows,
+                "total_columns": metrics.total_columns,
+                "column_count": metrics.total_columns,
+                "duplicate_rows": metrics.duplicate_rows,
+                "missing_values": metrics.missing_values,
+                "empty_rows": metrics.empty_rows,
+                "quality_score": metrics.quality_score,
+                "qualityScore": metrics.quality_score,
+            }
 
-    return {
-        "job_id": metrics.job_id,
-        "total_rows": metrics.total_rows,
-        "total_columns": metrics.total_columns,
-        "duplicate_rows": metrics.duplicate_rows,
-        "missing_values": metrics.missing_values,
-        "empty_rows": metrics.empty_rows,
-        "quality_score": metrics.quality_score
-    }
+    # 3. Calculate statistics directly from the physical file on disk
+    try:
+        if version.file_path:
+            resolved_p = resolve_file_path(version.file_path)
+            if os.path.exists(resolved_p):
+                df = load_file(resolved_p)
+                stats = calculate_quality_metrics(df)
+                return {
+                    "job_id": None,
+                    "total_rows": stats["total_rows"],
+                    "total_records": stats["total_rows"],
+                    "record_count": stats["total_rows"],
+                    "total_columns": stats["total_columns"],
+                    "column_count": stats["total_columns"],
+                    "duplicate_rows": stats.get("duplicate_rows", 0),
+                    "missing_values": stats.get("missing_values", 0),
+                    "empty_rows": stats.get("empty_rows", 0),
+                    "quality_score": stats.get("quality_score", 100.0),
+                    "qualityScore": stats.get("quality_score", 100.0),
+                }
+    except Exception:
+        pass
+
+    return None

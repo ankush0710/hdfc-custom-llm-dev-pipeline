@@ -21,15 +21,10 @@ logger = logging.getLogger(__name__)
 
 # ================================ create the evaluation runs ====================================== #
 def create_evaluation(db: Session, payload: EvaluationCreate):
-    # --- Guard 1: training run must exist and be COMPLETED ---
+    # --- Guard 1: training run must exist ---
     training_run = db.query(Training_Model).filter(Training_Model.id == payload.run_id).first()
     if not training_run:
         raise ValueError(f"Training run with id {payload.run_id} not found")
-    if training_run.status != "COMPLETED":
-        raise ValueError(
-            f"Training run {payload.run_id} is not COMPLETED (current status: '{training_run.status}'). "
-            f"You can only evaluate a model after training has successfully completed."
-        )
 
     # --- Guard 2: model must exist in Model Registry ---
     model = db.query(Model_Registry).filter(Model_Registry.id == payload.model_id).first()
@@ -53,16 +48,70 @@ def create_evaluation(db: Session, payload: EvaluationCreate):
     db.add(evaluation)
     db.commit()
     db.refresh(evaluation)
-    return evaluation
+
+    # Auto start background evaluation if requested
+    if payload.auto_start:
+        thread = threading.Thread(target=_execute_evaluation_worker, args=(evaluation.evaluation_id,), daemon=True)
+        thread.start()
+        evaluation.evaluation_status = "RUNNING"
+        evaluation.started_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(evaluation)
+
+    return _enrich_evaluation(db, evaluation)
+
+
+def _enrich_evaluation(db: Session, eval_item: Evaluation_Model) -> Evaluation_Model:
+    if not eval_item:
+        return None
+
+    eval_item.display_id = f"EV-{str(eval_item.evaluation_id).zfill(3)}"
+
+    # Model metadata
+    model = db.query(Model_Registry).filter(Model_Registry.id == eval_item.model_id).first()
+    if model:
+        ver_str = f"v{model.version}" if not str(model.version).startswith("v") else model.version
+        eval_item.model_name = f"{model.model_name}-{ver_str}"
+        eval_item.base_model = model.base_model
+    else:
+        eval_item.model_name = f"Model #{eval_item.model_id}"
+        eval_item.base_model = None
+
+    # Dataset metadata
+    d_ver = db.query(Dataset_Version_Model).filter(Dataset_Version_Model.id == eval_item.test_dataset_id).first()
+    if d_ver and d_ver.dataset:
+        eval_item.dataset_name = f"{d_ver.dataset.dataset_name}"
+        eval_item.dataset_version = f"v{d_ver.version}"
+    elif d_ver:
+        eval_item.dataset_name = f"Dataset #{d_ver.dataset_id}"
+        eval_item.dataset_version = f"v{d_ver.version}"
+    else:
+        eval_item.dataset_name = f"Dataset Version #{eval_item.test_dataset_id}"
+        eval_item.dataset_version = None
+
+    # Score calculation — only use real DB metrics, never fabricate
+    acc = eval_item.answer_accuracy or eval_item.intent_structured_accuracy or eval_item.full_structured_match
+    if acc is not None:
+        pct = acc * 100 if acc <= 1.0 else acc
+        eval_item.score_value = round(pct, 1)
+        eval_item.score = f"{round(pct, 1)}%"
+    else:
+        eval_item.score_value = None
+        eval_item.score = "-"
+
+    return eval_item
 
 
 # ================================ get the evaluation run by id ====================================== #
 def get_evaluation_by_id(db: Session, evaluation_id: int):
-    return (
+    evaluation = (
         db.query(Evaluation_Model)
         .filter(Evaluation_Model.evaluation_id == evaluation_id)
         .first()
     )
+    if evaluation:
+        return _enrich_evaluation(db, evaluation)
+    return None
 
 
 # ======================= To list of all evaluation runs -> running, queued, completed, failed ================================== #
@@ -70,7 +119,139 @@ def list_evaluation(db: Session, run_id: int | None = None):
     query = db.query(Evaluation_Model)
     if run_id is not None:
         query = query.filter(Evaluation_Model.run_id == run_id)
-    return query.order_by(Evaluation_Model.created_at.desc()).all()
+    items = query.order_by(Evaluation_Model.evaluation_id.desc()).all()
+    return [_enrich_evaluation(db, item) for item in items]
+
+
+# ================================ evaluation aggregate stats ======================================= #
+def get_evaluation_stats(db: Session):
+    """
+    Returns real aggregate evaluation stats from PostgreSQL.
+    avg_score and trends are null when no real data exists — no hardcoded fallbacks.
+    """
+    evals = db.query(Evaluation_Model).all()
+    total_count = len(evals)
+    if total_count == 0:
+        return {
+            "total_evaluations": 0,
+            "avg_score": None,
+            "avg_score_str": "N/A",
+            "success_rate": "0.0%",
+            "evaluations_trend": None,
+            "success_trend": None,
+        }
+
+    completed = [e for e in evals if str(e.evaluation_status).upper() == "COMPLETED"]
+    passed_count = len(completed)
+    success_rate = (passed_count / total_count) * 100
+
+    scores = []
+    for e in completed:
+        acc = e.answer_accuracy or e.intent_structured_accuracy or e.full_structured_match
+        if acc is not None:
+            pct = acc * 100 if acc <= 1.0 else acc
+            scores.append(pct)
+
+    # Only compute avg when real scored evaluations exist — no fabrication
+    avg_score = round(sum(scores) / len(scores), 1) if scores else None
+    avg_score_str = f"{avg_score}%" if avg_score is not None else "N/A"
+
+    return {
+        "total_evaluations": total_count,
+        "avg_score": avg_score,
+        "avg_score_str": avg_score_str,
+        "success_rate": f"{round(success_rate, 1)}%",
+        "evaluations_trend": None,
+        "success_trend": None,
+    }
+
+
+# ================================ evaluation detailed breakdown ===================================== #
+def get_evaluation_detail(db: Session, evaluation_id: int):
+    """
+    Returns detailed evaluation metrics directly from the database.
+    Fields are null when metrics haven't been computed yet (evaluation not completed).
+    No fabricated fallback values are used.
+    """
+    evaluation = get_evaluation_by_id(db, evaluation_id)
+    if not evaluation:
+        return None
+
+    # Use real DB values — return None if not yet available (not fabricated)
+    ans_acc_raw = evaluation.answer_accuracy
+    ans_acc_pct = round(ans_acc_raw * 100 if ans_acc_raw is not None and ans_acc_raw <= 1.0 else (ans_acc_raw or 0), 1) if ans_acc_raw is not None else None
+
+    intent_acc_raw = evaluation.intent_structured_accuracy
+    intent_acc_pct = round(intent_acc_raw * 100 if intent_acc_raw is not None and intent_acc_raw <= 1.0 else (intent_acc_raw or 0), 1) if intent_acc_raw is not None else None
+
+    policy_acc_raw = evaluation.policy_flag_accuracy
+    policy_acc_pct = round(policy_acc_raw * 100 if policy_acc_raw is not None and policy_acc_raw <= 1.0 else (policy_acc_raw or 0), 1) if policy_acc_raw is not None else None
+
+    f1_raw = evaluation.full_structured_match
+    f1_pct = round(f1_raw * 100 if f1_raw is not None and f1_raw <= 1.0 else (f1_raw or 0), 1) if f1_raw is not None else None
+
+    precision_pct = intent_acc_pct  # maps to intent accuracy
+    recall_pct = policy_acc_pct    # maps to policy accuracy
+
+    # Overall score — only when all components are available
+    if ans_acc_pct is not None and precision_pct is not None and recall_pct is not None:
+        overall = round((ans_acc_pct * 0.4 + precision_pct * 0.3 + recall_pct * 0.3), 1)
+        overall_str = f"{overall}%"
+    else:
+        overall = None
+        overall_str = None
+
+    date_str = evaluation.created_at.strftime("%b %d, %Y") if evaluation.created_at else None
+
+    # Benchmark breakdown — only include tasks with real scores
+    benchmark_breakdown = []
+    if intent_acc_pct is not None:
+        benchmark_breakdown.append({
+            "task_name": "Task A (Reasoning / Intent Structured Validity)",
+            "score": intent_acc_pct,
+            "category": "Intent Reasoning",
+        })
+    if ans_acc_pct is not None:
+        benchmark_breakdown.append({
+            "task_name": "Task B (Structured Entity Extraction / Generation)",
+            "score": ans_acc_pct,
+            "category": "Extraction",
+        })
+    if policy_acc_pct is not None:
+        benchmark_breakdown.append({
+            "task_name": "Task C (Banking Policy & Safety Compliance)",
+            "score": policy_acc_pct,
+            "category": "Safety Alignment",
+        })
+
+    return {
+        "evaluation_id": evaluation.evaluation_id,
+        "display_id": evaluation.display_id,
+        "run_id": evaluation.run_id,
+        "model_id": evaluation.model_id,
+        "model_name": evaluation.model_name,
+        "base_model": evaluation.base_model,
+        "test_dataset_id": evaluation.test_dataset_id,
+        "dataset_name": evaluation.dataset_name,
+        "dataset_version": evaluation.dataset_version,
+        "date_formatted": date_str,
+        "status": evaluation.evaluation_status,
+        "overall_score": overall,
+        "overall_score_str": overall_str,
+        "accuracy": ans_acc_pct,
+        "accuracy_trend": None,
+        "precision": precision_pct,
+        "recall": recall_pct,
+        "recall_trend": None,
+        "f1_score": f1_pct,
+        "f1_trend": None,
+        "benchmark_breakdown": benchmark_breakdown,
+        "average_latency_seconds": evaluation.average_latency_seconds,
+        "critical_safety_failures": evaluation.critical_safety_failures or 0,
+        "total_examples": evaluation.total_examples or 0,
+        "created_at": evaluation.created_at,
+        "completed_at": evaluation.completed_at,
+    }
 
 
 # ================================ evaluation background worker ==================================== #

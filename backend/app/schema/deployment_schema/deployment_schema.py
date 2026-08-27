@@ -12,6 +12,8 @@ class Deployment_Create(BaseModel):
 class Deployment_Response(BaseModel):
     id: int
     model_id: int
+    model_name: str | None = None
+    base_model: str | None = None
     version: str
     environment: str
     status: str
