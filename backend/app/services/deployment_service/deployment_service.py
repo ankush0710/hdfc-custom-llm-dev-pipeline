@@ -48,10 +48,17 @@ class DeploymentService:
         if not model:
             raise ValueError(f"Model {model_id} not found in Model Registry")
 
-        valid_deploy_statuses = {"READY", "APPROVED", "TRAINED", "DEPLOYED", "ACTIVE", "CREATED", "EVALUATED"}
-        if str(model.status).upper() not in valid_deploy_statuses:
+        from app.constants.quality_gate_config import VALID_DEPLOYABLE_STATUSES
+
+        status_upper = str(model.status).upper()
+        if status_upper in {"REJECTED", "FAILED"}:
             raise ValueError(
-                f"Model status '{model.status}' cannot be deployed. Valid statuses: {sorted(valid_deploy_statuses)}"
+                f"Deployment blocked: Model #{model_id} ({model.model_name}) was REJECTED by the Quality Gate evaluation."
+            )
+        if status_upper not in VALID_DEPLOYABLE_STATUSES:
+            raise ValueError(
+                f"Deployment blocked: Model #{model_id} status is '{model.status}'. "
+                f"A model must pass Quality Gate evaluation (Status: APPROVED / READY) before deployment."
             )
 
         slug = model.model_name.lower().replace(" ", "-").replace("_", "-")

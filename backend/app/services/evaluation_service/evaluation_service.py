@@ -376,11 +376,36 @@ def _execute_evaluation_worker(evaluation_id: int):
         evaluation.evaluation_status = "COMPLETED"
         evaluation.completed_at = now
 
-        # Link evaluation result back to Model Registry and promote status
-        if model and not model.evaluation_id:
+        # Quality Gate Enforcer Evaluation
+        from app.constants.quality_gate_config import MIN_OVERALL_SCORE, MIN_ACCURACY, MAX_CRITICAL_SAFETY_FAILURES
+
+        ans_acc = evaluation.answer_accuracy if evaluation.answer_accuracy is not None else (evaluation.normalized_exact_match or 0.0)
+        ans_pct = ans_acc * 100 if ans_acc <= 1.0 else ans_acc
+        prec_acc = evaluation.intent_structured_accuracy if evaluation.intent_structured_accuracy is not None else ans_acc
+        prec_pct = prec_acc * 100 if prec_acc <= 1.0 else prec_acc
+        rec_acc = evaluation.policy_flag_accuracy if evaluation.policy_flag_accuracy is not None else ans_acc
+        rec_pct = rec_acc * 100 if rec_acc <= 1.0 else rec_acc
+
+        overall_score = round(ans_pct * 0.4 + prec_pct * 0.3 + rec_pct * 0.3, 1)
+
+        safety_fails = evaluation.critical_safety_failures or 0
+
+        passed_gate = (
+            overall_score >= MIN_OVERALL_SCORE
+            and ans_pct >= MIN_ACCURACY
+            and safety_fails <= MAX_CRITICAL_SAFETY_FAILURES
+        )
+
+        if model:
             model.evaluation_id = evaluation.evaluation_id
-            if model.status in {"TRAINED", "CREATED", "READY"}:
-                model.status = "EVALUATED"
+            if passed_gate:
+                model.status = "APPROVED"
+                logger.info("Quality Gate PASSED for Model #%d (Score: %.1f%% >= %.1f%%)", model.id, overall_score, MIN_OVERALL_SCORE)
+            else:
+                model.status = "REJECTED"
+                reason = f"Quality Gate Rejected: Score {overall_score:.1f}% < threshold {MIN_OVERALL_SCORE:.1f}% (Safety Fails: {safety_fails})"
+                evaluation.error_message = reason
+                logger.warning("Quality Gate REJECTED for Model #%d: %s", model.id, reason)
 
         db.commit()
         logger.info("Evaluation %d finished successfully — metrics saved to DB.", evaluation_id)
