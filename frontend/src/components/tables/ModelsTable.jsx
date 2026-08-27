@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreVertical, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { MoreVertical, Filter, ChevronLeft, ChevronRight, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 
 export default function ModelsTable({
@@ -13,6 +13,10 @@ export default function ModelsTable({
   filterOptions = [],
   selectedFilter = "ALL",
   onFilterChange = null,
+  loading = false,
+  error = null,
+  onRetry = null,
+  emptyMessage = "No records available",
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -121,7 +125,7 @@ export default function ModelsTable({
                           if (onFilterChange) onFilterChange(opt.value);
                           setIsFilterOpen(false);
                         }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition text-left ${
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition text-left cursor-pointer ${
                           selectedFilter === opt.value
                             ? "bg-blue-50 text-blue-700 font-bold"
                             : "text-gray-700 hover:bg-gray-50 font-medium"
@@ -135,6 +139,21 @@ export default function ModelsTable({
                         )}
                       </button>
                     ))}
+
+                    {selectedFilter !== "ALL" && (
+                      <div className="pt-1 mt-1 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onFilterChange) onFilterChange("ALL");
+                            setIsFilterOpen(false);
+                          }}
+                          className="w-full text-center py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded cursor-pointer"
+                        >
+                          Reset Filter
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -177,7 +196,45 @@ export default function ModelsTable({
 
           {/* Table Body */}
           <tbody>
-            {currentData.length > 0 ? (
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="px-5 py-12 text-center"
+                >
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-[#002B55]" />
+                    <p className="text-xs font-semibold text-gray-500">
+                      Loading data from backend...
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="px-5 py-10 text-center"
+                >
+                  <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                    <AlertCircle className="h-6 w-6 text-red-500" />
+                    <p className="text-xs font-semibold text-red-600">
+                      {typeof error === "string" ? error : "Failed to load records."}
+                    </p>
+                    {onRetry && (
+                      <button
+                        type="button"
+                        onClick={onRetry}
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 underline"
+                      >
+                        <RefreshCw size={12} />
+                        <span>Retry</span>
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ) : currentData.length > 0 ? (
               currentData.map((row, rowIndex) => (
                 <tr
                   key={row.id ?? rowIndex}
@@ -205,9 +262,12 @@ export default function ModelsTable({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-5 py-10 text-center text-sm text-gray-500"
+                  className="px-5 py-12 text-center text-sm text-gray-500"
                 >
-                  No records available
+                  <div className="flex flex-col items-center justify-center gap-1.5 max-w-sm mx-auto text-center">
+                    <p className="text-sm font-semibold text-gray-700">No records found</p>
+                    <p className="text-xs text-gray-500">{emptyMessage}</p>
+                  </div>
                 </td>
               </tr>
             )}

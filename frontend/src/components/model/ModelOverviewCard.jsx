@@ -3,10 +3,10 @@
 import { Info, Database, Calendar, Cpu, Layers } from "lucide-react";
 
 export default function ModelOverviewCard({
-  baseModel = "Llama-3-70B-Instruct",
-  totalParameters = "70.0 Billion",
-  datasetName = "hdfc-kb-v4",
-  trainingDate = "Oct 24, 2023",
+  baseModel = "Qwen/Qwen3-0.6B",
+  totalParameters = "0.6B",
+  datasetName = "hdfc_faq_dataset",
+  trainingDate = "Aug 27, 2026",
 }) {
   return (
     <div className="h-full bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm flex flex-col justify-between">

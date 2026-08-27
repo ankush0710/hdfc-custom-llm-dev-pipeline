@@ -6,13 +6,37 @@ import { getDataset } from "@/app/services/datasetService/datasetServices";
 import { createTrainingRun, startTrainingRun } from "@/app/services/trainingService/trainingServices";
 import { toast } from "sonner";
 
+export const SUPPORTED_BASE_MODELS = [
+  {
+    id: "qwen2_5_1_5b_instruct",
+    displayName: "Qwen 2.5 1.5B Instruct",
+    hfModelId: "Qwen/Qwen2.5-1.5B-Instruct",
+    params: "1.54B",
+    description: "High-accuracy instruction-tuned enterprise model (1.54B params)",
+  },
+  {
+    id: "qwen3_0_6b",
+    displayName: "Qwen 3 0.6B",
+    hfModelId: "Qwen/Qwen3-0.6B",
+    params: "0.6B",
+    description: "Ultra-lightweight base model (0.6B params) optimized for edge & fast fine-tuning",
+  },
+  {
+    id: "smollm2_1_7b_instruct",
+    displayName: "SmolLM2 1.7B Instruct",
+    hfModelId: "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    params: "1.7B",
+    description: "High-efficiency compact reasoning model (1.7B params)",
+  },
+];
+
 export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
   const [datasets, setDatasets] = useState([]);
   const [loadingDatasets, setLoadingDatasets] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
-    base_model: "Llama-3-8B",
+    base_model: SUPPORTED_BASE_MODELS[0].id,
     dataset_version_id: "",
     training_method: "LoRA",
     epochs: 3,
@@ -31,17 +55,30 @@ export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
     try {
       setLoadingDatasets(true);
       const data = await getDataset();
-      setDatasets(Array.isArray(data) ? data : []);
+      const datasetList = Array.isArray(data) ? data : [];
+      setDatasets(datasetList);
 
-      // Select first available dataset version if none selected
-      if (Array.isArray(data) && data.length > 0 && !formData.dataset_version_id) {
-        const firstWithVersion = data.find((d) => d.versions && d.versions.length > 0);
-        if (firstWithVersion && firstWithVersion.versions[0]) {
-          setFormData((prev) => ({
-            ...prev,
-            dataset_version_id: String(firstWithVersion.versions[0].id),
-          }));
-        }
+      // Collect all versions across datasets
+      const allVersions = [];
+      datasetList.forEach((d) => {
+        (d.versions || []).forEach((v) => {
+          allVersions.push({
+            ...v,
+            dataset_name: d.dataset_name,
+          });
+        });
+      });
+
+      // Prefer first processed version or fallback to first available version
+      if (allVersions.length > 0 && !formData.dataset_version_id) {
+        const processedVer = allVersions.find(
+          (v) => String(v.status || "").toLowerCase() === "processed"
+        );
+        const defaultVer = processedVer || allVersions[0];
+        setFormData((prev) => ({
+          ...prev,
+          dataset_version_id: String(defaultVer.id),
+        }));
       }
     } catch (err) {
       console.error("Failed to load datasets:", err);
@@ -54,20 +91,39 @@ export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.dataset_version_id) {
+    const versionId = Number(formData.dataset_version_id);
+    if (!formData.dataset_version_id || isNaN(versionId) || versionId <= 0) {
       toast.error("Please select a valid dataset version.");
+      return;
+    }
+
+    const epochs = Number(formData.epochs);
+    if (isNaN(epochs) || epochs < 1 || epochs > 20) {
+      toast.error("Epochs must be a number between 1 and 20.");
+      return;
+    }
+
+    const lr = Number(formData.learning_rate);
+    if (isNaN(lr) || lr <= 0) {
+      toast.error("Learning rate must be greater than 0.");
+      return;
+    }
+
+    const batchSize = Number(formData.batch_size);
+    if (isNaN(batchSize) || batchSize < 1) {
+      toast.error("Batch size must be at least 1.");
       return;
     }
 
     try {
       setSubmitting(true);
       const runPayload = {
-        base_model: formData.base_model,
-        dataset_version_id: Number(formData.dataset_version_id),
-        training_method: formData.training_method,
-        epochs: Number(formData.epochs),
-        learning_rate: Number(formData.learning_rate),
-        batch_size: Number(formData.batch_size),
+        base_model: formData.base_model || SUPPORTED_BASE_MODELS[0].id,
+        dataset_version_id: versionId,
+        training_method: formData.training_method || "LoRA",
+        epochs: epochs,
+        learning_rate: lr,
+        batch_size: batchSize,
       };
 
       const createdRun = await createTrainingRun(runPayload);
@@ -85,8 +141,18 @@ export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
       onClose();
     } catch (err) {
       console.error("Failed to create training run:", err);
-      const detail = err?.response?.data?.detail || "Failed to create training run.";
-      toast.error(typeof detail === "string" ? detail : "Failed to create run.");
+      let errorMsg = "Failed to create training run.";
+      const detail = err?.response?.data?.detail;
+      if (typeof detail === "string") {
+        errorMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errorMsg = detail
+          .map((d) => (d.msg ? `${d.loc ? d.loc.slice(1).join(".") + ": " : ""}${d.msg}` : JSON.stringify(d)))
+          .join(", ");
+      } else if (err?.message) {
+        errorMsg = err.message;
+      }
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -126,12 +192,15 @@ export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
               onChange={(e) => setFormData({ ...formData, base_model: e.target.value })}
               className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#002B55] bg-white font-medium text-gray-800"
             >
-              <option value="Llama-3-8B">Llama-3-8B </option>
-              <option value="Mistral-7B-v0.2">Mistral-7B-v0.2</option>
-              <option value="Llama-3-70B">Llama-3-70B</option>
-              <option value="Phi-3-Mini">Phi-3-Mini </option>
-              <option value="Qwen-2.5-7B">Qwen-2.5-7B </option>
+              {SUPPORTED_BASE_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.displayName} ({m.params})
+                </option>
+              ))}
             </select>
+            <p className="mt-1 text-[11px] text-gray-500">
+              {SUPPORTED_BASE_MODELS.find((m) => m.id === formData.base_model)?.description}
+            </p>
           </div>
 
           {/* Dataset selection */}
@@ -158,11 +227,14 @@ export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
               >
                 <option value="">Select a dataset version</option>
                 {datasets.map((d) =>
-                  (d.versions || []).map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {d.dataset_name} (v{v.version}) - {v.file_type || "CSV"}
-                    </option>
-                  ))
+                  (d.versions || []).map((v) => {
+                    const isProcessed = String(v.status || "").toLowerCase() === "processed";
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {d.dataset_name} (v{v.version}) — {isProcessed ? "PROCESSED ✓" : `${v.status || "PENDING"}`} — {v.file_type || "CSV"}
+                      </option>
+                    );
+                  })
                 )}
               </select>
             )}

@@ -72,7 +72,20 @@ def create_run(
     data: TrainingRunCreate,
     db: Session = Depends(get_db)
 ):
-    return create_training_run(db, data)
+    try:
+        return create_training_run(db, data)
+    except HTTPException:
+        raise
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create training run: {str(error)}"
+        )
 
 
 @router.post(

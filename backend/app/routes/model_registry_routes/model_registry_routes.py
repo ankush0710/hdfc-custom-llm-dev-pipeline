@@ -62,7 +62,51 @@ def register_model(
 def get_models(
     db: Session = Depends(get_db),
 ):
-    return list_model(db)
+    models = list_model(db)
+    result = []
+    for m in models:
+        eval_record = (
+            db.query(Evaluation_Model)
+            .filter(Evaluation_Model.model_id == m.id)
+            .order_by(Evaluation_Model.evaluation_id.desc())
+            .first()
+        )
+        if not eval_record and m.evaluation_id:
+            eval_record = (
+                db.query(Evaluation_Model)
+                .filter(Evaluation_Model.evaluation_id == m.evaluation_id)
+                .first()
+            )
+
+        acc_str = None
+        if eval_record:
+            acc_raw = (
+                eval_record.answer_accuracy
+                if eval_record.answer_accuracy is not None
+                else eval_record.intent_structured_accuracy
+                if eval_record.intent_structured_accuracy is not None
+                else eval_record.full_structured_match
+            )
+            acc_pct = (acc_raw * 100) if (acc_raw is not None and acc_raw <= 1.0) else acc_raw
+            if acc_pct is not None:
+                acc_str = f"{round(acc_pct, 1)}%"
+
+        m_dict = {
+            "id": m.id,
+            "model_name": m.model_name,
+            "version": m.version,
+            "base_model": m.base_model,
+            "artifact_path": m.artifact_path,
+            "adapter_path": m.adapter_path,
+            "training_job_id": m.training_job_id,
+            "evaluation_id": m.evaluation_id,
+            "accuracy": acc_str,
+            "status": m.status,
+            "created_at": m.created_at,
+            "updated_at": m.updated_at,
+        }
+        result.append(Model_Response(**m_dict))
+    return result
 
 
 @router.get(

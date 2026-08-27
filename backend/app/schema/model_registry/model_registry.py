@@ -29,6 +29,7 @@ class Model_Response(BaseModel):
     adapter_path: Optional[str] = None
     training_job_id: Optional[int] = None
     evaluation_id: Optional[int] = None
+    accuracy: Optional[str] = None
     status: str
     created_at: datetime
     updated_at: datetime

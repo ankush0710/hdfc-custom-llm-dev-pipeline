@@ -43,12 +43,11 @@ export default function NewEvaluationModal({ isOpen, onClose, onEvaluationCreate
         setDatasets(validDatasets);
 
         // Pre-select first items if available
+        const firstDatasetVersion = validDatasets.find((d) => d.versions && d.versions.length > 0)?.versions[0];
         setFormData({
           model_id: validModels.length > 0 ? String(validModels[0].id) : "",
-          run_id: validRuns.length > 0 ? String(validRuns[0].id) : "1",
-          test_dataset_id: validDatasets.length > 0 && validDatasets[0].versions?.length > 0
-            ? String(validDatasets[0].versions[0].id)
-            : "1",
+          run_id: validRuns.length > 0 ? String(validRuns[0].id) : "",
+          test_dataset_id: firstDatasetVersion ? String(firstDatasetVersion.id) : "",
         });
       } catch (err) {
         console.error("Failed to load evaluation options:", err);
@@ -139,15 +138,12 @@ export default function NewEvaluationModal({ isOpen, onClose, onEvaluationCreate
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
                 required
               >
-                {models.length > 0 ? (
-                  models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.model_name} (v{m.version}) - {m.base_model}
-                    </option>
-                  ))
-                ) : (
-                  <option value="1">HDFC Banking Assistant (v1.2) - Default</option>
-                )}
+                <option value="">Select a registered model</option>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.model_name} (v{m.version}) - {m.base_model}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -162,15 +158,12 @@ export default function NewEvaluationModal({ isOpen, onClose, onEvaluationCreate
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
                 required
               >
-                {runs.length > 0 ? (
-                  runs.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      Run #{r.id} ({r.base_model} - {r.status})
-                    </option>
-                  ))
-                ) : (
-                  <option value="1">Run #1 (Llama-3-8B - COMPLETED)</option>
-                )}
+                <option value="">Select training run</option>
+                {runs.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    Run #{r.id} ({r.base_model} - {r.status})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -185,16 +178,13 @@ export default function NewEvaluationModal({ isOpen, onClose, onEvaluationCreate
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
                 required
               >
-                {datasets.length > 0 ? (
-                  datasets.map((d) =>
-                    (d.versions || []).map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {d.dataset_name} (v{v.version}) - {v.status || "Ready"}
-                      </option>
-                    ))
-                  )
-                ) : (
-                  <option value="1">HDFC Banking Test Set (v1.0)</option>
+                <option value="">Select test dataset version</option>
+                {datasets.map((d) =>
+                  (d.versions || []).map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {d.dataset_name} (v{v.version}) - {v.status || "Ready"}
+                    </option>
+                  ))
                 )}
               </select>
             </div>

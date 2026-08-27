@@ -26,8 +26,8 @@ class DeploymentService:
             if not deployment.endpoint or deployment.endpoint == "/inference/predict":
                 deployment.endpoint = f"https://inference.capital.ai/v1/models/{slug}-v{ver_slug}/generate"
         else:
-            deployment.model_name = f"Model-{deployment.model_id}"
-            deployment.base_model = "Llama-3-8B"
+            deployment.model_name = f"Model #{deployment.model_id}"
+            deployment.base_model = None
             if not deployment.endpoint:
                 deployment.endpoint = f"https://inference.capital.ai/v1/models/model-{deployment.model_id}/generate"
 

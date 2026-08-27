@@ -75,14 +75,7 @@ export const createModelColumns = ({ onViewDetails } = {}) => [
     key: "accuracy",
     label: "ACCURACY",
     render: (row) => {
-      // Calculate realistic accuracy based on id or status
-      const accuracy = row.accuracy || (
-        row.status === "ACTIVE" || row.status === "APPROVED" || row.status === "READY"
-          ? `${(92 + (row.id % 7)).toFixed(1)}%`
-          : row.status === "TRAINING"
-          ? `${(85 + (row.id % 5)).toFixed(1)}%`
-          : "81.2%"
-      );
+      const accuracy = row.accuracy || "—";
 
       return (
         <span className="font-mono font-bold text-xs text-gray-800">

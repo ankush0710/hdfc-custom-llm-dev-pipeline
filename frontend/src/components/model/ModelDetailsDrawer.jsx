@@ -86,7 +86,7 @@ export default function ModelDetailsDrawer({ isOpen, onClose, model, onStatusUpd
                 Accuracy Benchmark
               </span>
               <span className="font-mono font-bold text-blue-700 text-sm">
-                {model.accuracy || "94.2%"}
+                {model.accuracy || "—"}
               </span>
             </div>
           </div>

@@ -1,0 +1,16 @@
+customer_id,customer_name,account_number,account_type,balance,branch,city,email,phone,transaction_amount,transaction_type
+C001,Rahul Sharma,ACC10001,Savings,45000,Raipur,Raipur,rahul.sharma@email.com,9876543210,5000,Deposit
+C002,Priya Verma,ACC10002,Current,120000,Civil Lines,Raipur,priya.verma@email.com,9876543211,25000,Withdrawal
+C003,Amit Kumar,ACC10003,Savings,,Mumbai,Mumbai,amit.kumar@email.com,9876543212,10000,Deposit
+C004,Sneha Patel,INVALID-XYZ,Savings,75000,Navrangpura,Ahmedabad,sneha.patel@email,12345,-500,Transfer
+C005,Vikram Singh,ACC10005,Premium,abc,Unknown,,vikram.singh@email.com,9876543214,ten thousand,Deposit
+,,,,,,,,,,
+C006,Anjali Gupta,ACC10006,Savings,55000,Bandra,Mumbai,,9876543215,8000,Deposit
+C007,Rohit Mehta,ACC10007,Current,90000,Connaught Place,Delhi,rohit.mehta@email.com,,15000,Withdrawal
+C002,Priya Verma,ACC10002,Current,120000,Civil Lines,Raipur,priya.verma@email.com,9876543211,25000,Withdrawal
+C008,Neha Joshi,ACC10008,Savings,30000,Koregaon Park,Pune,neha.joshi@email.com,9876543216,,Deposit
+C009,Arjun Das,ACC10009,Savings,-2000,Salt Lake,Kolkata,arjun.das@email.com,INVALID_PHONE,7000,Deposit
+C010,Kavita Rao,ACC10010,Current,250000,MG Road,Bengaluru,kavita.rao@email.com,9876543218,50000,Withdrawal
+C010,Kavita Rao,ACC10010,Current,250000,MG Road,Bengaluru,kavita.rao@email.com,9876543218,50000,Withdrawal
+,,,,,,,,,,
+C011,Test User,ACC10011,UnknownType,50000,Raipur,Raipur,not-an-email,98765ABCDE,999999999999,InvalidType

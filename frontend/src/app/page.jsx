@@ -30,7 +30,7 @@ import {
   RefreshCw,
   AlertCircle,
 } from "lucide-react";
-import { ModelColumns } from "@/sampleData/DashboardTableData";
+import { DashboardModelColumns as ModelColumns } from "@/components/tables/DashboardDeploymentColumns";
 
 // ─── Icon & styling constants (no business data here) ──────────────────────── //
 const STAT_CARD_META = [

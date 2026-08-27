@@ -7,6 +7,7 @@ from app.ai.inference_adapter.inference_adapter import (
 )
 
 from app.model.model_registry import Model_Registry
+from app.core.path_utils import validate_artifact_directory, resolve_artifact_path
 
 
 INFERENCE_ALLOWED_STATUSES = {
@@ -42,7 +43,6 @@ class InferenceService:
         # ---------------------------------------
         # 1. Find model in PostgreSQL
         # ---------------------------------------
-
         model = (
             self.db.query(Model_Registry)
             .filter(
@@ -52,52 +52,43 @@ class InferenceService:
         )
 
         if model is None:
-
             raise ValueError(
-                f"Model with id {model_id} "
-                "was not found."
+                f"Model ID '{model_id}' was not found in the Model Registry."
             )
 
         # ---------------------------------------
         # 2. Check model status
         # ---------------------------------------
-
         if model.status not in INFERENCE_ALLOWED_STATUSES:
-
             raise ValueError(
-                f"Model '{model.model_name}' "
-                f"version '{model.version}' "
-                f"is not available for inference. "
-                f"Current status: {model.status}"
+                f"Model '{model.model_name}' (v{model.version}) has status '{model.status}'. "
+                f"Inference is only allowed for models with status in {sorted(INFERENCE_ALLOWED_STATUSES)}."
             )
 
         # ---------------------------------------
-        # 3. Validate model name
+        # 3. Validate & resolve artifact path on disk
         # ---------------------------------------
+        raw_target_path = model.adapter_path or model.artifact_path
+        resolved_adapter_str = None
+        adapter_base_model = None
 
-        if not model.model_name:
-
-            raise ValueError(
-                "Model registry does not contain "
-                "a model_name."
-            )
+        if raw_target_path:
+            validation = validate_artifact_directory(raw_target_path)
+            if not validation["is_valid"]:
+                raise ValueError(
+                    f"Model '{model.model_name}' (ID: {model_id}) artifact directory is invalid or missing on disk: "
+                    f"{validation['error_message']}"
+                )
+            resolved_adapter_str = str(validation["resolved_path"])
+            adapter_base_model = validation.get("base_model")
 
         # ---------------------------------------
-        # 4. Call AI inference
+        # 4. Resolve Base Model Architecture
         # ---------------------------------------
-        valid_tasks = {
-            "intent_classification",
-            "sft_grounded_generation",
-            "customer_faq_qa",
-            "domain_concept_qa",
-        }
-        actual_task_type = task_type if task_type in valid_tasks else "sft_grounded_generation"
+        raw_base = adapter_base_model or (model.base_model or "").strip()
+        if not raw_base or raw_base.lower() in {"base_model", "none", "null"}:
+            raw_base = "Qwen/Qwen3-0.6B"
 
-        # Resolve AI model string ID from base_model in the registry.
-        # base_model holds the HuggingFace model path (e.g. "Qwen/Qwen3-0.6B").
-        # We derive the AI pipeline key from the last path segment, lowercased.
-        raw_base = (model.base_model or "").strip()
-        # Derive slug: take last path component, lower, replace - with _
         base_slug = raw_base.split("/")[-1].lower().replace("-", "_").replace(".", "_")
 
         # Map known base_model slugs to AI service model IDs
@@ -111,12 +102,19 @@ class InferenceService:
         elif "smol" in base_slug:
             resolved_model_id = "smollm2_1_7b_instruct"
         else:
-            # Cannot resolve — raise a real error so the caller knows
-            raise ValueError(
-                f"Cannot resolve AI model ID for base_model '{raw_base}' "
-                f"(registry model: '{model.model_name}'). "
-                f"Supported base models: Qwen/Qwen3-0.6B, Qwen/Qwen2.5-1.5B-Instruct, HuggingFaceTB/SmolLM2-1.7B-Instruct."
-            )
+            resolved_model_id = "qwen3_0_6b"
+
+        # ---------------------------------------
+        # 5. Call AI inference
+        # ---------------------------------------
+        valid_tasks = {
+            "intent_classification",
+            "sft_grounded_generation",
+            "customer_faq_qa",
+            "domain_concept_qa",
+            "inference",
+        }
+        actual_task_type = task_type if task_type in valid_tasks and task_type != "inference" else "sft_grounded_generation"
 
         start_time = time.perf_counter()
 
@@ -130,8 +128,8 @@ class InferenceService:
             top_p=top_p,
             do_sample=do_sample,
             seed=seed,
-            adapter_path_override=model.adapter_path or None,
-            base_model_override=raw_base or "Qwen/Qwen3-0.6B",
+            adapter_path_override=resolved_adapter_str,
+            base_model_override=raw_base,
         )
 
         latency = (

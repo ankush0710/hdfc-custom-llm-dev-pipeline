@@ -19,6 +19,7 @@ export default function ModelRegistryPage() {
     const [models, setModels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedModel, setSelectedModel] = useState(null);
     const [statusFilter, setStatusFilter] = useState("ALL");
@@ -28,6 +29,7 @@ export default function ModelRegistryPage() {
         try {
             if (!isSilent) setLoading(true);
             else setRefreshing(true);
+            setError(null);
 
             const data = await getModels();
             if (Array.isArray(data)) {
@@ -36,7 +38,10 @@ export default function ModelRegistryPage() {
                 setModels([]);
             }
         } catch (err) {
-            console.error("Failed to fetch models:")
+            console.error("Failed to fetch models:", err);
+            const msg = err?.response?.data?.detail || "Failed to fetch models from Model Registry.";
+            setError(typeof msg === "string" ? msg : "Failed to load models.");
+            toast.error("Failed to fetch models from Model Registry.");
             setModels([]);
         } finally {
             setLoading(false);
@@ -134,6 +139,10 @@ export default function ModelRegistryPage() {
                     filterOptions={filterOptions}
                     selectedFilter={statusFilter}
                     onFilterChange={(val) => setStatusFilter(val)}
+                    loading={loading}
+                    error={error}
+                    onRetry={() => fetchModels()}
+                    emptyMessage="No models registered in the Model Registry yet. Create and train a model or register one using the button above."
                 />
             </div>
 

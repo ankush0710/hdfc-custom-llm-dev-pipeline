@@ -3,16 +3,17 @@
 import { CheckCircle2, Award } from "lucide-react";
 
 export default function EvaluationOverallScoreCard({
-  score = 91.4,
-  status = "PASSED",
+  score = null,
+  status = "QUEUED",
 }) {
   const isPassed = String(status).toUpperCase() === "PASSED" || String(status).toUpperCase() === "COMPLETED";
-  const numScore = typeof score === "number" ? score : parseFloat(score) || 0;
+  const numScore = score !== null && score !== undefined ? (typeof score === "number" ? score : parseFloat(score) || 0) : null;
+  const displayScore = numScore !== null ? `${numScore.toFixed(1)}%` : "—";
   
   // Calculate SVG stroke circle parameters
   const radius = 64;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (numScore / 100) * circumference;
+  const strokeDashoffset = numScore !== null ? circumference - (numScore / 100) * circumference : circumference;
 
   return (
     <div className="h-full bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm flex flex-col justify-between">
@@ -74,7 +75,7 @@ export default function EvaluationOverallScoreCard({
           {/* Centered Score */}
           <div className="absolute flex flex-col items-center justify-center text-center">
             <span className="font-mono text-3xl font-extrabold text-gray-900 tracking-tight">
-              {numScore}%
+              {displayScore}
             </span>
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">
               Score

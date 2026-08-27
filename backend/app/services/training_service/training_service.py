@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.training_adapter.training_adapter import AITrainingAdapter
 from app.constants.training_status import training_status
+from app.constants.supported_models import resolve_hf_model_id, resolve_model_config
 from app.dbConfig.database_config import SessionLocal
 from app.model.dataset_version_model import Dataset_Version_Model
 from app.model.model_registry import Model_Registry
@@ -22,6 +23,16 @@ logger = logging.getLogger(__name__)
 
 # ================= create new training run ========================================= #
 def create_training_run(db: Session, data: TrainingRunCreate):
+    # 1. Validate and resolve model to canonical HF model ID
+    try:
+        canonical_base_model = resolve_hf_model_id(data.base_model)
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=400,
+            detail=str(val_err)
+        )
+
+    # 2. Validate dataset version
     dataset_version = (
         db.query(Dataset_Version_Model)
         .filter(Dataset_Version_Model.id == data.dataset_version_id)
@@ -46,7 +57,7 @@ def create_training_run(db: Session, data: TrainingRunCreate):
 
     training_run = Training_Model(
         dataset_version_id=data.dataset_version_id,
-        base_model=data.base_model,
+        base_model=canonical_base_model,
         training_method=data.training_method,
         epochs=data.epochs,
         learning_rate=data.learning_rate,
@@ -118,9 +129,10 @@ def _execute_training_run_worker(run_id: int):
         training_job.progress = 20
         db.commit()
 
-        logger.info("Starting AI training adapter for run %d...", run_id)
+        canonical_base_model = resolve_hf_model_id(training_run.base_model)
+        logger.info("Starting AI training adapter for run %d with base model '%s'...", run_id, canonical_base_model)
         train_result = AITrainingAdapter.train(
-            base_model=training_run.base_model,
+            base_model=canonical_base_model,
             dataset_path=ds_path,
             output_dir=output_dir,
             epochs=float(training_run.epochs),

@@ -3,42 +3,49 @@
 import { TrendingUp, TrendingDown, Target, CheckSquare, RefreshCw, Award } from "lucide-react";
 
 export default function EvaluationMetricsGrid({
-  accuracy = 94,
-  accuracyTrend = "+1.5% vs prev",
-  precision = 92,
-  recall = 89,
-  recallTrend = "-1.2% vs prev",
-  f1Score = 91,
-  f1Trend = "+0.8% vs prev",
+  accuracy = null,
+  accuracyTrend = null,
+  precision = null,
+  recall = null,
+  recallTrend = null,
+  f1Score = null,
+  f1Trend = null,
 }) {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return "—";
+    const num = typeof v === "number" ? v : parseFloat(v);
+    if (isNaN(num)) return String(v);
+    return `${num.toFixed(1)}%`;
+  };
+
   const metrics = [
     {
       label: "Accuracy",
-      value: `${accuracy}%`,
-      trend: accuracyTrend,
+      value: formatVal(accuracy),
+      trend: accuracy ? accuracyTrend : null,
       trendUp: true,
       icon: Target,
       iconColor: "text-blue-600 bg-blue-50",
     },
     {
       label: "Precision",
-      value: `${precision}%`,
+      value: formatVal(precision),
       trend: null,
       icon: CheckSquare,
       iconColor: "text-indigo-600 bg-indigo-50",
     },
     {
       label: "Recall",
-      value: `${recall}%`,
-      trend: recallTrend,
+      value: formatVal(recall),
+      trend: recall ? recallTrend : null,
       trendUp: false,
       icon: RefreshCw,
       iconColor: "text-amber-600 bg-amber-50",
     },
     {
       label: "F1 Score",
-      value: `${f1Score}%`,
-      trend: f1Trend,
+      value: formatVal(f1Score),
+      trend: f1Score ? f1Trend : null,
       trendUp: true,
       icon: Award,
       iconColor: "text-emerald-600 bg-emerald-50",

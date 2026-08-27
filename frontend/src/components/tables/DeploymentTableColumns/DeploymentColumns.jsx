@@ -20,7 +20,7 @@ export const createDeploymentColumns = () => [
               {formattedName}
             </Link>
             <span className="text-[11px] text-gray-400 font-normal">
-              {row.base_model || "Llama-3-8B"}
+              {row.base_model || "Qwen/Qwen3-0.6B"}
             </span>
           </div>
         </div>

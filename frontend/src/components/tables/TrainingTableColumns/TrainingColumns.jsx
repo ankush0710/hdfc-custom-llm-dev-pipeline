@@ -28,7 +28,7 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
     label: "Base Model",
     render: (row) => (
       <span className="text-xs font-semibold text-gray-900">
-        {row.base_model || "Llama-3-8B"}
+        {row.base_model || "Qwen/Qwen3-0.6B"}
       </span>
     ),
   },

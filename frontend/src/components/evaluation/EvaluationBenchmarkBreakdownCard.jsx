@@ -3,25 +3,7 @@
 import { BarChart3, Layers, CheckCircle2 } from "lucide-react";
 
 export default function EvaluationBenchmarkBreakdownCard({ tasks = [] }) {
-  const defaultTasks = [
-    {
-      task_name: "Task A (Reasoning / Intent Structured Validity)",
-      score: 94,
-      category: "Intent Reasoning",
-    },
-    {
-      task_name: "Task B (Structured Entity Extraction / Generation)",
-      score: 92,
-      category: "Extraction",
-    },
-    {
-      task_name: "Task C (Banking Policy & Safety Compliance)",
-      score: 89,
-      category: "Safety Alignment",
-    },
-  ];
-
-  const taskList = tasks && tasks.length > 0 ? tasks : defaultTasks;
+  const taskList = Array.isArray(tasks) ? tasks : [];
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm">
@@ -42,32 +24,38 @@ export default function EvaluationBenchmarkBreakdownCard({ tasks = [] }) {
         </div>
       </div>
 
-      {/* Task Progress Bars */}
-      <div className="space-y-6">
-        {taskList.map((item, index) => {
-          const numScore = typeof item.score === "number" ? item.score : parseFloat(item.score) || 0;
-          return (
-            <div key={index} className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-gray-800">
-                  {item.task_name}
-                </span>
-                <span className="font-mono text-xs font-bold text-gray-900">
-                  {numScore}%
-                </span>
-              </div>
+      {/* Task Progress Bars or Empty State */}
+      {taskList.length === 0 ? (
+        <div className="py-8 text-center text-xs text-gray-400">
+          No benchmark task breakdown data available for this evaluation run.
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {taskList.map((item, index) => {
+            const numScore = typeof item.score === "number" ? item.score : parseFloat(item.score) || 0;
+            return (
+              <div key={index} className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-gray-800">
+                    {item.task_name}
+                  </span>
+                  <span className="font-mono text-xs font-bold text-gray-900">
+                    {numScore}%
+                  </span>
+                </div>
 
-              {/* Progress Track */}
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden p-0.5">
-                <div
-                  className="h-full bg-[#002B55] rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${Math.min(numScore, 100)}%` }}
-                />
+                {/* Progress Track */}
+                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden p-0.5">
+                  <div
+                    className="h-full bg-[#002B55] rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${Math.min(numScore, 100)}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

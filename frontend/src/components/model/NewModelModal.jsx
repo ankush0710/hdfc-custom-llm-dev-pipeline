@@ -8,13 +8,9 @@ import { getTrainingRuns } from "@/app/services/trainingService/trainingServices
 import { toast } from "sonner";
 
 const BASE_MODEL_OPTIONS = [
-  "Llama-3-70B-Instruct",
-  "Llama-3-8B-Instruct",
-  "Llama-3-8B",
-  "Qwen1.5-0.5B",
-  "FinBERT-Base",
-  "Mistral-7B-Instruct-v0.2",
-  "BGE-Large-en-v1.5",
+  "Qwen/Qwen2.5-1.5B-Instruct",
+  "Qwen/Qwen3-0.6B",
+  "HuggingFaceTB/SmolLM2-1.7B-Instruct",
 ];
 
 const MODEL_TYPE_OPTIONS = [

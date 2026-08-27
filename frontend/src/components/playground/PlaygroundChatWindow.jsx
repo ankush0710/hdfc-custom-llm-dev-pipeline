@@ -23,7 +23,7 @@ export default function PlaygroundChatWindow({
   onSendMessage,
   onClearChat,
   loading = false,
-  tokenCount = 482,
+  tokenCount = 0,
 }) {
   const [inputPrompt, setInputPrompt] = useState("");
   const [copiedIndex, setCopiedIndex] = useState(null);

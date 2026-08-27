@@ -74,8 +74,8 @@ def _enrich_evaluation(db: Session, eval_item: Evaluation_Model) -> Evaluation_M
         eval_item.model_name = f"{model.model_name}-{ver_str}"
         eval_item.base_model = model.base_model
     else:
-        eval_item.model_name = f"Model-{eval_item.model_id}"
-        eval_item.base_model = "Llama-3-8B"
+        eval_item.model_name = f"Model #{eval_item.model_id}"
+        eval_item.base_model = None
 
     # Dataset metadata
     d_ver = db.query(Dataset_Version_Model).filter(Dataset_Version_Model.id == eval_item.test_dataset_id).first()
@@ -83,11 +83,11 @@ def _enrich_evaluation(db: Session, eval_item: Evaluation_Model) -> Evaluation_M
         eval_item.dataset_name = f"{d_ver.dataset.dataset_name}"
         eval_item.dataset_version = f"v{d_ver.version}"
     elif d_ver:
-        eval_item.dataset_name = f"Dataset-{d_ver.dataset_id}"
+        eval_item.dataset_name = f"Dataset #{d_ver.dataset_id}"
         eval_item.dataset_version = f"v{d_ver.version}"
     else:
-        eval_item.dataset_name = f"HDFC-KB-v{eval_item.test_dataset_id}"
-        eval_item.dataset_version = "v1.0"
+        eval_item.dataset_name = f"Dataset Version #{eval_item.test_dataset_id}"
+        eval_item.dataset_version = None
 
     # Score calculation — only use real DB metrics, never fabricate
     acc = eval_item.answer_accuracy or eval_item.intent_structured_accuracy or eval_item.full_structured_match

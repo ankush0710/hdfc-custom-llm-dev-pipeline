@@ -9,7 +9,7 @@ import StatCard from "@/components/ui/StatCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
 import { createDatasetColumns } from "@/components/tables/DatasetTableColumns/DatasetColumns";
-import { getDataset, deleteDataset } from "../services/datasetService/datasetServices";
+import { getDataset, deleteDataset } from "@/app/services/datasetService/datasetServices";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Upload,

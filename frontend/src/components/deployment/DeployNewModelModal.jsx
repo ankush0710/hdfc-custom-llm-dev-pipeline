@@ -132,15 +132,12 @@ export default function DeployNewModelModal({ isOpen, onClose, onModelDeployed }
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
                 required
               >
-                {models.length > 0 ? (
-                  models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.model_name} (v{m.version}) - {m.base_model}
-                    </option>
-                  ))
-                ) : (
-                  <option value="1">HDFC Banking Assistant (v1.2)</option>
-                )}
+                <option value="">Select a registered model</option>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.model_name} (v{m.version}) - {m.base_model}
+                  </option>
+                ))}
               </select>
             </div>
 
