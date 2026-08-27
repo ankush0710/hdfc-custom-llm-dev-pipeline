@@ -30,13 +30,17 @@ async def start_processing(
         return {
             "job_id": job.id,
             "dataset_version_id": job.dataset_version_id,
-            "status": job.status
+            "status": job.status,
+            "pii_instances_detected": metrics.get("pii_instances_detected", 0),
+            "pii_types_detected": metrics.get("pii_types_detected", "NONE"),
+            "records_sanitized": metrics.get("records_sanitized", 0),
+            "is_safe_for_training": metrics.get("is_safe_for_training", False),
         }
 
     except ValueError as error:
-
+        status_code = 404 if "not found" in str(error).lower() else 400
         raise HTTPException(
-            status_code=404,
+            status_code=status_code,
             detail=str(error)
         )
 
@@ -61,12 +65,22 @@ def get_processing_status(
             detail="Processing job not found"
         )
 
-    return{
-        "job_id":job.id,
-        "dataset_version_id":job.dataset_version_id,
-        "status":job.status,
-        "output_file":job.output_file,
-        "error_message":job.error_message
+    quality = job.quality_metrics
+    pii_instances = quality.pii_instances_detected if quality else 0
+    pii_types = quality.pii_types_detected if quality else "NONE"
+    records_sanitized = quality.records_sanitized if quality else 0
+    is_safe = quality.is_safe_for_training if quality else (job.status == "COMPLETED")
+
+    return {
+        "job_id": job.id,
+        "dataset_version_id": job.dataset_version_id,
+        "status": job.status,
+        "output_file": job.output_file,
+        "error_message": job.error_message,
+        "pii_instances_detected": pii_instances,
+        "pii_types_detected": pii_types,
+        "records_sanitized": records_sanitized,
+        "is_safe_for_training": is_safe,
     }
 
 
@@ -108,6 +122,11 @@ def get_version_quality_metrics(
                 "empty_rows": metrics.empty_rows,
                 "quality_score": metrics.quality_score,
                 "qualityScore": metrics.quality_score,
+                "pii_instances_detected": metrics.pii_instances_detected,
+                "pii_types_detected": metrics.pii_types_detected,
+                "records_sanitized": metrics.records_sanitized,
+                "is_safe_for_training": metrics.is_safe_for_training,
+                "pii_scan_status": version.pii_scan_status,
             }
 
     # 2. Check if this version was produced by another version's processing job
@@ -133,6 +152,11 @@ def get_version_quality_metrics(
                 "empty_rows": metrics.empty_rows,
                 "quality_score": metrics.quality_score,
                 "qualityScore": metrics.quality_score,
+                "pii_instances_detected": metrics.pii_instances_detected,
+                "pii_types_detected": metrics.pii_types_detected,
+                "records_sanitized": metrics.records_sanitized,
+                "is_safe_for_training": metrics.is_safe_for_training,
+                "pii_scan_status": version.pii_scan_status,
             }
 
     # 3. Calculate statistics directly from the physical file on disk
@@ -154,6 +178,11 @@ def get_version_quality_metrics(
                     "empty_rows": stats.get("empty_rows", 0),
                     "quality_score": stats.get("quality_score", 100.0),
                     "qualityScore": stats.get("quality_score", 100.0),
+                    "pii_instances_detected": 0,
+                    "pii_types_detected": "NONE",
+                    "records_sanitized": 0,
+                    "is_safe_for_training": version.is_safe_for_training,
+                    "pii_scan_status": version.pii_scan_status,
                 }
     except Exception:
         pass

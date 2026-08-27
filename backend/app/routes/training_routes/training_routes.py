@@ -157,12 +157,6 @@ def get_run_detail(
     run_id: int,
     db: Session = Depends(get_db)
 ):
-    """
-    Returns the full training run record enriched with:
-    - dataset name and version label (resolved from dataset_version_id)
-    - linked training job status and progress
-    All values come from the database — no hardcoded content.
-    """
     from app.model.dataset_model import Dataset_Model
 
     training_run = get_training_run_by_id(db, run_id)
@@ -182,7 +176,6 @@ def get_run_detail(
         if d_ver.dataset:
             dataset_name = d_ver.dataset.dataset_name
 
-    # Resolve most recent training job
     job = (
         db.query(TrainingJobModel)
         .filter(TrainingJobModel.training_run_id == run_id)
@@ -220,11 +213,6 @@ def get_run_logs(
     run_id: int,
     db: Session = Depends(get_db)
 ):
-    """
-    Returns the training run status and associated job log entries.
-    Log entries are constructed from real database state (status, timestamps,
-    error messages, progress). No hardcoded log messages.
-    """
     training_run = get_training_run_by_id(db, run_id)
     if not training_run:
         raise HTTPException(status_code=404, detail="Training run not found")
@@ -292,4 +280,4 @@ def get_run_logs(
         job_status=job.status if job else None,
         job_progress=job.progress if job else None,
         logs=logs,
-    )
+    )

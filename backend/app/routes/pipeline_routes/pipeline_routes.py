@@ -310,13 +310,16 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         .limit(2)
         .all()
     )
+    model_ids = [dep.model_id for dep in recent_deployments if dep.model_id]
+    models_map = {}
+    if model_ids:
+        models_map = {
+            m.id: m.model_name
+            for m in db.query(Model_Registry).filter(Model_Registry.id.in_(model_ids)).all()
+        }
+
     for dep in recent_deployments:
-        model_rec = (
-            db.query(Model_Registry)
-            .filter(Model_Registry.id == dep.model_id)
-            .first()
-        )
-        model_name = model_rec.model_name if model_rec else f"Model-{dep.model_id}"
+        model_name = models_map.get(dep.model_id, f"Model-{dep.model_id}")
         ts = dep.updated_at or dep.created_at
         ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None
 

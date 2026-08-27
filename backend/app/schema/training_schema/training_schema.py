@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.constants.supported_models import resolve_hf_model_id, SUPPORTED_TRAINING_MODELS
 
@@ -30,7 +31,6 @@ class TrainingRunCreate(BaseModel):
         return resolve_hf_model_id(v)
 
 class TrainingRunResponse(BaseModel):
-
     id: int
     dataset_version_id: int
     base_model: str
@@ -39,8 +39,12 @@ class TrainingRunResponse(BaseModel):
     learning_rate: float
     batch_size: int
     status: str
-    error_message: str | None = None
-    created_at: datetime
+    error_message: Optional[str] = None
+    created_at: Optional[datetime] = None
+    job_id: Optional[int] = None
+    job_status: Optional[str] = None
+    job_progress: Optional[int] = 0
+    progress: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 

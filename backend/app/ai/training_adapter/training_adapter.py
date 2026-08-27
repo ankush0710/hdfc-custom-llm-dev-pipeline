@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from datasets import Dataset
@@ -10,7 +10,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from ai.training.config import TrainingConfig
 from ai.training.model import prepare_model
-from ai.training.trainer import train_model
+from ai.training.trainer import train_model, TrainingProgressCallback
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +104,7 @@ class AITrainingAdapter:
         learning_rate: float = 2e-4,
         batch_size: int = 1,
         max_seq_length: int = 256,
+        progress_callback: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """Execute full training pipeline for a given base model and dataset."""
         data_p = Path(dataset_path)
@@ -132,7 +133,22 @@ class AITrainingAdapter:
         logger.info("Preparing model with LoRA...")
         model = prepare_model(config)
 
-        logger.info("Executing training for %d examples...", len(train_dataset))
-        result = train_model(model, tokenizer, train_dataset, config)
+        callbacks = []
 
-        return result.to_dict()
+        if progress_callback is not None:
+            logger.info("Training progress callback CONNECTED")
+
+            callbacks.append(
+                TrainingProgressCallback(
+                    on_progress=progress_callback,
+                    start_pct=20,
+                    end_pct=95,
+                )
+            )
+        else:
+            logger.warning("Training progress callback NOT PROVIDED")
+
+        logger.info("Executing training for %d examples...", len(train_dataset))
+        result = train_model(model, tokenizer, train_dataset, config, callbacks=callbacks)
+
+        return result.to_dict()

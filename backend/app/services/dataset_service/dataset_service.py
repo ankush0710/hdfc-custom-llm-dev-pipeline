@@ -86,7 +86,9 @@ async def create_dataset(
         file_size = file_size,
         file_type = extension.replace(".", "").upper(),
         file_hash = None,
-        status = "Uploaded"
+        status = "Uploaded",
+        is_safe_for_training = False,
+        pii_scan_status = "PENDING",
     )
 
     db.add(dataset_version)
