@@ -7,11 +7,7 @@ const API = axios.create({
 });
 
 export const uploadDataset = async (formData) => {
-  const response = await API.post("/datasets/upload-dataset", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+  const response = await API.post("/datasets/upload-dataset", formData);
   return response.data;
 };
 
@@ -74,13 +70,13 @@ export const downloadVersionFile = async (versionId, filename = "dataset_version
 
 export const startProcessingJob = async (
   datasetVersionId,
-  operations = ["clean", "remove_duplicate"]
+  operations = ["clean", "remove_duplicate", "detect_pii", "deidentify_pii"]
 ) => {
   const response = await API.post("/data-processing/jobs", {
     dataset_version_id: Number(datasetVersionId),
     operations: Array.isArray(operations)
       ? operations
-      : ["clean", "remove_duplicate"],
+      : ["clean", "remove_duplicate", "detect_pii", "deidentify_pii"],
   });
   return response.data;
 };

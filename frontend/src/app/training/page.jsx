@@ -5,7 +5,7 @@ Training Jobs Dashboard: Monitor and manage foundation model fine-tuning pipelin
 //=======================================================================================//
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import StatCard from "@/components/ui/StatCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
@@ -33,26 +33,89 @@ export default function Training() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
 
+  const isFetchingRef = useRef(false);
+  const latestReqIdRef = useRef(0);
+
   // Load real training runs from backend API
   const loadRuns = useCallback(async (isSilent = false) => {
+    // Avoid overlapping background polling requests
+    if (isFetchingRef.current && isSilent) {
+      return;
+    }
+
+    const reqId = ++latestReqIdRef.current;
+    isFetchingRef.current = true;
+
     if (!isSilent) setLoading(true);
     else setRefreshing(true);
 
     try {
       const data = await getTrainingRuns();
-      setRuns(Array.isArray(data) ? data : []);
+      // Ensure only the newest response updates state to avoid race condition overwrites
+      if (reqId === latestReqIdRef.current && Array.isArray(data)) {
+        setRuns((prevRuns) => {
+          const prevMap = new Map(prevRuns.map((r) => [r.id, r]));
+          return data.map((newRun) => {
+            const prevRun = prevMap.get(newRun.id);
+            if (
+              prevRun &&
+              (newRun.status || "").toUpperCase() === "RUNNING" &&
+              (prevRun.status || "").toUpperCase() === "RUNNING"
+            ) {
+              const prevProg =
+                typeof prevRun.progress === "number"
+                  ? prevRun.progress
+                  : prevRun.job_progress || 0;
+              const newProg =
+                typeof newRun.progress === "number"
+                  ? newRun.progress
+                  : newRun.job_progress || 0;
+              // Guarantee monotonic progress display while running
+              if (newProg < prevProg) {
+                return { ...newRun, progress: prevProg, job_progress: prevProg };
+              }
+            }
+            return newRun;
+          });
+        });
+      }
     } catch (err) {
       console.error("Failed to load training runs:", err);
-      toast.error("Failed to fetch training runs from server.");
+      if (!isSilent) {
+        toast.error("Failed to fetch training runs from server.");
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      isFetchingRef.current = false;
+      if (reqId === latestReqIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
+  // Initial load
   useEffect(() => {
     loadRuns();
   }, [loadRuns]);
+
+  // Check if any training run is actively running or queued
+  const hasActiveRuns = useMemo(() => {
+    return runs.some((r) => {
+      const status = (r.status || "").toUpperCase();
+      return status === "RUNNING" || status === "QUEUED";
+    });
+  }, [runs]);
+
+  // Clean polling every 2.5 seconds while active runs exist
+  useEffect(() => {
+    if (!hasActiveRuns) return;
+
+    const intervalId = setInterval(() => {
+      loadRuns(true);
+    }, 2500);
+
+    return () => clearInterval(intervalId);
+  }, [hasActiveRuns, loadRuns]);
 
   // Action handlers
   const handleStartRun = async (run) => {

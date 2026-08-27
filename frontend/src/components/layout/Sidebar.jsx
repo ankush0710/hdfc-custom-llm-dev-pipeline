@@ -74,7 +74,7 @@ const bottomItems = [
 //======================= side bar item function ==============================================//
 function SidebarItem({ item, pathname }) {
     const Icon = item.icon;
-    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    const isActive = item.href === "/" ? pathname === "/" : (pathname === item.href || pathname.startsWith(`${item.href}/`));
 
     return (
         <Link href={item.href} className={`relative flex items-center gap-4 px-5 py-4 rounded-r-lg transition-all duration-300 group ${isActive ? " bg-[#07477F] text-white" : "text-white hover:bg-[#063967]"}`}>

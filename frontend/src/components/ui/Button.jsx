@@ -8,7 +8,7 @@ export default function Button({
   ...props
 }) {
   const variants = {
-    default: "hover:bg-gray-200 hover:text-blue-900 border border-gray-400",
+    default: "hover:bg-gray-200 hover:text-[#002B55] border border-gray-400",
 
     primary: "bg-[#002B55] text-white border border-gray-400",
   };

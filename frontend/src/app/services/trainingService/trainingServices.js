@@ -7,7 +7,15 @@ const API = axios.create({
 });
 
 export const getTrainingRuns = async () => {
-  const response = await API.get("/training/runs");
+  const response = await API.get("/training/runs", {
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+    params: {
+      _t: Date.now(),
+    },
+  });
   return response.data;
 };
 

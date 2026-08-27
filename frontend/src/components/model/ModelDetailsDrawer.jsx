@@ -46,7 +46,7 @@ export default function ModelDetailsDrawer({ isOpen, onClose, model, onStatusUpd
                 </span>
               </div>
               <p className="text-xs text-gray-500">
-                Registered on {new Date(model.created_at || Date.now()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                Registered on {model.created_at ? new Date(model.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Recently"}
               </p>
             </div>
           </div>
