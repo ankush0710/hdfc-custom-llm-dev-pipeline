@@ -25,8 +25,12 @@ export default function DeployNewModelModal({ isOpen, onClose, onModelDeployed }
       try {
         setLoadingModels(true);
         const data = await getModels();
-        const validList = Array.isArray(data) ? data : [];
-        setModels(validList);
+        const rawList = Array.isArray(data) ? data : [];
+        const validList = rawList.filter((m) => {
+          const st = (m.status || "").toUpperCase();
+          return st !== "REJECTED" && st !== "FAILED";
+        });
+        setModels(validList.length > 0 ? validList : rawList);
 
         if (validList.length > 0) {
           setFormData({

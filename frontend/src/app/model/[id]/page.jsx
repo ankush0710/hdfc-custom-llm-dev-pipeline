@@ -24,7 +24,8 @@ import ModelOverviewCard from "@/components/model/ModelOverviewCard";
 import ModelDeploymentInfoCard from "@/components/model/ModelDeploymentInfoCard";
 import ModelPerformanceMetricsCard from "@/components/model/ModelPerformanceMetricsCard";
 import ModelLogsModal from "@/components/model/ModelLogsModal";
-import { getModelDetail, updateModelStatus } from "@/app/services/modelService/modelServices";
+import { getModelDetail } from "@/app/services/modelService/modelServices";
+import { deployModel } from "@/app/services/deploymentService/deploymentServices";
 import { toast } from "sonner";
 
 export default function ModelDetailPage() {
@@ -35,18 +36,17 @@ export default function ModelDetailPage() {
   const [modelDetail, setModelDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [deploying, setDeploying] = useState(false);
+  const [isLogsOpen, setIsLogsOpen] = useState(false);
 
   // Fetch real model details from FastAPI
   const fetchDetail = useCallback(async (isSilent = false) => {
     if (!id) return;
     try {
       if (!isSilent) setLoading(true);
-      setError(null);
-
       const data = await getModelDetail(id);
       setModelDetail(data);
+      setError(null);
     } catch (err) {
       console.error("Failed to fetch model details:", err);
       setError(err?.response?.data?.detail || "Failed to load model details");
@@ -63,14 +63,19 @@ export default function ModelDetailPage() {
   const handleDeploy = async () => {
     try {
       setDeploying(true);
-      await updateModelStatus(id, "ACTIVE");
-      toast.success("Model deployment triggered successfully!", {
+      await deployModel({
+        model_id: parseInt(id, 10),
+        version: modelDetail?.version || "1.0",
+        environment: "Production",
+      });
+      toast.success("Model deployed successfully!", {
         description: "Active serving endpoint provisioned on enterprise cluster.",
       });
       fetchDetail(true);
     } catch (err) {
       console.error("Failed to deploy model:", err);
-      toast.error("Failed to deploy model.");
+      const msg = err?.response?.data?.detail || "Failed to deploy model.";
+      toast.error(msg);
     } finally {
       setDeploying(false);
     }

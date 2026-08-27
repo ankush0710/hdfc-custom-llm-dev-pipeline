@@ -17,9 +17,12 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
     render: (row) => {
       const formattedId = row.display_id || (row.id ? `trn-${String(row.id).padStart(4, "0").toLowerCase()}` : "trn-xxxx");
       return (
-        <span className="font-mono text-xs font-semibold text-slate-700">
+        <Link
+          href={`/training/${row.id}`}
+          className="font-mono text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline transition"
+        >
           {formattedId}
-        </span>
+        </Link>
       );
     },
   },
