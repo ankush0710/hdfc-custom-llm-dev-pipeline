@@ -8,6 +8,7 @@ from app.model.evaluation_run_model import Evaluation_Model
 from app.model.pipeline_run_model import Pipeline_Run_Model
 from app.model.model_registry import Model_Registry
 from app.model.deployment_model import Deployment
+from app.model.user_model import User_Model
 
 Deployment_Model = Deployment
 
@@ -22,5 +23,6 @@ __all__ = [
     "Pipeline_Run_Model",
     "Model_Registry",
     "Deployment",
-    "Deployment_Model"
+    "Deployment_Model",
+    "User_Model",
 ]
