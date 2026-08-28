@@ -12,10 +12,12 @@ import NewModelModal from "@/components/model/NewModelModal";
 import ModelDetailsDrawer from "@/components/model/ModelDetailsDrawer";
 import { createModelColumns } from "@/components/tables/ModelTableColumns/ModelColumns";
 import { getModels } from "@/app/services/modelService/modelServices";
+import { useAuth } from "@/app/context/AuthContext";
 import { Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ModelRegistryPage() {
+    const { hasRole } = useAuth();
     const [models, setModels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -23,6 +25,8 @@ export default function ModelRegistryPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedModel, setSelectedModel] = useState(null);
     const [statusFilter, setStatusFilter] = useState("ALL");
+
+    const canRegisterModel = hasRole("ADMIN", "DS");
 
     // Fetch models from FastAPI backend
     const fetchModels = useCallback(async (isSilent = false) => {
@@ -118,13 +122,15 @@ export default function ModelRegistryPage() {
                         {refreshing ? "Refreshing..." : "Refresh"}
                     </Button>
 
-                    <Button
-                        variant="primary"
-                        icon={Plus}
-                        onClick={() => setIsModalOpen(true)}
-                    >
-                        Register New Model
-                    </Button>
+                    {canRegisterModel && (
+                        <Button
+                            variant="primary"
+                            icon={Plus}
+                            onClick={() => setIsModalOpen(true)}
+                        >
+                            Register New Model
+                        </Button>
+                    )}
                 </div>
             </div>
 

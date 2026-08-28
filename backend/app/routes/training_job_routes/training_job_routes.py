@@ -6,8 +6,9 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
+from app.core.auth_dependency import get_current_user
 from app.dbConfig.database_config import get_db
-
+from app.model.user_model import User_Model
 from app.schema.training_job_schema.training_job_schema import (
     TrainingJobResponse
 )
@@ -30,7 +31,8 @@ router = APIRouter(
     response_model=list[TrainingJobResponse]
 )
 def get_jobs(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     return get_training_jobs(db)
 
@@ -42,7 +44,8 @@ def get_jobs(
 )
 def get_job(
     job_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     job = get_training_job_by_id(db, job_id)
 

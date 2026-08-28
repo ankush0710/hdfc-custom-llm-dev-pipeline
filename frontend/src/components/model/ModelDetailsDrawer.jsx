@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { X, Box, Cpu, HardDrive, Sparkles, Check, Clock, ShieldCheck, Layers, ExternalLink } from "lucide-react";
 import { updateModelStatus } from "@/app/services/modelService/modelServices";
+import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
 
 export default function ModelDetailsDrawer({ isOpen, onClose, model, onStatusUpdated }) {
+  const { hasRole } = useAuth();
   const [updating, setUpdating] = useState(false);
 
   if (!isOpen || !model) return null;
+
+  const canUpdateStatus = hasRole("ADMIN", "REVIEWER");
 
   const handleStatusChange = async (newStatus) => {
     try {
@@ -115,37 +119,39 @@ export default function ModelDetailsDrawer({ isOpen, onClose, model, onStatusUpd
           )}
 
           {/* Status Actions */}
-          <div className="pt-3 border-t border-gray-100">
-            <span className="text-[11px] font-semibold text-gray-600 block mb-2">
-              Update Deployment State:
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={updating || model.status === "ACTIVE"}
-                onClick={() => handleStatusChange("ACTIVE")}
-                className="px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
-              >
-                Set Active / Deployed
-              </button>
-              <button
-                type="button"
-                disabled={updating || model.status === "ARCHIVED"}
-                onClick={() => handleStatusChange("ARCHIVED")}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
-              >
-                Archive Model
-              </button>
-              <button
-                type="button"
-                disabled={updating || model.status === "READY"}
-                onClick={() => handleStatusChange("READY")}
-                className="px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
-              >
-                Set Ready
-              </button>
+          {canUpdateStatus && (
+            <div className="pt-3 border-t border-gray-100">
+              <span className="text-[11px] font-semibold text-gray-600 block mb-2">
+                Update Deployment State (Admin / Reviewer):
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={updating || model.status === "ACTIVE"}
+                  onClick={() => handleStatusChange("ACTIVE")}
+                  className="px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  Set Active / Deployed
+                </button>
+                <button
+                  type="button"
+                  disabled={updating || model.status === "ARCHIVED"}
+                  onClick={() => handleStatusChange("ARCHIVED")}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  Archive Model
+                </button>
+                <button
+                  type="button"
+                  disabled={updating || model.status === "READY"}
+                  onClick={() => handleStatusChange("READY")}
+                  className="px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  Set Ready
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer */}

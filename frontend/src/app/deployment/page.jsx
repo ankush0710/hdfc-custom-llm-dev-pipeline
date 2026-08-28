@@ -12,14 +12,18 @@ import ModelsTable from "@/components/tables/ModelsTable";
 import DeployNewModelModal from "@/components/deployment/DeployNewModelModal";
 import { createDeploymentColumns } from "@/components/tables/DeploymentTableColumns/DeploymentColumns";
 import { getDeployments } from "@/app/services/deploymentService/deploymentServices";
+import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
 
 export default function DeploymentPage() {
+  const { hasRole } = useAuth();
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const canDeploy = hasRole("ADMIN");
 
   // Fetch active deployments from FastAPI
   const fetchDeployments = useCallback(async (isSilent = false) => {
@@ -92,13 +96,15 @@ export default function DeploymentPage() {
             {refreshing ? "Refreshing..." : "Refresh"}
           </Button>
 
-          <Button
-            variant="primary"
-            icon={Plus}
-            onClick={() => setIsModalOpen(true)}
-          >
-            Deploy New Model
-          </Button>
+          {canDeploy && (
+            <Button
+              variant="primary"
+              icon={Plus}
+              onClick={() => setIsModalOpen(true)}
+            >
+              Deploy New Model
+            </Button>
+          )}
         </div>
       </div>
 

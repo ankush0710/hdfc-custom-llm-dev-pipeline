@@ -275,16 +275,21 @@ function UploadDatasetContent() {
   );
 }
 
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+
 export default function UploadDataset() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center lg:ml-[280px]">
-          <Loader2 className="h-8 w-8 animate-spin text-[#002B55]" />
-        </div>
-      }
-    >
-      <UploadDatasetContent />
-    </Suspense>
+    <ProtectedRoute allowedRoles={["ADMIN", "DS"]}>
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center lg:ml-[280px]">
+            <Loader2 className="h-8 w-8 animate-spin text-[#002B55]" />
+          </div>
+        }
+      >
+        <UploadDatasetContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
+

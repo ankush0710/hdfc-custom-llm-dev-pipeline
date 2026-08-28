@@ -1,6 +1,8 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
+from app.core.auth_dependency import get_current_user, require_roles
 from app.dbConfig.database_config import get_db
+from app.model.user_model import User_Model
 from app.schema.evaluation_schema.evaluation_schema import (
     EvaluationCreate,
     EvaluationResponse,
@@ -22,7 +24,8 @@ router = APIRouter(
 )
 def create_evaluation(
     payload: EvaluationCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS", "REVIEWER")),
 ):
     try:
         return evaluation_service.create_evaluation(db, payload)
@@ -38,7 +41,8 @@ def create_evaluation(
     response_model=EvaluationStatsResponse
 )
 def get_evaluation_stats(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     return evaluation_service.get_evaluation_stats(db)
 
@@ -50,7 +54,8 @@ def get_evaluation_stats(
 )
 def list_evaluations(
     run_id: int | None = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     return evaluation_service.list_evaluation(db, run_id)
 
@@ -63,6 +68,7 @@ def list_evaluations(
 def get_evaluation_by_id(
     evaluation_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     evaluation = evaluation_service.get_evaluation_by_id(db, evaluation_id)
     if not evaluation:
@@ -78,6 +84,7 @@ def get_evaluation_by_id(
 def get_evaluation_detail(
     evaluation_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     detail = evaluation_service.get_evaluation_detail(db, evaluation_id)
     if not detail:
@@ -93,7 +100,8 @@ def get_evaluation_detail(
 def start_evaluation(
     evaluation_id: int,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS", "REVIEWER")),
 ):
     try:
         return evaluation_service.start_evaluation(

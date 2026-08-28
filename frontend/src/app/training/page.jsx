@@ -26,12 +26,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useAuth } from "@/app/context/AuthContext";
+
 export default function Training() {
+  const { hasRole } = useAuth();
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const canManageTraining = hasRole("ADMIN", "DS");
 
   const isFetchingRef = useRef(false);
   const latestReqIdRef = useRef(0);
@@ -150,13 +155,13 @@ export default function Training() {
   const columns = useMemo(
     () =>
       createTrainingColumns({
-        onStartRun: handleStartRun,
-        onStopRun: handleStopRun,
+        onStartRun: canManageTraining ? handleStartRun : undefined,
+        onStopRun: canManageTraining ? handleStopRun : undefined,
         onViewMetrics: handleViewMetrics,
         onViewLogs: handleViewLogs,
-        onCancelRun: handleCancelRun,
+        onCancelRun: canManageTraining ? handleCancelRun : undefined,
       }),
-    []
+    [canManageTraining]
   );
 
   // Compute stat cards dynamically from real backend training run records
@@ -278,13 +283,15 @@ export default function Training() {
             Refresh
           </Button>
 
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            icon={Plus}
-            variant="primary"
-          >
-            New Training
-          </Button>
+          {canManageTraining && (
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              icon={Plus}
+              variant="primary"
+            >
+              New Training
+            </Button>
+          )}
         </div>
       </div>
 
@@ -313,15 +320,17 @@ export default function Training() {
             <p className="mt-1 text-sm text-gray-500 max-w-sm">
               Initiate a fine-tuning run on an existing dataset version to start training your custom LLM.
             </p>
-            <div className="mt-6">
-              <Button
-                onClick={() => setIsModalOpen(true)}
-                icon={Plus}
-                variant="primary"
-              >
-                Create First Training Job
-              </Button>
-            </div>
+            {canManageTraining && (
+              <div className="mt-6">
+                <Button
+                  onClick={() => setIsModalOpen(true)}
+                  icon={Plus}
+                  variant="primary"
+                >
+                  Create First Training Job
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <ModelsTable

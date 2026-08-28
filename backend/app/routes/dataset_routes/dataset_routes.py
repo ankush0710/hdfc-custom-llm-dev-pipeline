@@ -7,8 +7,10 @@ from uuid import uuid4
 from fastapi import (APIRouter, HTTPException, Depends, File, Form, UploadFile)
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from app.core.auth_dependency import get_current_user, require_roles
 from app.dbConfig.database_config import get_db
 from app.model.dataset_model import Dataset_Model
+from app.model.user_model import User_Model
 from app.schema.dataset_schema.dataset_scehma import DatasetResponse
 from app.services.dataset_service.dataset_service import (create_dataset, get_all_datasets, get_dataset_by_id, delete_dataset_by_id)
 
@@ -33,6 +35,7 @@ async def upload_dataset(
     description: str | None = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
 
     file_extension=Path(file.filename).suffix.lower()
@@ -72,7 +75,10 @@ async def upload_dataset(
     "/",
     response_model=list[DatasetResponse],
 )
-def get_dataset(db:Session=Depends(get_db)):
+def get_dataset(
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
+):
     return get_all_datasets(db)
 
 
@@ -81,7 +87,11 @@ def get_dataset(db:Session=Depends(get_db)):
     "/{dataset_id}",
     response_model=DatasetResponse,
 )
-def get_dataset_id(dataset_id:int, db:Session=Depends(get_db)):
+def get_dataset_id(
+    dataset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
+):
     dataset = get_dataset_by_id(db, dataset_id)
 
     if dataset is None:
@@ -96,7 +106,8 @@ def get_dataset_id(dataset_id:int, db:Session=Depends(get_db)):
 @router.get("/{dataset_id}/download")
 def download_dataset(
     dataset_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     dataset = get_dataset_by_id(db, dataset_id)
 
@@ -132,7 +143,8 @@ def download_dataset(
 @router.delete("/{dataset_id}")
 def delete_dataset_id(
     dataset_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     dataset = delete_dataset_by_id(
         db,

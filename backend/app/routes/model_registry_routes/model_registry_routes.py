@@ -5,7 +5,9 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from app.core.auth_dependency import get_current_user, require_roles
 from app.dbConfig.database_config import get_db
+from app.model.user_model import User_Model
 from app.schema.model_registry.model_registry import (
     Model_Create,
     Model_Response,
@@ -42,6 +44,7 @@ router = APIRouter(
 def register_model(
     payload: Model_Create,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     try:
         return create_model(
@@ -61,6 +64,7 @@ def register_model(
 )
 def get_models(
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     models = list_model(db)
     result = []
@@ -344,6 +348,7 @@ def change_model_status(
     model_id: int,
     payload: Model_Update_Status,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "REVIEWER")),
 ):
     try:
         return update_status(

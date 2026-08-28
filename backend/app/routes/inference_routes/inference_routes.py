@@ -6,17 +6,16 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
+from app.core.auth_dependency import get_current_user, require_roles
 from app.dbConfig.database_config import get_db
-
+from app.model.user_model import User_Model
 from app.schema.inference_schema.inference_schema import (
     InferenceRequest,
     InferenceResponse,
 )
-
 from app.services.inference_service.inference_service import (
     InferenceService,
 )
-
 from app.ai.inference_adapter.inference_adapter import (
     AIInferenceAdapter,
 )
@@ -35,6 +34,7 @@ router = APIRouter(
 def predict(
     payload: InferenceRequest,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
 
     service = InferenceService(db)
@@ -76,7 +76,9 @@ def predict(
 
 
 @router.get("/models")
-def list_models():
+def list_models(
+    current_user: User_Model = Depends(get_current_user),
+):
 
     try:
 
@@ -93,7 +95,9 @@ def list_models():
 
 
 @router.post("/unload")
-def unload_model():
+def unload_model(
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+):
 
     try:
 
