@@ -51,13 +51,39 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import torch
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers import PreTrainedModel, PreTrainedTokenizerBase, TrainerCallback
 from trl import SFTConfig, SFTTrainer
 
 from ai.training.config import TrainingConfig
 from ai.training.model import count_parameters
 
 logger = logging.getLogger(__name__)
+
+
+class TrainingProgressCallback(TrainerCallback):
+    """Callback to report step-level training progress percentage to external listeners."""
+
+    def __init__(self, on_progress: Optional[Any] = None, start_pct: int = 20, end_pct: int = 95):
+        super().__init__()
+        self.on_progress = on_progress
+        self.start_pct = start_pct
+        self.end_pct = end_pct
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if state.max_steps and state.max_steps > 0:
+            ratio = min(1.0, max(0.0, state.global_step / state.max_steps))
+            current_pct = int(self.start_pct + (self.end_pct - self.start_pct) * ratio)
+            logger.info(
+                "TRAINER CALLBACK: percentage=%d, global_step=%d, max_steps=%d",
+                current_pct,
+                state.global_step,
+                state.max_steps,
+            )
+            if self.on_progress:
+                try:
+                    self.on_progress(current_pct, state.global_step, state.max_steps)
+                except Exception as exc:
+                    logger.exception("Progress callback notification failed: %s", exc)
 
 
 class TrainerError(RuntimeError):
@@ -187,6 +213,7 @@ def train_model(
     config: TrainingConfig,
     output_dir: Optional[Union[str, Path]] = None,
     dataset_text_field: str = "text",
+    callbacks: Optional[List[Any]] = None,
 ) -> TrainingResult:
     """
     Run a short SFT training job on an already-prepared PEFT model.
@@ -248,6 +275,7 @@ def train_model(
             args=sft_config,
             train_dataset=dataset,
             processing_class=tokenizer,
+            callbacks=callbacks,
         )
     except Exception as exc:  # noqa: BLE001 - re-raised as a domain error
         raise TrainingExecutionError(

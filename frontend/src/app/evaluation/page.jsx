@@ -12,15 +12,19 @@ import ModelsTable from "@/components/tables/ModelsTable";
 import NewEvaluationModal from "@/components/evaluation/NewEvaluationModal";
 import { createEvaluationColumns } from "@/components/tables/EvaluationTableColumns/EvaluationColumns";
 import { getEvaluations, getEvaluationStats } from "@/app/services/evaluationService/evaluationServices";
+import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
 
 export default function EvaluationPage() {
+  const { hasRole } = useAuth();
   const [evaluations, setEvaluations] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const canRunEvaluation = hasRole("ADMIN", "DS", "REVIEWER");
 
   // Fetch evaluations and aggregate stats from FastAPI
   const fetchData = useCallback(async (isSilent = false) => {
@@ -76,9 +80,9 @@ export default function EvaluationPage() {
   const columns = useMemo(
     () =>
       createEvaluationColumns({
-        onStartEval: () => fetchData(true),
+        onStartEval: canRunEvaluation ? () => fetchData(true) : undefined,
       }),
-    [fetchData]
+    [canRunEvaluation, fetchData]
   );
 
   // Use real backend stats — show '—' when not available, never fabricate
@@ -109,13 +113,15 @@ export default function EvaluationPage() {
             {refreshing ? "Refreshing..." : "Refresh"}
           </Button>
 
-          <Button
-            variant="primary"
-            icon={Plus}
-            onClick={() => setIsModalOpen(true)}
-          >
-            New Evaluation
-          </Button>
+          {canRunEvaluation && (
+            <Button
+              variant="primary"
+              icon={Plus}
+              onClick={() => setIsModalOpen(true)}
+            >
+              New Evaluation
+            </Button>
+          )}
         </div>
       </div>
 

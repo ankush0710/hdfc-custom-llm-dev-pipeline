@@ -23,30 +23,24 @@ export default function ModelsTable({
 
   // Total number of pages (at least 1)
   const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-
-  // Reset or adjust current page if out of bounds after data changes
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalPages, currentPage]);
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
   // Data for current page (only pageSize items visible)
   const currentData = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
+    const startIndex = (safeCurrentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     return data.slice(startIndex, endIndex);
-  }, [data, currentPage, pageSize]);
+  }, [data, safeCurrentPage, pageSize]);
 
   // Generate visible page numbers (smart ellipsis for large page counts)
   const visiblePages = useMemo(() => {
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
-    if (currentPage <= 4) {
+    if (safeCurrentPage <= 4) {
       return [1, 2, 3, 4, 5, "...", totalPages];
     }
-    if (currentPage >= totalPages - 3) {
+    if (safeCurrentPage >= totalPages - 3) {
       return [
         1,
         "...",
@@ -60,13 +54,13 @@ export default function ModelsTable({
     return [
       1,
       "...",
-      currentPage - 1,
-      currentPage,
-      currentPage + 1,
+      safeCurrentPage - 1,
+      safeCurrentPage,
+      safeCurrentPage + 1,
       "...",
       totalPages,
     ];
-  }, [totalPages, currentPage]);
+  }, [totalPages, safeCurrentPage]);
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -282,11 +276,11 @@ export default function ModelsTable({
           <p className="text-xs sm:text-sm text-gray-500">
             Showing{" "}
             <span className="font-semibold text-gray-800">
-              {(currentPage - 1) * pageSize + 1}
+              {(safeCurrentPage - 1) * pageSize + 1}
             </span>{" "}
             to{" "}
             <span className="font-semibold text-gray-800">
-              {Math.min(currentPage * pageSize, data.length)}
+              {Math.min(safeCurrentPage * pageSize, data.length)}
             </span>{" "}
             of <span className="font-semibold text-gray-800">{data.length}</span>{" "}
             entries
@@ -298,7 +292,7 @@ export default function ModelsTable({
               {/* Previous */}
               <button
                 type="button"
-                disabled={currentPage === 1}
+                disabled={safeCurrentPage === 1}
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                 title="Previous page"
@@ -319,7 +313,7 @@ export default function ModelsTable({
                   );
                 }
 
-                const isActive = currentPage === page;
+                const isActive = safeCurrentPage === page;
                 return (
                   <button
                     key={page}
@@ -338,7 +332,7 @@ export default function ModelsTable({
               {/* Next */}
               <button
                 type="button"
-                disabled={currentPage === totalPages}
+                disabled={safeCurrentPage === totalPages}
                 onClick={() =>
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }

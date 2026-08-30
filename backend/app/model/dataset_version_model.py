@@ -3,6 +3,7 @@
 # ====================================================================================
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
@@ -78,6 +79,18 @@ class Dataset_Version_Model(Base):
         String(50),
         nullable=False,
         default="Uploaded"
+    )
+
+    is_safe_for_training = Column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+
+    pii_scan_status = Column(
+        String(50),
+        nullable=False,
+        default="PENDING"
     )
 
     created_at = Column(

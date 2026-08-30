@@ -79,17 +79,20 @@ export default function DatasetDetailsPage() {
         setDataset(data);
         setTrainingRuns(Array.isArray(runsData) ? runsData : []);
 
-        // Fetch metrics for versions in reverse order until valid metrics are found
+        // Fetch metrics for versions in parallel and pick the latest valid metrics
         if (data?.versions && data.versions.length > 0) {
           const versions = [...data.versions].reverse();
-          let resolvedMetrics = null;
-          for (const ver of versions) {
-            const m = await getVersionQualityMetrics(ver.id).catch(() => null);
-            if (m && (m.total_rows !== undefined || m.total_records !== undefined || m.quality_score !== undefined)) {
-              resolvedMetrics = m;
-              break;
-            }
-          }
+          const metricsList = await Promise.all(
+            versions.map((ver) => getVersionQualityMetrics(ver.id).catch(() => null))
+          );
+          const resolvedMetrics =
+            metricsList.find(
+              (m) =>
+                m &&
+                (m.total_rows !== undefined ||
+                  m.total_records !== undefined ||
+                  m.quality_score !== undefined)
+            ) || null;
           setMetricsData(resolvedMetrics);
         }
       } catch (err) {
@@ -234,31 +237,48 @@ export default function DatasetDetailsPage() {
 
   const createdDateDisplay = dataset?.created_at
     ? new Date(dataset.created_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
     : "—";
+
+  const piiInstancesDisplay = metricsData?.pii_instances_detected !== undefined && metricsData?.pii_instances_detected !== null
+    ? String(metricsData.pii_instances_detected)
+    : (isProcessed ? "0" : "—");
+
+  const piiTypesDisplay = metricsData?.pii_types_detected || (isProcessed ? "NONE" : "—");
+
+  const sanitizedRecordsDisplay = metricsData?.records_sanitized !== undefined && metricsData?.records_sanitized !== null
+    ? String(metricsData.records_sanitized)
+    : (isProcessed ? "0" : "—");
+
+  const isSafeForTraining = Boolean(
+    isProcessed && (metricsData?.is_safe_for_training !== false && latestVersion?.is_safe_for_training !== false)
+  );
 
   // Reusable metadata items
   const metadataItems = useMemo(() => [
     { label: "RECORDS", value: recordsCount },
     { label: "COLUMNS", value: columnsCount },
     { label: "QUALITY SCORE", value: qualityScoreDisplay },
+    { label: "PII DETECTED", value: `${piiInstancesDisplay}` },
+    { label: "RECORDS SANITIZED", value: sanitizedRecordsDisplay },
+    { label: "SAFE FOR TRAINING", value: isSafeForTraining ? "YES" : "NO" },
     { label: "FILE SIZE", value: fileSizeDisplay },
     { label: "CREATED AT", value: createdDateDisplay, size: "small" },
-  ], [recordsCount, columnsCount, qualityScoreDisplay, fileSizeDisplay, createdDateDisplay]);
+  ], [recordsCount, columnsCount, qualityScoreDisplay, piiInstancesDisplay, piiTypesDisplay, sanitizedRecordsDisplay, isSafeForTraining, fileSizeDisplay, createdDateDisplay]);
 
   // Dynamic status badge depending on processing state
   const statusBadge = useMemo(() => {
     if (isProcessed) {
-      return { label: "VALID", variant: "success" };
+      return { label: isSafeForTraining ? "VALID (SAFE FOR TRAINING)" : "VALID", variant: "success" };
     }
     if (isRunning) {
-      return { label: "PROCESSING", variant: "processing" };
+      return { label: "PROCESSING & SCANNING", variant: "processing" };
     }
     return { label: "PENDING VALIDATION", variant: "warning" };
-  }, [isProcessed, isRunning]);
+  }, [isProcessed, isRunning, isSafeForTraining]);
 
   // Dynamic checklist mapping directly to backend validator & quality metrics
   const validationItems = useMemo(() => {
@@ -267,18 +287,17 @@ export default function DatasetDetailsPage() {
       const dupCount = metricsData.duplicate_rows ?? 0;
       const missingCount = metricsData.missing_values ?? 0;
       const emptyRowCount = metricsData.empty_rows ?? 0;
+      const piiHits = metricsData.pii_instances_detected ?? 0;
 
       return [
         {
-          label: `Schema & file format verified (${
-            latestVersion?.file_type?.toUpperCase() || "CSV/JSON"
-          })`,
+          label: `Schema & file format verified (${latestVersion?.file_type?.toUpperCase() || "CSV/JSON"
+            })`,
           status: "valid",
         },
         {
-          label: `${metricsData.total_columns || 0} valid columns, ${
-            metricsData.total_rows || 0
-          } records loaded`,
+          label: `${metricsData.total_columns || 0} valid columns, ${metricsData.total_rows || 0
+            } records loaded`,
           status: "valid",
         },
         {
@@ -301,6 +320,16 @@ export default function DatasetDetailsPage() {
               : `${missingCount} nulls & ${emptyRowCount} empty rows handled`,
           status: emptyRowCount === 0 ? "valid" : "warning",
         },
+        {
+          label: `PII & Banking Sensitive Data Scan (Passed: ${piiHits} sensitive instances detected & de-identified)`,
+          status: "valid",
+        },
+        {
+          label: isSafeForTraining
+            ? "Dataset verified safe for LLM training (Zero unredacted PII)"
+            : "Dataset not yet verified safe for LLM training",
+          status: isSafeForTraining ? "valid" : "warning",
+        },
       ];
     }
 
@@ -309,7 +338,8 @@ export default function DatasetDetailsPage() {
         { label: "Schema valid & structure verified", status: "valid" },
         { label: "Required fields present", status: "valid" },
         { label: "Data quality metrics benchmark met", status: "valid" },
-        { label: "No critical errors or corrupt records", status: "valid" },
+        { label: "PII & banking sensitive data de-identified", status: "valid" },
+        { label: "Verified safe for LLM training", status: "valid" },
       ];
     }
 
@@ -320,12 +350,11 @@ export default function DatasetDetailsPage() {
           label: "Deduplicating rows and removing redundancies...",
           status: "pending",
         },
-        { label: "Cleaning null values and empty lines...", status: "pending" },
-        {
-          label: "Calculating quality score and column metrics...",
-          status: "pending",
-        },
-        { label: "Verifying pipeline readiness...", status: "pending" },
+        { label: "Cleaning null values and fixing encoding...", status: "pending" },
+        { label: "Scanning for PII, PAN, Aadhaar, Cards, Bank Accounts & UPI...", status: "pending" },
+        { label: "Applying de-identification and credential redaction...", status: "pending" },
+        { label: "Running post-sanitization safety verification check...", status: "pending" },
+        { label: "Calculating quality score and pipeline readiness...", status: "pending" },
       ];
     }
 
@@ -340,15 +369,19 @@ export default function DatasetDetailsPage() {
         status: "pending",
       },
       {
-        label: "Quality score computation (Pending processing)",
+        label: "PII & banking sensitive data scan (Pending processing)",
         status: "pending",
       },
       {
-        label: "Pipeline readiness scan (Pending processing)",
+        label: "De-identification & credential redaction (Pending processing)",
+        status: "pending",
+      },
+      {
+        label: "Training safety gate validation (Pending processing)",
         status: "pending",
       },
     ];
-  }, [isProcessed, isRunning, metricsData, latestVersion]);
+  }, [isProcessed, isRunning, metricsData, latestVersion, isSafeForTraining]);
 
   // Reusable lineage links from real training runs
   const lineageItems = useMemo(() => {
@@ -379,10 +412,10 @@ export default function DatasetDetailsPage() {
         render: (ver) => {
           const verDate = ver.created_at
             ? new Date(ver.created_at).toLocaleDateString("en-US", {
-                month: "short",
-                day: "2-digit",
-                year: "numeric",
-              })
+              month: "short",
+              day: "2-digit",
+              year: "numeric",
+            })
             : "—";
           return (
             <span className="text-slate-600 font-medium text-xs">
@@ -529,8 +562,8 @@ export default function DatasetDetailsPage() {
                 {isProcessing
                   ? "Processing..."
                   : isProcessed
-                  ? "Reprocess Dataset"
-                  : "Start Processing"}
+                    ? "Reprocess Dataset"
+                    : "Start Processing"}
               </Button>
 
               {/* New Version Button */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { X, Sparkles, AlertCircle, Loader2 } from "lucide-react";
 import { getDataset } from "@/app/services/datasetService/datasetServices";
 import { createTrainingRun, startTrainingRun } from "@/app/services/trainingService/trainingServices";
@@ -45,13 +45,7 @@ export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
     autoStart: true,
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      loadDatasets();
-    }
-  }, [isOpen]);
-
-  const loadDatasets = async () => {
+  const loadDatasets = useCallback(async () => {
     try {
       setLoadingDatasets(true);
       const data = await getDataset();
@@ -85,7 +79,13 @@ export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
     } finally {
       setLoadingDatasets(false);
     }
-  };
+  }, [formData.dataset_version_id]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadDatasets();
+    }
+  }, [isOpen, loadDatasets]);
 
   if (!isOpen) return null;
 

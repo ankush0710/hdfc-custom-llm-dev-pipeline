@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, String, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.dbConfig.database_config import Base
@@ -21,6 +21,14 @@ class Quality_Model(Base):
     empty_rows = Column(Integer, default=0)
 
     quality_score = Column(Float, default=0.0)
+
+    pii_instances_detected = Column(Integer, default=0)
+
+    pii_types_detected = Column(String(500), default="NONE")
+
+    records_sanitized = Column(Integer, default=0)
+
+    is_safe_for_training = Column(Boolean, default=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

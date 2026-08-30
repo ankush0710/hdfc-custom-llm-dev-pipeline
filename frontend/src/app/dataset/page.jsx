@@ -21,12 +21,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useAuth } from "@/app/context/AuthContext";
+
 export default function Dataset() {
   const router = useRouter();
+  const { hasRole } = useAuth();
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  const canManageDatasets = hasRole("ADMIN", "DS");
 
   const loadDatasets = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -72,8 +77,8 @@ export default function Dataset() {
   };
 
   const columns = useMemo(
-    () => createDatasetColumns({ onDelete: handleDelete }),
-    []
+    () => createDatasetColumns({ onDelete: canManageDatasets ? handleDelete : undefined }),
+    [canManageDatasets]
   );
 
   // Compute stat cards dynamically from real dataset records
@@ -166,13 +171,15 @@ export default function Dataset() {
             <span>Refresh</span>
           </button>
 
-          <Button
-            onClick={() => router.push("/dataset/uploadDataset")}
-            icon={Upload}
-            variant="primary"
-          >
-            Upload Dataset
-          </Button>
+          {canManageDatasets && (
+            <Button
+              onClick={() => router.push("/dataset/uploadDataset")}
+              icon={Upload}
+              variant="primary"
+            >
+              Upload Dataset
+            </Button>
+          )}
         </div>
       </div>
 
@@ -197,15 +204,17 @@ export default function Dataset() {
             <p className="mt-1 text-sm text-gray-500 max-w-sm">
               Ingest your first CSV, XLSX, JSON, or JSONL dataset to start training or processing.
             </p>
-            <div className="mt-6">
-              <Button
-                onClick={() => router.push("/dataset/uploadDataset")}
-                icon={Upload}
-                variant="primary"
-              >
-                Upload First Dataset
-              </Button>
-            </div>
+            {canManageDatasets && (
+              <div className="mt-6">
+                <Button
+                  onClick={() => router.push("/dataset/uploadDataset")}
+                  icon={Upload}
+                  variant="primary"
+                >
+                  Upload First Dataset
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <ModelsTable

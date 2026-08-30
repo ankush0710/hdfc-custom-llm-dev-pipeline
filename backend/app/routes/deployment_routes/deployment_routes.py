@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
+from app.core.auth_dependency import get_current_user, require_roles
 from app.dbConfig.database_config import get_db
+from app.model.user_model import User_Model
 from app.schema.deployment_schema.deployment_schema import (
     Deployment_Create,
     Deployment_Response,
@@ -24,6 +25,7 @@ router = APIRouter(
 def deploy_model(
     payload: Deployment_Create,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN")),
 ):
     service = DeploymentService(db)
     try:
@@ -45,6 +47,7 @@ def deploy_model(
 )
 def list_deployments(
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     service = DeploymentService(db)
     return service.list_deployments()
@@ -57,6 +60,7 @@ def list_deployments(
 def get_deployment(
     deployment_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     service = DeploymentService(db)
     deployment = service.get_deployment_by_id(deployment_id)
@@ -75,6 +79,7 @@ def get_deployment(
 def undeploy_model(
     deployment_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN")),
 ):
     service = DeploymentService(db)
     try:
@@ -93,6 +98,7 @@ def undeploy_model(
 def unload_model(
     deployment_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN")),
 ):
     service = DeploymentService(db)
     try:
@@ -111,6 +117,7 @@ def unload_model(
 def reload_model(
     deployment_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN")),
 ):
     service = DeploymentService(db)
     try:
@@ -129,6 +136,7 @@ def reload_model(
 def restart_model(
     deployment_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN")),
 ):
     service = DeploymentService(db)
     try:
@@ -147,6 +155,7 @@ def restart_model(
 def start_model(
     deployment_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN")),
 ):
     service = DeploymentService(db)
     try:
@@ -165,6 +174,7 @@ def start_model(
 def delete_deployment(
     deployment_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN")),
 ):
     service = DeploymentService(db)
     try:

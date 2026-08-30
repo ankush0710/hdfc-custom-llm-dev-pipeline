@@ -17,9 +17,12 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
     render: (row) => {
       const formattedId = row.display_id || (row.id ? `trn-${String(row.id).padStart(4, "0").toLowerCase()}` : "trn-xxxx");
       return (
-        <span className="font-mono text-xs font-semibold text-slate-700">
+        <Link
+          href={`/training/${row.id}`}
+          className="font-mono text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline transition"
+        >
           {formattedId}
-        </span>
+        </Link>
       );
     },
   },
@@ -94,9 +97,11 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
       const numProgress =
         typeof row.progress === "number"
           ? Math.max(0, Math.min(100, Math.round(row.progress)))
-          : rawStatus === "COMPLETED"
-          ? 100
-          : 0;
+          : typeof row.job_progress === "number"
+            ? Math.max(0, Math.min(100, Math.round(row.job_progress)))
+            : rawStatus === "COMPLETED"
+              ? 100
+              : 0;
 
       const isRunning = rawStatus === "RUNNING";
       const isCompleted = rawStatus === "COMPLETED";
@@ -107,19 +112,18 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
       const barColor = isFailed
         ? "bg-rose-500"
         : isCompleted
-        ? "bg-emerald-600"
-        : isRunning
-        ? "bg-[#002B55]"
-        : "bg-gray-300";
+          ? "bg-emerald-600"
+          : isRunning
+            ? "bg-[#002B55]"
+            : "bg-gray-300";
 
       return (
         <div className="flex items-center gap-3 min-w-[140px] max-w-[210px]">
           {/* Progress bar track */}
           <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden p-0.5 border border-gray-200/50">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${barColor} ${
-                isRunning ? "animate-pulse" : ""
-              }`}
+              className={`h-full rounded-full transition-all duration-500 ${barColor} ${isRunning ? "animate-pulse" : ""
+                }`}
               style={{ width: `${Math.max(isRunning && numProgress === 0 ? 5 : 0, numProgress)}%` }}
             />
           </div>

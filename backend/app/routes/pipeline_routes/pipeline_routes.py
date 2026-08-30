@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
+from app.core.auth_dependency import get_current_user
 from app.dbConfig.database_config import get_db
 from app.model.dataset_processing_model import Processing_Model
 from app.model.dataset_version_model import Dataset_Version_Model
@@ -27,6 +28,7 @@ from app.model.evaluation_run_model import Evaluation_Model
 from app.model.model_registry import Model_Registry
 from app.model.training_job_model import TrainingJobModel
 from app.model.training_model import Training_Model
+from app.model.user_model import User_Model
 
 
 router = APIRouter(
@@ -180,7 +182,10 @@ def _resolve_stage(
         "All values are computed from PostgreSQL — no hardcoded fallbacks."
     ),
 )
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
+):
     from app.model.dataset_model import Dataset_Model
 
     # ── Counts ────────────────────────────────────────────────────────────────
@@ -310,13 +315,16 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         .limit(2)
         .all()
     )
+    model_ids = [dep.model_id for dep in recent_deployments if dep.model_id]
+    models_map = {}
+    if model_ids:
+        models_map = {
+            m.id: m.model_name
+            for m in db.query(Model_Registry).filter(Model_Registry.id.in_(model_ids)).all()
+        }
+
     for dep in recent_deployments:
-        model_rec = (
-            db.query(Model_Registry)
-            .filter(Model_Registry.id == dep.model_id)
-            .first()
-        )
-        model_name = model_rec.model_name if model_rec else f"Model-{dep.model_id}"
+        model_name = models_map.get(dep.model_id, f"Model-{dep.model_id}")
         ts = dep.updated_at or dep.created_at
         ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None
 
@@ -363,6 +371,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 def get_pipeline_status(
     dataset_version_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     # ── 1. Dataset version ─────────────────────────────────────────────────
     dv = (

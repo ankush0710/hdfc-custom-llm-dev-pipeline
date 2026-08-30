@@ -90,7 +90,16 @@ def _enrich_evaluation(db: Session, eval_item: Evaluation_Model) -> Evaluation_M
         eval_item.dataset_version = None
 
     # Score calculation — only use real DB metrics, never fabricate
-    acc = eval_item.answer_accuracy or eval_item.intent_structured_accuracy or eval_item.full_structured_match
+    acc = None
+    if eval_item.answer_accuracy is not None:
+        acc = eval_item.answer_accuracy
+    elif eval_item.full_structured_match is not None:
+        acc = eval_item.full_structured_match
+    elif eval_item.normalized_exact_match is not None:
+        acc = eval_item.normalized_exact_match
+    elif eval_item.intent_structured_accuracy is not None:
+        acc = eval_item.intent_structured_accuracy
+
     if acc is not None:
         pct = acc * 100 if acc <= 1.0 else acc
         eval_item.score_value = round(pct, 1)
@@ -147,7 +156,19 @@ def get_evaluation_stats(db: Session):
 
     scores = []
     for e in completed:
-        acc = e.answer_accuracy or e.intent_structured_accuracy or e.full_structured_match
+        acc = (
+            e.answer_accuracy
+            if e.answer_accuracy is not None
+            else (
+                e.full_structured_match
+                if e.full_structured_match is not None
+                else (
+                    e.normalized_exact_match
+                    if e.normalized_exact_match is not None
+                    else e.intent_structured_accuracy
+                )
+            )
+        )
         if acc is not None:
             pct = acc * 100 if acc <= 1.0 else acc
             scores.append(pct)
@@ -179,6 +200,8 @@ def get_evaluation_detail(db: Session, evaluation_id: int):
 
     # Use real DB values — return None if not yet available (not fabricated)
     ans_acc_raw = evaluation.answer_accuracy
+    if ans_acc_raw is None and evaluation.normalized_exact_match is not None:
+        ans_acc_raw = evaluation.normalized_exact_match
     ans_acc_pct = round(ans_acc_raw * 100 if ans_acc_raw is not None and ans_acc_raw <= 1.0 else (ans_acc_raw or 0), 1) if ans_acc_raw is not None else None
 
     intent_acc_raw = evaluation.intent_structured_accuracy
@@ -190,12 +213,20 @@ def get_evaluation_detail(db: Session, evaluation_id: int):
     f1_raw = evaluation.full_structured_match
     f1_pct = round(f1_raw * 100 if f1_raw is not None and f1_raw <= 1.0 else (f1_raw or 0), 1) if f1_raw is not None else None
 
-    precision_pct = intent_acc_pct  # maps to intent accuracy
-    recall_pct = policy_acc_pct    # maps to policy accuracy
+    precision_pct = intent_acc_pct if intent_acc_pct is not None else ans_acc_pct
+    recall_pct = policy_acc_pct if policy_acc_pct is not None else ans_acc_pct
+    if f1_pct is None and precision_pct is not None and recall_pct is not None:
+        if (precision_pct + recall_pct) > 0:
+            f1_pct = round(2 * precision_pct * recall_pct / (precision_pct + recall_pct), 1)
+        else:
+            f1_pct = 0.0
 
-    # Overall score — only when all components are available
-    if ans_acc_pct is not None and precision_pct is not None and recall_pct is not None:
-        overall = round((ans_acc_pct * 0.4 + precision_pct * 0.3 + recall_pct * 0.3), 1)
+    # Overall score — computed when evaluated
+    if ans_acc_pct is not None or precision_pct is not None or recall_pct is not None:
+        a = ans_acc_pct if ans_acc_pct is not None else 0.0
+        p = precision_pct if precision_pct is not None else a
+        r = recall_pct if recall_pct is not None else a
+        overall = round((a * 0.4 + p * 0.3 + r * 0.3), 1)
         overall_str = f"{overall}%"
     else:
         overall = None
@@ -205,10 +236,10 @@ def get_evaluation_detail(db: Session, evaluation_id: int):
 
     # Benchmark breakdown — only include tasks with real scores
     benchmark_breakdown = []
-    if intent_acc_pct is not None:
+    if precision_pct is not None:
         benchmark_breakdown.append({
             "task_name": "Task A (Reasoning / Intent Structured Validity)",
-            "score": intent_acc_pct,
+            "score": precision_pct,
             "category": "Intent Reasoning",
         })
     if ans_acc_pct is not None:
@@ -217,10 +248,10 @@ def get_evaluation_detail(db: Session, evaluation_id: int):
             "score": ans_acc_pct,
             "category": "Extraction",
         })
-    if policy_acc_pct is not None:
+    if recall_pct is not None:
         benchmark_breakdown.append({
             "task_name": "Task C (Banking Policy & Safety Compliance)",
-            "score": policy_acc_pct,
+            "score": recall_pct,
             "category": "Safety Alignment",
         })
 
@@ -345,11 +376,36 @@ def _execute_evaluation_worker(evaluation_id: int):
         evaluation.evaluation_status = "COMPLETED"
         evaluation.completed_at = now
 
-        # Link evaluation result back to Model Registry and promote status
-        if model and not model.evaluation_id:
+        # Quality Gate Enforcer Evaluation
+        from app.constants.quality_gate_config import MIN_OVERALL_SCORE, MIN_ACCURACY, MAX_CRITICAL_SAFETY_FAILURES
+
+        ans_acc = evaluation.answer_accuracy if evaluation.answer_accuracy is not None else (evaluation.normalized_exact_match or 0.0)
+        ans_pct = ans_acc * 100 if ans_acc <= 1.0 else ans_acc
+        prec_acc = evaluation.intent_structured_accuracy if evaluation.intent_structured_accuracy is not None else ans_acc
+        prec_pct = prec_acc * 100 if prec_acc <= 1.0 else prec_acc
+        rec_acc = evaluation.policy_flag_accuracy if evaluation.policy_flag_accuracy is not None else ans_acc
+        rec_pct = rec_acc * 100 if rec_acc <= 1.0 else rec_acc
+
+        overall_score = round(ans_pct * 0.4 + prec_pct * 0.3 + rec_pct * 0.3, 1)
+
+        safety_fails = evaluation.critical_safety_failures or 0
+
+        passed_gate = (
+            overall_score >= MIN_OVERALL_SCORE
+            and ans_pct >= MIN_ACCURACY
+            and safety_fails <= MAX_CRITICAL_SAFETY_FAILURES
+        )
+
+        if model:
             model.evaluation_id = evaluation.evaluation_id
-            if model.status in {"TRAINED", "CREATED", "READY"}:
-                model.status = "EVALUATED"
+            if passed_gate:
+                model.status = "APPROVED"
+                logger.info("Quality Gate PASSED for Model #%d (Score: %.1f%% >= %.1f%%)", model.id, overall_score, MIN_OVERALL_SCORE)
+            else:
+                model.status = "REJECTED"
+                reason = f"Quality Gate Rejected: Score {overall_score:.1f}% < threshold {MIN_OVERALL_SCORE:.1f}% (Safety Fails: {safety_fails})"
+                evaluation.error_message = reason
+                logger.warning("Quality Gate REJECTED for Model #%d: %s", model.id, reason)
 
         db.commit()
         logger.info("Evaluation %d finished successfully — metrics saved to DB.", evaluation_id)

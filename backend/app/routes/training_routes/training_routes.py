@@ -5,9 +5,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
+from app.core.auth_dependency import get_current_user, require_roles
 from app.dbConfig.database_config import get_db
 from app.model.dataset_version_model import Dataset_Version_Model
 from app.model.training_job_model import TrainingJobModel
+from app.model.user_model import User_Model
 from app.schema.training_schema.training_schema import (TrainingRunCreate, TrainingRunResponse)
 from app.services.training_service.training_service import (
     create_training_run,
@@ -69,11 +71,12 @@ class TrainingRunLogsResponse(BaseModel):
     response_model=TrainingRunResponse
 )
 def create_run(
-    data: TrainingRunCreate,
-    db: Session = Depends(get_db)
+    training_data: TrainingRunCreate,
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     try:
-        return create_training_run(db, data)
+        return create_training_run(db, training_data)
     except HTTPException:
         raise
     except ValueError as error:
@@ -95,7 +98,8 @@ def create_run(
 def start_run(
     run_id: int,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     try:
         training_run = start_training_run(
@@ -124,7 +128,8 @@ def start_run(
     response_model=list[TrainingRunResponse]
 )
 def get_all_runs(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     return get_training_runs(db)
 
@@ -135,7 +140,8 @@ def get_all_runs(
 )
 def get_run_by_id(
     run_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(get_current_user),
 ):
     training_run = get_training_run_by_id(db, run_id)
 
@@ -157,12 +163,6 @@ def get_run_detail(
     run_id: int,
     db: Session = Depends(get_db)
 ):
-    """
-    Returns the full training run record enriched with:
-    - dataset name and version label (resolved from dataset_version_id)
-    - linked training job status and progress
-    All values come from the database — no hardcoded content.
-    """
     from app.model.dataset_model import Dataset_Model
 
     training_run = get_training_run_by_id(db, run_id)
@@ -182,7 +182,6 @@ def get_run_detail(
         if d_ver.dataset:
             dataset_name = d_ver.dataset.dataset_name
 
-    # Resolve most recent training job
     job = (
         db.query(TrainingJobModel)
         .filter(TrainingJobModel.training_run_id == run_id)
@@ -220,11 +219,6 @@ def get_run_logs(
     run_id: int,
     db: Session = Depends(get_db)
 ):
-    """
-    Returns the training run status and associated job log entries.
-    Log entries are constructed from real database state (status, timestamps,
-    error messages, progress). No hardcoded log messages.
-    """
     training_run = get_training_run_by_id(db, run_id)
     if not training_run:
         raise HTTPException(status_code=404, detail="Training run not found")
@@ -292,4 +286,4 @@ def get_run_logs(
         job_status=job.status if job else None,
         job_progress=job.progress if job else None,
         logs=logs,
-    )
+    )
