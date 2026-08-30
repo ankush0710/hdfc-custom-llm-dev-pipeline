@@ -11,7 +11,6 @@ Sources:
 //=======================================================================================//
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import Footer from "@/components/layout/Footer";
 import StatCard from "@/components/ui/StatCard";
 import ActivityCard from "@/components/ui/ActivityCard";
 import ModelsTable from "@/components/tables/ModelsTable";
@@ -241,11 +240,6 @@ export default function Dashboard() {
           )}
         </div>
       </main>
-
-      {/* Footer */}
-      <div className="mt-12 lg:ml-[280px]">
-        <Footer />
-      </div>
     </>
   );
 }
