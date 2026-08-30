@@ -22,50 +22,84 @@ from app.routes.auth_routes.auth_routes import router as auth_router
 Base.metadata.create_all(bind=engine)
 
 def _seed_initial_admin():
-    """Seed initial default ADMIN user securely and idempotently."""
+    """Seed initial default users securely and idempotently."""
     import os
     from app.dbConfig.database_config import SessionLocal
     from app.model.user_model import User_Model
     from app.core.auth_dependency import hash_password, verify_password
 
-    admin_email = os.getenv("INITIAL_ADMIN_EMAIL", "ankushkurvey053@gmail.com").lower().strip()
-    admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "ankush@1234")
-    admin_name = os.getenv("INITIAL_ADMIN_NAME", "Ankush Kurvey (System Admin)")
+    seed_users = [
+        {
+            "email": os.getenv("INITIAL_ADMIN_EMAIL", "ankushkurvey053@gmail.com").lower().strip(),
+            "password": os.getenv("INITIAL_ADMIN_PASSWORD", "ankush@1234"),
+            "full_name": os.getenv("INITIAL_ADMIN_NAME", "Ankush Kurvey (System Admin)"),
+            "role": "ADMIN",
+        },
+        {
+            "email": "ankushkurvey053@hdfc.com",
+            "password": "ankush@1234",
+            "full_name": "Ankush Kurvey (Admin)",
+            "role": "ADMIN",
+        },
+        {
+            "email": "admin@hdfc.com",
+            "password": "admin@1234",
+            "full_name": "Enterprise System Admin",
+            "role": "ADMIN",
+        },
+        {
+            "email": "datascientist@hdfc.com",
+            "password": "ds@1234",
+            "full_name": "Lead Data Scientist",
+            "role": "DS",
+        },
+        {
+            "email": "reviewer@hdfc.com",
+            "password": "reviewer@1234",
+            "full_name": "Model Governance Reviewer",
+            "role": "REVIEWER",
+        },
+        {
+            "email": "viewer@hdfc.com",
+            "password": "viewer@1234",
+            "full_name": "Business Analyst Viewer",
+            "role": "VIEWER",
+        },
+    ]
 
     db = SessionLocal()
     try:
-        # 1. Clean up legacy seed account if present
+        # Clean up legacy seed account if present
         legacy_admin = db.query(User_Model).filter(User_Model.email == "ankushkurvey@053").first()
-        if legacy_admin and legacy_admin.email != admin_email:
+        if legacy_admin:
             db.delete(legacy_admin)
             db.commit()
 
-        # 2. Seed or update required initial ADMIN account
-        admin_user = db.query(User_Model).filter(User_Model.email == admin_email).first()
-        if not admin_user:
-            admin_user = User_Model(
-                full_name=admin_name,
-                email=admin_email,
-                password_hash=hash_password(admin_password),
-                role="ADMIN",
-                is_active=True,
-            )
-            db.add(admin_user)
-            db.commit()
-        else:
-            # Ensure proper role, active status and valid password hash
-            updated = False
-            if admin_user.role != "ADMIN":
-                admin_user.role = "ADMIN"
-                updated = True
-            if not admin_user.is_active:
-                admin_user.is_active = True
-                updated = True
-            if not verify_password(admin_password, admin_user.password_hash):
-                admin_user.password_hash = hash_password(admin_password)
-                updated = True
-            if updated:
+        for u_data in seed_users:
+            user = db.query(User_Model).filter(User_Model.email == u_data["email"]).first()
+            if not user:
+                user = User_Model(
+                    full_name=u_data["full_name"],
+                    email=u_data["email"],
+                    password_hash=hash_password(u_data["password"]),
+                    role=u_data["role"],
+                    is_active=True,
+                )
+                db.add(user)
                 db.commit()
+            else:
+                updated = False
+                if user.role != u_data["role"]:
+                    user.role = u_data["role"]
+                    updated = True
+                if not user.is_active:
+                    user.is_active = True
+                    updated = True
+                if not verify_password(u_data["password"], user.password_hash):
+                    user.password_hash = hash_password(u_data["password"])
+                    updated = True
+                if updated:
+                    db.commit()
     except Exception as exc:
         db.rollback()
     finally:

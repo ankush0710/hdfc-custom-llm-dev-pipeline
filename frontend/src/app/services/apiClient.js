@@ -24,13 +24,33 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+export function getApiErrorMessage(error, fallback = "An unexpected error occurred.") {
+  if (!error) return fallback;
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => d.msg || `${d.loc?.join(".")}: ${d.msg}`).join("; ");
+  }
+  if (detail && typeof detail === "object") {
+    return detail.message || JSON.stringify(detail);
+  }
+  if (error?.response?.data?.message) {
+    return error.response.data.message;
+  }
+  if (error?.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
 // Response Interceptor: Handle 401 Unauthorized & 403 Forbidden globally
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (typeof window !== "undefined") {
       const status = error?.response?.status;
-      const isAuthRoute = error?.config?.url?.includes("/auth/login") || error?.config?.url?.includes("/auth/signup");
+      const url = error?.config?.url || "";
+      const isAuthRoute = url.includes("/auth/login") || url.includes("/auth/signup");
 
       if (status === 401 && !isAuthRoute) {
         localStorage.removeItem("token");
@@ -39,8 +59,8 @@ apiClient.interceptors.response.use(
         if (!window.location.pathname.startsWith("/login")) {
           window.location.href = "/login";
         }
-      } else if (status === 403) {
-        const msg = error?.response?.data?.detail || "Access Denied: You do not have permission to perform this action.";
+      } else if (status === 403 && !isAuthRoute) {
+        const msg = getApiErrorMessage(error, "Access Denied: You do not have permission to perform this action.");
         toast.error("Permission Denied", { description: msg });
       }
     }
