@@ -88,6 +88,10 @@ def create_model(
         base_model=payload.base_model,
         artifact_path=payload.artifact_path,
         adapter_path=payload.adapter_path,
+        huggingface_repo=payload.huggingface_repo,
+        huggingface_path=payload.huggingface_path,
+        commit_hash=payload.commit_hash,
+        model_size=payload.model_size,
         training_job_id=payload.training_job_id,
         evaluation_id=payload.evaluation_id,
         status=init_status,
@@ -96,6 +100,7 @@ def create_model(
     db.add(model)
     db.commit()
     db.refresh(model)
+
 
     return model
 

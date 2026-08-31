@@ -93,6 +93,21 @@ class Dataset_Version_Model(Base):
         default="PENDING"
     )
 
+    huggingface_repo = Column(
+        String(255),
+        nullable=True
+    )
+
+    huggingface_path = Column(
+        String(500),
+        nullable=True
+    )
+
+    commit_hash = Column(
+        String(128),
+        nullable=True
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now()
