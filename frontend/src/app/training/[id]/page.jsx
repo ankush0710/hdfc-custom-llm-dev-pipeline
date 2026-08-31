@@ -5,10 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Cpu,
-  Database,
-  CheckCircle2,
-  Clock,
   AlertCircle,
   Loader2,
   RefreshCw,
@@ -139,10 +135,10 @@ export default function TrainingDetailPage() {
               status === "COMPLETED"
                 ? "success"
                 : status === "RUNNING"
-                ? "processing"
-                : status === "FAILED"
-                ? "error"
-                : "default"
+                  ? "processing"
+                  : status === "FAILED"
+                    ? "error"
+                    : "default"
             }
             actions={
               <Button
@@ -181,13 +177,12 @@ export default function TrainingDetailPage() {
             </div>
             <div className="h-3 w-full rounded-full bg-blue-950 border border-blue-800/60 overflow-hidden p-0.5">
               <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  status === "COMPLETED"
+                className={`h-full rounded-full transition-all duration-500 ${status === "COMPLETED"
                     ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]"
                     : status === "FAILED"
-                    ? "bg-red-500"
-                    : "bg-blue-400 animate-pulse shadow-[0_0_12px_rgba(96,165,250,0.8)]"
-                }`}
+                      ? "bg-red-500"
+                      : "bg-blue-400 animate-pulse shadow-[0_0_12px_rgba(96,165,250,0.8)]"
+                  }`}
                 style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
               />
             </div>

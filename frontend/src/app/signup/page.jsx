@@ -83,8 +83,10 @@ export default function SignupPage() {
         fullNameClean,
         emailClean,
         passwordClean,
-        confirmPasswordClean
+        confirmPasswordClean,
+        formData.type
       );
+
 
       const roleLabel =
         ACCOUNT_TYPES.find((t) => t.value === formData.type)?.label || "User";

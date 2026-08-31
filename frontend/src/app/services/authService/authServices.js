@@ -6,10 +6,12 @@ export const signup = async (payload) => {
     email: payload?.email ? String(payload.email).trim().toLowerCase() : "",
     password: payload?.password ? String(payload.password) : "",
     confirm_password: payload?.confirm_password ? String(payload.confirm_password) : "",
+    role: payload?.role || payload?.type || "DS",
   };
   const response = await apiClient.post("/auth/signup", cleanPayload);
   return response.data;
 };
+
 
 export const login = async (payload) => {
   try {
@@ -29,16 +31,9 @@ export const login = async (payload) => {
 
     const response = await apiClient.post("/auth/login", cleanPayload);
 
-    console.log("Login response:", response.data);
 
     return response.data;
   } catch (error) {
-    console.error(
-      "Login failed:",
-      error.response?.status,
-      error.response?.data
-    );
-
     throw error;
   }
 };

@@ -42,7 +42,6 @@ export default function LoginPage() {
         description: `Logged in as ${user.full_name} (${user.role}).`,
       });
     } catch (err) {
-      console.error("Login error:", err);
       const msg = getApiErrorMessage(err, "Invalid email or password.");
       setError(msg);
       toast.error("Login Failed", { description: msg });
