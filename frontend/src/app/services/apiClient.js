@@ -19,10 +19,15 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+    // If sending FormData, do not set application/json to let Axios/browser set multipart/form-data boundary
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
+    }
     return config;
   },
   (error) => Promise.reject(error)
 );
+
 
 export function getApiErrorMessage(error, fallback = "An unexpected error occurred.") {
   if (!error) return fallback;

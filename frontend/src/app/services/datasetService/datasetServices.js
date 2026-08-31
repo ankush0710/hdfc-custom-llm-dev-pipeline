@@ -2,9 +2,14 @@ import apiClient from "@/app/services/apiClient";
 const API = apiClient;
 
 export const uploadDataset = async (formData) => {
-  const response = await API.post("/datasets/upload-dataset", formData);
+  const response = await API.post("/datasets/upload-dataset", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return response.data;
 };
+
 
 export const getDataset = async () => {
   const response = await API.get("/datasets");

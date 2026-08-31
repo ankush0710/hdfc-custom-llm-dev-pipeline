@@ -28,7 +28,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     response_model=DatasetResponse
 )
 async def upload_dataset(
-    datasetName:str = Form(...),
+    datasetName: str | None = Form(None),
+    dataset_name: str | None = Form(None),
     category: str = Form(...),
     version: str = Form(...),
     source: str = Form(...),
@@ -37,6 +38,12 @@ async def upload_dataset(
     db: Session = Depends(get_db),
     current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
+    final_dataset_name = datasetName or dataset_name
+    if not final_dataset_name:
+        raise HTTPException(
+            status_code=422,
+            detail="datasetName or dataset_name is required"
+        )
 
     file_extension=Path(file.filename).suffix.lower()
 
@@ -56,13 +63,14 @@ async def upload_dataset(
     try:
         return await create_dataset(
             db=db,
-            dataset_name=datasetName,
+            dataset_name=final_dataset_name,
             category=category,
             version=version,
             source=source,
             description=description,
             file=file,
         )
+
     except ValueError as e:
         raise HTTPException(
             status_code=400,

@@ -45,7 +45,14 @@ class TrainingRunDetailResponse(BaseModel):
     job_id: Optional[int] = None
     job_status: Optional[str] = None
     job_progress: Optional[int] = None
+    # Model Registry fields (if registered)
+    model_id: Optional[int] = None
+    model_name: Optional[str] = None
+    huggingface_repo: Optional[str] = None
+    huggingface_path: Optional[str] = None
+    commit_hash: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class TrainingLogEntry(BaseModel):
@@ -189,6 +196,21 @@ def get_run_detail(
         .first()
     )
 
+    from app.model.model_registry import Model_Registry
+    model_record = None
+    if job:
+        model_record = (
+            db.query(Model_Registry)
+            .filter(Model_Registry.training_job_id == job.id)
+            .first()
+        )
+    if not model_record:
+        model_record = (
+            db.query(Model_Registry)
+            .filter(Model_Registry.model_name.like(f"%run_{run_id}%"))
+            .first()
+        )
+
     return TrainingRunDetailResponse(
         id=training_run.id,
         dataset_version_id=training_run.dataset_version_id,
@@ -207,7 +229,13 @@ def get_run_detail(
         job_id=job.id if job else None,
         job_status=job.status if job else None,
         job_progress=job.progress if job else None,
+        model_id=model_record.id if model_record else None,
+        model_name=model_record.model_name if model_record else None,
+        huggingface_repo=model_record.huggingface_repo if model_record else None,
+        huggingface_path=model_record.huggingface_path if model_record else None,
+        commit_hash=model_record.commit_hash if model_record else None,
     )
+
 
 
 @router.get(

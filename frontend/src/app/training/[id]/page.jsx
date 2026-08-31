@@ -13,12 +13,21 @@ import {
   Layers,
   FileCode,
   Terminal,
+  Play,
+  CheckCircle2,
+  ExternalLink,
+  ShieldCheck,
+  Cpu,
 } from "lucide-react";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import DetailHeader from "@/components/ui/DetailHeader";
 import Button from "@/components/ui/Button";
 import MetadataCard from "@/components/ui/MetadataCard";
-import { getTrainingRunById } from "@/app/services/trainingService/trainingServices";
+import {
+  getTrainingRunDetail,
+  getTrainingRunLogs,
+  startTrainingRun,
+} from "@/app/services/trainingService/trainingServices";
 import { toast } from "sonner";
 
 export default function TrainingDetailPage() {
@@ -27,8 +36,10 @@ export default function TrainingDetailPage() {
   const id = params?.id;
 
   const [trainingRun, setTrainingRun] = useState(null);
+  const [logsData, setLogsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchDetail = useCallback(async (isSilent = false) => {
@@ -37,12 +48,20 @@ export default function TrainingDetailPage() {
       if (!isSilent) setLoading(true);
       else setRefreshing(true);
 
-      const data = await getTrainingRunById(id);
-      if (data) {
-        setTrainingRun(data);
+      const [detailRes, logsRes] = await Promise.allSettled([
+        getTrainingRunDetail(id),
+        getTrainingRunLogs(id),
+      ]);
+
+      if (detailRes.status === "fulfilled" && detailRes.value) {
+        setTrainingRun(detailRes.value);
         setError(null);
-      } else {
+      } else if (!trainingRun) {
         setError(`Training run #${id} not found`);
+      }
+
+      if (logsRes.status === "fulfilled" && logsRes.value?.logs) {
+        setLogsData(logsRes.value.logs);
       }
     } catch (err) {
       console.error("Failed to fetch training run detail:", err);
@@ -51,34 +70,65 @@ export default function TrainingDetailPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [id]);
+  }, [id, trainingRun]);
 
   useEffect(() => {
     fetchDetail();
 
-    // Auto poll while running
+    // Auto-poll while running
     const interval = setInterval(() => {
-      fetchDetail(true);
-    }, 3000);
+      if (trainingRun?.status === "RUNNING" || trainingRun?.status === "QUEUED") {
+        fetchDetail(true);
+      }
+    }, 2500);
 
     return () => clearInterval(interval);
-  }, [fetchDetail]);
+  }, [fetchDetail, trainingRun?.status]);
+
+  const handleStart = async () => {
+    try {
+      setStarting(true);
+      await startTrainingRun(id);
+      toast.success("Training run dispatched successfully!");
+      fetchDetail(true);
+    } catch (err) {
+      const msg = err?.response?.data?.detail || "Failed to start training run";
+      toast.error(msg);
+    } finally {
+      setStarting(false);
+    }
+  };
 
   const status = (trainingRun?.status || "QUEUED").toUpperCase();
-  const progress = trainingRun?.progress ?? trainingRun?.job_progress ?? (status === "COMPLETED" ? 100 : 0);
+  const progress =
+    typeof trainingRun?.job_progress === "number"
+      ? trainingRun.job_progress
+      : typeof trainingRun?.progress === "number"
+      ? trainingRun.progress
+      : status === "COMPLETED"
+      ? 100
+      : 0;
 
   const overviewItems = useMemo(() => {
     if (!trainingRun) return [];
     return [
       { label: "Run ID", value: `#${trainingRun.id}` },
       { label: "Status", value: status },
+      {
+        label: "Dataset",
+        value: trainingRun.dataset_name
+          ? `${trainingRun.dataset_name} (${trainingRun.dataset_version_label || `v${trainingRun.dataset_version_id}`})`
+          : `Dataset Version #${trainingRun.dataset_version_id}`,
+      },
       { label: "Base Model", value: trainingRun.base_model || "Qwen/Qwen3-0.6B" },
-      { label: "Training Method", value: trainingRun.training_method || "LoRA" },
+      { label: "Fine-Tuning Method", value: trainingRun.training_method || "LORA_SFT" },
       { label: "Epochs", value: trainingRun.epochs || 1 },
       { label: "Learning Rate", value: trainingRun.learning_rate || 0.0002 },
       { label: "Batch Size", value: trainingRun.batch_size || 1 },
-      { label: "Dataset Version ID", value: `#${trainingRun.dataset_version_id}` },
-      { label: "Created At", value: trainingRun.created_at ? new Date(trainingRun.created_at).toLocaleString() : "N/A" },
+      {
+        label: "Created At",
+        value: trainingRun.created_at ? new Date(trainingRun.created_at).toLocaleString() : "N/A",
+      },
     ];
   }, [trainingRun, status]);
 
@@ -130,25 +180,49 @@ export default function TrainingDetailPage() {
           <DetailHeader
             title={`Training Run #${trainingRun.id}`}
             status={status}
-            displayId={`TR-${String(trainingRun.id).padStart(3, "0")}`}
+            displayId={`TRN-${String(trainingRun.id).padStart(4, "0")}`}
             badgeVariant={
               status === "COMPLETED"
                 ? "success"
                 : status === "RUNNING"
-                  ? "processing"
-                  : status === "FAILED"
-                    ? "error"
-                    : "default"
+                ? "processing"
+                : status === "FAILED"
+                ? "error"
+                : "default"
             }
             actions={
-              <Button
-                variant="default"
-                icon={RefreshCw}
-                onClick={() => fetchDetail(true)}
-                disabled={refreshing}
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {status === "CREATED" && (
+                  <Button
+                    variant="default"
+                    icon={Play}
+                    onClick={handleStart}
+                    disabled={starting}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {starting ? "Starting..." : "Start Training"}
+                  </Button>
+                )}
+
+                {status === "COMPLETED" && (
+                  <Button
+                    variant="outline"
+                    icon={ExternalLink}
+                    onClick={() => router.push("/model")}
+                  >
+                    View in Model Registry
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  icon={RefreshCw}
+                  onClick={() => fetchDetail(true)}
+                  disabled={refreshing}
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </Button>
+              </div>
             }
           />
         </div>
@@ -163,7 +237,13 @@ export default function TrainingDetailPage() {
               <span>Live Training Execution Status</span>
             </div>
             <h2 className="text-xl font-black mt-1">
-              {status === "RUNNING" ? `Training in Progress (${progress}%)` : status === "COMPLETED" ? "Training Completed (100%)" : `Status: ${status}`}
+              {status === "RUNNING"
+                ? `Training in Progress (${progress}%)`
+                : status === "COMPLETED"
+                ? "Training Completed (100%)"
+                : status === "FAILED"
+                ? "Training Run Failed"
+                : `Status: ${status} (Ready to start)`}
             </h2>
             <p className="text-xs text-slate-300 mt-1 font-mono">
               Model: {trainingRun.base_model} • Method: {trainingRun.training_method} • Epochs: {trainingRun.epochs}
@@ -177,13 +257,14 @@ export default function TrainingDetailPage() {
             </div>
             <div className="h-3 w-full rounded-full bg-blue-950 border border-blue-800/60 overflow-hidden p-0.5">
               <div
-                className={`h-full rounded-full transition-all duration-500 ${status === "COMPLETED"
+                className={`h-full rounded-full transition-all duration-500 ${
+                  status === "COMPLETED"
                     ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]"
                     : status === "FAILED"
-                      ? "bg-red-500"
-                      : "bg-blue-400 animate-pulse shadow-[0_0_12px_rgba(96,165,250,0.8)]"
-                  }`}
-                style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                    ? "bg-red-500"
+                    : "bg-blue-400 animate-pulse shadow-[0_0_12px_rgba(96,165,250,0.8)]"
+                }`}
+                style={{ width: `${Math.min(100, Math.max(status === "RUNNING" && progress === 0 ? 5 : 0, progress))}%` }}
               />
             </div>
           </div>
@@ -228,80 +309,83 @@ export default function TrainingDetailPage() {
 
             <div className="rounded-lg bg-slate-50 p-3 border border-slate-100">
               <span className="text-gray-400 block text-[11px]">Target Modules</span>
-              <span className="font-bold text-gray-900 font-mono mt-0.5 block">q_proj, v_proj, k_proj</span>
+              <span className="font-bold text-gray-900 font-mono mt-0.5 block">q_proj, v_proj, k_proj, o_proj</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 4. Artifacts Location & Output Storage */}
+      {/* 4. Hugging Face Storage & Artifacts */}
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm mb-6">
         <div className="flex items-center gap-2 border-b border-gray-100 pb-3 mb-4">
           <FolderArchive size={16} className="text-blue-600" />
-          <h3 className="text-sm font-bold text-gray-900">Training Artifacts & Model Checkpoints</h3>
+          <h3 className="text-sm font-bold text-gray-900">Cloud Model Artifacts (Hugging Face Hub)</h3>
         </div>
 
         <div className="flex flex-col gap-3 font-mono text-xs">
           <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
             <div className="flex items-center gap-2">
               <FileCode size={14} className="text-blue-600" />
-              <span className="font-semibold text-gray-700">Model Artifact Directory:</span>
+              <span className="font-semibold text-gray-700">Hugging Face Model Repo:</span>
             </div>
-            <span className="text-blue-700 font-bold">backend/ai/artifacts/runs/run_{trainingRun.id}</span>
+            <span className="text-blue-700 font-bold">
+              {trainingRun.huggingface_repo || "ankush0710/hdfc-llm-models"}
+            </span>
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
             <div className="flex items-center gap-2">
               <FileCode size={14} className="text-purple-600" />
-              <span className="font-semibold text-gray-700">LoRA Adapter Weights:</span>
+              <span className="font-semibold text-gray-700">Model Storage Path:</span>
             </div>
-            <span className="text-purple-700 font-bold">backend/ai/artifacts/runs/run_{trainingRun.id}/adapter_model.safetensors</span>
+            <span className="text-purple-700 font-bold">
+              {trainingRun.huggingface_path || `models/hdfc_${trainingRun.base_model}_run_${trainingRun.id}/v1.0/`}
+            </span>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
-            <div className="flex items-center gap-2">
-              <FileCode size={14} className="text-emerald-600" />
-              <span className="font-semibold text-gray-700">Tokenizer & Config:</span>
+          {trainingRun.commit_hash && (
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-emerald-600" />
+                <span className="font-semibold text-gray-700">Hugging Face Commit Hash:</span>
+              </div>
+              <span className="text-emerald-700 font-bold truncate max-w-xs" title={trainingRun.commit_hash}>
+                {trainingRun.commit_hash}
+              </span>
             </div>
-            <span className="text-emerald-700 font-bold">backend/ai/artifacts/runs/run_{trainingRun.id}/adapter_config.json</span>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* 5. Chronological Audit Logs */}
+      {/* 5. Chronological Event Audit Logs */}
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 border-b border-gray-100 pb-3 mb-4">
           <Terminal size={16} className="text-blue-600" />
-          <h3 className="text-sm font-bold text-gray-900">Execution Logs & Event Audit Feed</h3>
+          <h3 className="text-sm font-bold text-gray-900">Execution Logs & Real-Time Event Feed</h3>
         </div>
 
         <div className="space-y-2.5 font-mono text-xs">
-          <div className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50">
-            <span className="text-gray-400 shrink-0">[{trainingRun.created_at ? new Date(trainingRun.created_at).toLocaleTimeString() : "00:00:00"}]</span>
-            <span className="text-slate-700 font-semibold">Training run #{trainingRun.id} created and queued.</span>
-          </div>
-
-          <div className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50">
-            <span className="text-blue-500 shrink-0">[{trainingRun.created_at ? new Date(trainingRun.created_at).toLocaleTimeString() : "00:00:00"}]</span>
-            <span className="text-slate-800 font-semibold">Background training worker started. Initialized base model {trainingRun.base_model}.</span>
-          </div>
-
-          <div className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50">
-            <span className="text-emerald-600 shrink-0">[{trainingRun.created_at ? new Date(trainingRun.created_at).toLocaleTimeString() : "00:00:00"}]</span>
-            <span className="text-slate-800 font-semibold">Dataset pre-processing complete. LoRA adapter initialized.</span>
-          </div>
-
-          {status === "COMPLETED" && (
-            <div className="flex items-start gap-3 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
-              <span className="text-emerald-700 font-bold shrink-0">[COMPLETE]</span>
-              <span className="text-emerald-900 font-bold">Training finished successfully. Artifacts persisted to disk and marked 100%.</span>
-            </div>
-          )}
-
-          {status === "FAILED" && (
-            <div className="flex items-start gap-3 p-2.5 rounded-lg bg-red-50 border border-red-200">
-              <span className="text-red-700 font-bold shrink-0">[FAILED]</span>
-              <span className="text-red-900 font-bold">{trainingRun.error_message || "Training run failed during execution."}</span>
+          {logsData && logsData.length > 0 ? (
+            logsData.map((log, index) => (
+              <div
+                key={index}
+                className={`flex items-start gap-3 p-2.5 rounded-lg ${
+                  log.level === "ERROR"
+                    ? "bg-red-50 border border-red-200 text-red-900"
+                    : log.level === "WARNING"
+                    ? "bg-amber-50 border border-amber-200 text-amber-900"
+                    : "bg-slate-50 text-slate-800"
+                }`}
+              >
+                <span className="text-gray-400 shrink-0 text-[11px]">
+                  [{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : "00:00:00"}]
+                </span>
+                <span className="font-semibold">{log.message}</span>
+              </div>
+            ))
+          ) : (
+            <div className="p-3 rounded-lg bg-slate-50 text-gray-500 text-center">
+              No detailed logs available yet. Launch or refresh training run to see execution stream.
             </div>
           )}
         </div>
@@ -309,3 +393,4 @@ export default function TrainingDetailPage() {
     </main>
   );
 }
+
