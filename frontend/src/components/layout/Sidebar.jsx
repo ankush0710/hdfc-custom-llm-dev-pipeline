@@ -74,9 +74,8 @@ function SidebarItem({ item, pathname }) {
   return (
     <Link
       href={item.href}
-      className={`relative flex items-center gap-4 px-5 py-3 rounded-r-lg transition-all duration-300 group ${
-        isActive ? " bg-[#07477F] text-white font-bold" : "text-gray-200 hover:bg-[#063967]"
-      }`}
+      className={`relative flex items-center gap-4 px-5 py-3 rounded-r-lg transition-all duration-300 group ${isActive ? " bg-[#07477F] text-white font-bold" : "text-gray-200 hover:bg-[#063967]"
+        }`}
     >
       {isActive && <span className="absolute left-0 top-0 h-full w-1 bg-red-500" />}
       <Icon size={20} strokeWidth={2} className="shrink-0 text-white" />
@@ -98,10 +97,10 @@ export default function Sidebar({ isOpen, onClose }) {
     role === "ADMIN"
       ? "bg-red-500/20 text-red-300 border-red-400/40"
       : role === "DS" || role === "DATA_SCIENTIST"
-      ? "bg-purple-500/20 text-purple-300 border-purple-400/40"
-      : role === "REVIEWER"
-      ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
-      : "bg-blue-500/20 text-blue-300 border-blue-400/40";
+        ? "bg-purple-500/20 text-purple-300 border-purple-400/40"
+        : role === "REVIEWER"
+          ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
+          : "bg-blue-500/20 text-blue-300 border-blue-400/40";
 
   return (
     <>
@@ -112,9 +111,8 @@ export default function Sidebar({ isOpen, onClose }) {
         />
       )}
       <div
-        className={`fixed left-0 top-0 z-40 h-screen w-[280px] bg-[#002B55] transition-transform duration-300 ease-in-out flex flex-col justify-between ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0 lg:z-40`}
+        className={`fixed left-0 top-0 z-40 h-screen w-[280px] bg-[#002B55] transition-transform duration-300 ease-in-out flex flex-col justify-between ${isOpen ? "translate-x-0" : "-translate-x-full"
+          } lg:translate-x-0 lg:z-40`}
       >
         <div className="overflow-y-auto max-h-[calc(100vh-100px)]">
           <button
@@ -127,7 +125,7 @@ export default function Sidebar({ isOpen, onClose }) {
             <Link href="/" className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#003A70]">
                 <img
-                  src="/HDFC_Forge_logo.png"
+                  src="./images/HDFC_Forge_logo.png"
                   alt="HDFC Forge"
                   className="h-9 w-9 object-contain"
                 />
