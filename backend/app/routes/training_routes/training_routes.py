@@ -1,4 +1,4 @@
-import math
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -41,9 +41,9 @@ router = APIRouter(
 
 class TrainingMetricPoint(BaseModel):
     step: int
-    loss: float
-    lr: float
-    accuracy: float
+    loss: Optional[float] = None
+    lr: Optional[float] = None
+    accuracy: Optional[float] = None
 
 
 class TrainingRunDetailResponse(BaseModel):
@@ -72,18 +72,10 @@ class TrainingRunDetailResponse(BaseModel):
     huggingface_repo: Optional[str] = None
     huggingface_path: Optional[str] = None
     commit_hash: Optional[str] = None
-    # Real-time computed metrics from backend
-    creator_name: Optional[str] = "HDFC Data Scientist"
-    started_time_ago: Optional[str] = None
-    current_step: int = 0
-    total_steps: int = 10000
-    current_epoch: int = 1
-    total_epochs: int = 1
-    time_remaining_formatted: str = "Estimating..."
-    elapsed_formatted: str = "0s"
-    training_loss: float = 0.0
-    current_lr: float = 0.0002
-    token_accuracy: float = 0.0
+    # Real trainer metrics from DB (null when not yet available)
+    training_loss: Optional[float] = None
+    current_lr: Optional[float] = None
+    token_accuracy: Optional[float] = None
     metric_history: List[TrainingMetricPoint] = []
     model_config = ConfigDict(from_attributes=True)
 
@@ -280,8 +272,13 @@ def get_run_detail(
         prog = 100
 
     total_epochs = training_run.epochs or 1
-    total_steps = max(500, int(total_epochs * 1500))
-    current_step = int((prog / 100.0) * total_steps)
+    # Use real step counts from DB if available; otherwise estimate
+    if job and job.max_steps:
+        total_steps = job.max_steps
+        current_step = job.current_step or int((prog / 100.0) * total_steps)
+    else:
+        total_steps = max(500, int(total_epochs * 1500))
+        current_step = int((prog / 100.0) * total_steps)
     if prog >= 100:
         current_epoch = total_epochs
     elif prog > 0:
@@ -337,42 +334,49 @@ def get_run_detail(
             time_remaining_formatted = "Stopped"
 
 
-    # Compute training loss and accuracy curve
-    current_lr = training_run.learning_rate or 0.0002
-    if prog > 0:
-        norm = prog / 100.0
-        training_loss = round(max(0.42, 2.85 * math.exp(-1.18 * norm) + 0.04 * math.sin(norm * 14.0)), 4)
-        token_accuracy = round(min(98.5, 42.0 + 38.5 * (norm ** 0.75) + 0.8 * math.sin(norm * 18.0)), 1)
-    else:
-        training_loss = round(2.85, 4)
-        token_accuracy = 0.0
-
-    # Build metric history points for sparkline plots
+    # Resolve real metrics from DB (no fabrication)
+    real_train_loss: Optional[float] = None
+    real_current_lr: Optional[float] = None
     metric_history: List[TrainingMetricPoint] = []
-    num_pts = 10
-    for idx in range(num_pts + 1):
-        ratio = idx / num_pts
-        p_val = ratio * (prog / 100.0) if prog > 0 else 0.0
-        s_val = int(p_val * total_steps)
-        l_val = round(max(0.42, 2.85 * math.exp(-1.18 * p_val) + 0.04 * math.sin(p_val * 14.0)), 4) if prog > 0 else 2.85
-        a_val = round(min(98.5, 42.0 + 38.5 * (p_val ** 0.75) + 0.8 * math.sin(p_val * 18.0)), 1) if prog > 0 else 0.0
-        if p_val < 0.15:
-            lr_val = current_lr * max(0.2, p_val / 0.15)
-        else:
-            lr_val = current_lr * (1.0 - 0.12 * p_val)
-        metric_history.append(TrainingMetricPoint(
-            step=s_val,
-            loss=l_val,
-            lr=round(lr_val, 6),
-            accuracy=a_val,
-        ))
+
+    if job:
+        if job.train_loss is not None:
+            real_train_loss = round(float(job.train_loss), 6)
+        if job.current_lr is not None:
+            real_current_lr = round(float(job.current_lr), 8)
+
+        # Parse log_entries for sparkline chart data
+        if job.log_entries:
+            try:
+                raw_entries = json.loads(job.log_entries)
+                if isinstance(raw_entries, list):
+                    # Sample to at most 20 evenly-spaced points for chart
+                    total = len(raw_entries)
+                    if total <= 20:
+                        sampled = raw_entries
+                    else:
+                        step_size = total / 20
+                        sampled = [raw_entries[int(i * step_size)] for i in range(20)]
+                        # Always include the last entry
+                        if raw_entries[-1] not in sampled:
+                            sampled.append(raw_entries[-1])
+
+                    for e in sampled:
+                        metric_history.append(TrainingMetricPoint(
+                            step=int(e.get("step", 0)),
+                            loss=round(float(e["loss"]), 6) if e.get("loss") is not None else None,
+                            lr=round(float(e["lr"]), 8) if e.get("lr") is not None else None,
+                            accuracy=None,  # SFTTrainer does not produce token accuracy
+                        ))
+            except (json.JSONDecodeError, TypeError, KeyError):
+                pass
 
     return TrainingRunDetailResponse(
         id=training_run.id,
         dataset_version_id=training_run.dataset_version_id,
         dataset_name=dataset_name,
         dataset_version_label=dataset_version_label,
-        dataset_row_count=1200000,
+        dataset_row_count=getattr(d_ver, "row_count", None) if d_ver else None,
         base_model=training_run.base_model,
         training_method=training_run.training_method,
         epochs=training_run.epochs,
@@ -399,9 +403,9 @@ def get_run_detail(
         total_epochs=total_epochs,
         time_remaining_formatted=time_remaining_formatted,
         elapsed_formatted=elapsed_formatted,
-        training_loss=training_loss,
-        current_lr=current_lr,
-        token_accuracy=token_accuracy,
+        training_loss=real_train_loss,
+        current_lr=real_current_lr,
+        token_accuracy=None,  # Not produced by SFTTrainer
         metric_history=metric_history,
     )
 
@@ -442,80 +446,68 @@ def get_run_logs(
     current_epoch = min(total_epochs, max(1, int(1 + (prog / 100.0) * total_epochs - (0.001 if prog < 100 else 0)))) if prog > 0 else 1
 
     start_time = _to_naive_utc(training_run.started_at) or _to_naive_utc(training_run.created_at) or datetime.utcnow()
+
+    # Serve real log entries from DB; fall back to minimal honest header lines
     logs: List[TrainingLogEntry] = []
 
-    # Standard initialization logs
+    # Always include a job-started marker from the actual started_at
     t0 = start_time.strftime("%H:%M:%S")
-    t1 = (start_time + timedelta(seconds=4)).strftime("%H:%M:%S")
-    t2 = (start_time + timedelta(seconds=12)).strftime("%H:%M:%S")
-    t3 = (start_time + timedelta(seconds=20)).strftime("%H:%M:%S")
-    t4 = (start_time + timedelta(seconds=28)).strftime("%H:%M:%S")
-    t5 = (start_time + timedelta(seconds=35)).strftime("%H:%M:%S")
-
     logs.append(TrainingLogEntry(
         timestamp=t0,
         level="INFO",
-        message=f"[{t0}] Loading dataset {dataset_name} ({version_label})...",
-    ))
-    logs.append(TrainingLogEntry(
-        timestamp=t1,
-        level="INFO",
-        message=f"[{t1}] Dataset loaded successfully (1.2M rows).",
-    ))
-    logs.append(TrainingLogEntry(
-        timestamp=t2,
-        level="INFO",
-        message=f"[{t2}] Starting tokenizer (vocab_size=32000)...",
-    ))
-    logs.append(TrainingLogEntry(
-        timestamp=t3,
-        level="INFO",
-        message=f"[{t3}] Tokenization complete. Max sequence length: 2048.",
-    ))
-    logs.append(TrainingLogEntry(
-        timestamp=t4,
-        level="INFO",
-        message=f"[{t4}] Initializing {training_run.base_model} with {training_run.training_method} configuration...",
-    ))
-    logs.append(TrainingLogEntry(
-        timestamp=t5,
-        level="INFO",
-        message=f"[{t5}] Training epoch {current_epoch}/{total_epochs} started.",
+        message=f"[{t0}] Training run #{run_id} started. Base model: {training_run.base_model} | Method: {training_run.training_method}",
     ))
 
-    # Step progress entries
-    if prog > 0:
-        step_interval = max(100, int(total_steps / 10))
-        for s in range(step_interval, current_step + 1, step_interval):
-            p_val = s / total_steps
-            l_val = round(max(0.42, 2.85 * math.exp(-1.18 * p_val) + 0.04 * math.sin(p_val * 14.0)), 4)
-            lr_val = training_run.learning_rate or 0.0002
-            t_step = (start_time + timedelta(seconds=int(p_val * 1200 + 40))).strftime("%H:%M:%S")
-            logs.append(TrainingLogEntry(
-                timestamp=t_step,
-                level="INFO",
-                message=f"[{t_step}] Step {s} | Loss: {l_val:.4f} | LR: {lr_val:.4f}",
-            ))
+    # Serve real step entries from DB log_entries JSON
+    if job and job.log_entries:
+        try:
+            raw_entries = json.loads(job.log_entries)
+            if isinstance(raw_entries, list):
+                for e in raw_entries:
+                    entry_ts = e.get("ts", "")
+                    if entry_ts:
+                        try:
+                            entry_ts = datetime.fromisoformat(entry_ts).strftime("%H:%M:%S")
+                        except (ValueError, TypeError):
+                            pass
+                    step_num = e.get("step", 0)
+                    step_pct = e.get("pct", 0)
+                    loss_val = e.get("loss")
+                    lr_val = e.get("lr")
+
+                    parts = [f"Step {step_num} | {step_pct}%"]
+                    if loss_val is not None:
+                        parts.append(f"Loss: {loss_val:.4f}")
+                    if lr_val is not None:
+                        parts.append(f"LR: {lr_val:.2e}")
+
+                    logs.append(TrainingLogEntry(
+                        timestamp=entry_ts,
+                        level="INFO",
+                        message=f"[{entry_ts}] {' | '.join(parts)}",
+                    ))
+        except (json.JSONDecodeError, TypeError):
+            pass
 
     run_status = str(training_run.status or "").upper()
     if run_status == "COMPLETED":
-        end_time = training_run.completed_at or (start_time + timedelta(minutes=15))
+        end_time = _to_naive_utc(training_run.completed_at) or (start_time + timedelta(minutes=15))
         t_end = end_time.strftime("%H:%M:%S")
         logs.append(TrainingLogEntry(
             timestamp=t_end,
             level="INFO",
-            message=f"[{t_end}] Training completed successfully. Model artifacts saved and registered to Hugging Face.",
+            message=f"[{t_end}] Training completed successfully.",
         ))
     elif run_status == "FAILED":
-        end_time = training_run.completed_at or (start_time + timedelta(minutes=5))
+        end_time = _to_naive_utc(training_run.completed_at) or (start_time + timedelta(minutes=5))
         t_end = end_time.strftime("%H:%M:%S")
         logs.append(TrainingLogEntry(
             timestamp=t_end,
             level="ERROR",
             message=f"[{t_end}] Training FAILED: {training_run.error_message or 'Execution encountered fatal error.'}",
         ))
-    elif run_status == "STOPPED":
-        end_time = training_run.completed_at or (start_time + timedelta(minutes=5))
+    elif run_status in {"STOPPED", "CANCELLED"}:
+        end_time = _to_naive_utc(training_run.completed_at) or (start_time + timedelta(minutes=5))
         t_end = end_time.strftime("%H:%M:%S")
         logs.append(TrainingLogEntry(
             timestamp=t_end,

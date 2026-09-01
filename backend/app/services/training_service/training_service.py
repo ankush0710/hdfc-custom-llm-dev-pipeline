@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import threading
@@ -99,7 +100,7 @@ def create_training_run(db: Session, data: TrainingRunCreate):
 def _execute_training_run_worker(run_id: int):
     """Background worker executing model training and updating DB status/registry."""
     from app.services.huggingface_service.hf_storage_service import get_hf_storage_service
-    from app.core.config import HF_LOCAL_TEMP_DIR
+    from app.core.config import HF_LOCAL_TEMP_DIR, HF_UPLOAD_TIMEOUT_SECONDS
     import shutil
 
     db = SessionLocal()
@@ -189,13 +190,15 @@ def _execute_training_run_worker(run_id: int):
 
             return False
 
-        def _on_step_progress(pct: int, step: int, max_steps: int):
-            """Persist real-time step progress in Neon PostgreSQL without throwing exceptions."""
+        def _on_step_progress(pct: int, step: int, max_steps: int, loss: Optional[float] = None, lr: Optional[float] = None):  # noqa: E501
+            """Persist real-time step progress and trainer metrics to Neon PostgreSQL."""
             logger.info(
-                "DATABASE CALLBACK RECEIVED: percentage=%d, step=%d, max_steps=%d",
+                "DATABASE CALLBACK RECEIVED: percentage=%d, step=%d, max_steps=%d, loss=%s, lr=%s",
                 pct,
                 step,
                 max_steps,
+                loss,
+                lr,
             )
             progress_db = None
 
@@ -223,18 +226,48 @@ def _execute_training_run_worker(run_id: int):
                 if job.progress is not None and safe_progress < job.progress:
                     safe_progress = job.progress
 
-                # Save the actual trainer progress immediately in Neon
                 job.progress = safe_progress
                 job.status = training_status.RUNNING
+
+                # Persist real trainer metrics and step counts
+                job.current_step = step
+                job.max_steps = max_steps
+                if loss is not None:
+                    job.train_loss = round(float(loss), 6)
+                if lr is not None:
+                    job.current_lr = round(float(lr), 8)
+
+                # Append structured log entry to the JSON array
+                try:
+                    existing_entries = json.loads(job.log_entries or "[]")
+                except (json.JSONDecodeError, TypeError):
+                    existing_entries = []
+
+                entry = {
+                    "step": step,
+                    "pct": safe_progress,
+                    "loss": round(float(loss), 6) if loss is not None else None,
+                    "lr": round(float(lr), 8) if lr is not None else None,
+                    "ts": datetime.utcnow().isoformat(),
+                }
+                existing_entries.append(entry)
+
+                # Cap at 500 entries to keep the column size bounded
+                if len(existing_entries) > 500:
+                    existing_entries = existing_entries[-500:]
+
+                job.log_entries = json.dumps(existing_entries)
 
                 progress_db.commit()
                 progress_db.refresh(job)
 
                 logger.info(
-                    "DATABASE PROGRESS SAVED: run_id=%d, job_id=%d, progress=%d",
+                    "DATABASE PROGRESS SAVED: run_id=%d, job_id=%d, progress=%d, loss=%s, lr=%s",
                     run_id,
                     job.id,
                     safe_progress,
+                    loss,
+                    lr,
                 )
 
             except Exception:
@@ -306,16 +339,26 @@ def _execute_training_run_worker(run_id: int):
         reg_model_name = f"hdfc_{clean_model_name}_run_{run_id}"
         model_version = f"1.{run_id}.0"
 
-        logger.info("Uploading trained model artifacts to Hugging Face repo '%s'...", hf_service.model_repo)
+        logger.info(
+            "Training run %d finalization: uploading artifacts to Hugging Face repo '%s' (timeout=%ss).",
+            run_id,
+            hf_service.model_repo,
+            HF_UPLOAD_TIMEOUT_SECONDS,
+        )
         hf_model_upload = hf_service.upload_model(
             local_dir=output_dir,
             model_name=reg_model_name,
             version=model_version,
             run_id=run_id,
             commit_message=f"Upload trained model {reg_model_name} v{model_version} from Run #{run_id}",
+            timeout_seconds=HF_UPLOAD_TIMEOUT_SECONDS,
         )
 
-        # Mark Run & Job as COMPLETED in Neon
+        logger.info("Training run %d finalization: upload completed; updating registry and terminal status.", run_id)
+
+        # Register the uploaded model and complete the related job/run in one DB
+        # transaction. A registry failure must leave the run eligible for the
+        # failure handler below, rather than reporting a premature completion.
         now = datetime.utcnow()
 
         # Expire all cached objects in worker session to avoid stale state
@@ -333,16 +376,8 @@ def _execute_training_run_worker(run_id: int):
             .first()
         )
 
-        if training_job:
-            training_job.status = training_status.COMPLETED
-            training_job.progress = 100
-            training_job.completed_at = now
-
-        if training_run:
-            training_run.status = training_status.COMPLETED
-            training_run.completed_at = now
-
-        db.commit()
+        if not training_run or not training_job:
+            raise RuntimeError(f"Training run {run_id} lost its run or job record during finalization.")
 
         # Auto-register trained model in Neon Model_Registry
         registered_model = Model_Registry(
@@ -359,8 +394,18 @@ def _execute_training_run_worker(run_id: int):
             status="READY",
         )
         db.add(registered_model)
+
+        training_job.status = training_status.COMPLETED
+        training_job.progress = 100
+        training_job.completed_at = now
+        training_run.status = training_status.COMPLETED
+        training_run.completed_at = now
         db.commit()
-        logger.info("Model '%s' registered in Neon with status READY and HF path '%s'.", reg_model_name, hf_model_upload["huggingface_path"])
+        logger.info(
+            "Training run %d finalization completed: model '%s' registered and progress set to 100%%.",
+            run_id,
+            reg_model_name,
+        )
 
         # Safely clean temporary downloaded dataset and training scratch files
         if temp_dataset_downloaded and ds_path and os.path.exists(ds_path):
@@ -371,6 +416,10 @@ def _execute_training_run_worker(run_id: int):
 
     except Exception as exc:
         now = datetime.utcnow()
+        # A failed commit leaves SQLAlchemy's session unusable until rollback.
+        # Do this before querying the records to guarantee finalization errors
+        # transition the run/job out of RUNNING rather than stranding it at 95%.
+        db.rollback()
 
         # Differentiate between normal user stop and actual failure
         stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)

@@ -1,9 +1,13 @@
 # pyrefly: ignore [missing-import]
+import logging
+import os
+
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
-from app.dbConfig.database_config import Base, engine
-import app.model
+import app.model  # noqa: F401 — registers all ORM models with Base
+
 from app.routes.dataset_routes.dataset_routes import router as dataset_router
 from app.routes.processing_routes.processing_routes import router as processing_router
 from app.routes.training_routes.training_routes import router as training_router
@@ -14,120 +18,110 @@ from app.routes.deployment_routes.deployment_routes import router as deployment_
 from app.routes.inference_routes.inference_routes import router as inference_router
 from app.routes.ai_routes.ai_routes import router as ai_router
 from app.routes.pipeline_routes.pipeline_routes import router as pipeline_router
-
-
 from app.routes.auth_routes.auth_routes import router as auth_router
 
+_logger = logging.getLogger(__name__)
 
-Base.metadata.create_all(bind=engine)
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+_env = os.getenv("ENVIRONMENT", "development").lower()
+_is_production = _env == "production"
 
+# ---------------------------------------------------------------------------
+# Admin seed — credentials from environment only
+# ---------------------------------------------------------------------------
 def _seed_initial_admin():
-    """Seed initial default users securely and idempotently."""
-    import os
+
     from app.dbConfig.database_config import SessionLocal
     from app.model.user_model import User_Model
     from app.core.auth_dependency import hash_password, verify_password
 
-    seed_users = [
-        {
-            "email": os.getenv("INITIAL_ADMIN_EMAIL", "ankushkurvey053@gmail.com").lower().strip(),
-            "password": os.getenv("INITIAL_ADMIN_PASSWORD", "ankush@1234"),
-            "full_name": os.getenv("INITIAL_ADMIN_NAME", "Ankush Kurvey (System Admin)"),
-            "role": "ADMIN",
-        },
-        {
-            "email": "ankushkurvey053@hdfc.com",
-            "password": "ankush@1234",
-            "full_name": "Ankush Kurvey (Admin)",
-            "role": "ADMIN",
-        },
-        {
-            "email": "admin@hdfc.com",
-            "password": "admin@1234",
-            "full_name": "Enterprise System Admin",
-            "role": "ADMIN",
-        },
-        {
-            "email": "datascientist@hdfc.com",
-            "password": "ds@1234",
-            "full_name": "Lead Data Scientist",
-            "role": "DS",
-        },
-        {
-            "email": "reviewer@hdfc.com",
-            "password": "reviewer@1234",
-            "full_name": "Model Governance Reviewer",
-            "role": "REVIEWER",
-        },
-        {
-            "email": "viewer@hdfc.com",
-            "password": "viewer@1234",
-            "full_name": "Business Analyst Viewer",
-            "role": "VIEWER",
-        },
-    ]
+    admin_email = (os.getenv("INITIAL_ADMIN_EMAIL") or "").lower().strip()
+    admin_password = os.getenv("INITIAL_ADMIN_PASSWORD") or ""
+    admin_name = os.getenv("INITIAL_ADMIN_NAME", "System Admin")
+
+    if not admin_email or not admin_password:
+        _logger.warning(
+            "INITIAL_ADMIN_EMAIL / INITIAL_ADMIN_PASSWORD not set — skipping admin seed."
+        )
+        return
 
     db = SessionLocal()
     try:
-        # Clean up legacy seed account if present
-        legacy_admin = db.query(User_Model).filter(User_Model.email == "ankushkurvey@053").first()
-        if legacy_admin:
-            db.delete(legacy_admin)
+        user = db.query(User_Model).filter(User_Model.email == admin_email).first()
+        if not user:
+            user = User_Model(
+                full_name=admin_name,
+                email=admin_email,
+                password_hash=hash_password(admin_password),
+                role="ADMIN",
+                is_active=True,
+            )
+            db.add(user)
             db.commit()
-
-        for u_data in seed_users:
-            user = db.query(User_Model).filter(User_Model.email == u_data["email"]).first()
-            if not user:
-                user = User_Model(
-                    full_name=u_data["full_name"],
-                    email=u_data["email"],
-                    password_hash=hash_password(u_data["password"]),
-                    role=u_data["role"],
-                    is_active=True,
-                )
-                db.add(user)
+            _logger.info("Admin user seeded: %s", admin_email)
+        else:
+            updated = False
+            if user.role != "ADMIN":
+                user.role = "ADMIN"
+                updated = True
+            if not user.is_active:
+                user.is_active = True
+                updated = True
+            if not verify_password(admin_password, user.password_hash):
+                user.password_hash = hash_password(admin_password)
+                updated = True
+            if updated:
                 db.commit()
-            else:
-                updated = False
-                if user.role != u_data["role"]:
-                    user.role = u_data["role"]
-                    updated = True
-                if not user.is_active:
-                    user.is_active = True
-                    updated = True
-                if not verify_password(u_data["password"], user.password_hash):
-                    user.password_hash = hash_password(u_data["password"])
-                    updated = True
-                if updated:
-                    db.commit()
     except Exception as exc:
+        _logger.error("Admin seed failed: %s", exc)
         db.rollback()
     finally:
         db.close()
 
+
 _seed_initial_admin()
 
+# ---------------------------------------------------------------------------
+# CORS — explicit origins from env in production
+# ---------------------------------------------------------------------------
+_extra_origins = [
+    o.strip() for o in os.getenv("ALLOW_ORIGIN", "").split(",") if o.strip()
+]
+
+_DEV_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+
+# ---------------------------------------------------------------------------
+# Application
+# ---------------------------------------------------------------------------
 app = FastAPI(
-    title = "HDFC Custom llm Development Pipeline API",
-    version = "1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    title="HDFC Custom LLM Development Pipeline API",
+    version="1.0.0",
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
+        *(_DEV_ORIGINS if not _is_production else []),
+        *_extra_origins,
     ],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+    # Allow any localhost port only in development; production must set ALLOW_ORIGIN explicitly
+    allow_origin_regex=(
+        r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$" if not _is_production else None
+    ),
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
+    max_age=600,
 )
 
 app.include_router(auth_router)
@@ -142,8 +136,32 @@ app.include_router(inference_router)
 app.include_router(ai_router)
 app.include_router(pipeline_router)
 
+
+# ---------------------------------------------------------------------------
+# System endpoints
+# ---------------------------------------------------------------------------
 @app.get("/")
 def root():
-    return {
-        "message": "HDFC Custom LLM Pipeline API is running"
-    }
+    return {"message": "HDFC Custom LLM Pipeline API is running", "environment": _env}
+
+
+@app.get("/health", tags=["Health"])
+def health_check():
+    """Liveness probe for load balancers and container orchestration."""
+    from app.dbConfig.database_config import SessionLocal
+    from sqlalchemy import text
+    db_ok = False
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        db_ok = True
+    except Exception:
+        pass
+    return JSONResponse(
+        status_code=200 if db_ok else 503,
+        content={
+            "status": "ok" if db_ok else "degraded",
+            "database": "connected" if db_ok else "unreachable",
+        },
+    )

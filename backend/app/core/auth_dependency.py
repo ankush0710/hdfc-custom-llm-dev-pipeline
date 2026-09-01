@@ -1,3 +1,4 @@
+import logging
 import os
 import bcrypt
 from datetime import datetime, timedelta, timezone
@@ -11,8 +12,16 @@ from sqlalchemy.orm import Session
 from app.dbConfig.database_config import get_db
 from app.model.user_model import User_Model
 
-# JWT Configuration
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "hdfc_custom_llm_pipeline_jwt_secret_key_2026_super_secure")
+_logger = logging.getLogger(__name__)
+
+# JWT Configuration — JWT_SECRET_KEY MUST be set in the environment.
+# Generate a secure key: python -c "import secrets; print(secrets.token_hex(32))"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not JWT_SECRET_KEY:
+    raise ValueError(
+        "JWT_SECRET_KEY env var is required and not set. "
+        "Generate a secure key with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 

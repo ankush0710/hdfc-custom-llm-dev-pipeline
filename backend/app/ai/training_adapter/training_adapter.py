@@ -57,12 +57,13 @@ class AITrainingAdapter:
         if "messages" in record and isinstance(record["messages"], list):
             return record["messages"]
 
-        # 2. 'question' / 'context' / 'response' or 'answer'
-        question = record.get("question") or record.get("instruction") or record.get("prompt") or ""
-        context = record.get("context") or ""
-        response = record.get("response") or record.get("answer") or record.get("output") or record.get("completion") or ""
+        # 2. 'question' / 'context' / 'response' or 'answer' (case-insensitive lookup)
+        lowered = {str(k).lower(): v for k, v in record.items()} if isinstance(record, dict) else {}
+        question = lowered.get("question") or lowered.get("instruction") or lowered.get("prompt") or ""
+        context = lowered.get("context") or ""
+        response = lowered.get("response") or lowered.get("answer") or lowered.get("output") or lowered.get("completion") or ""
 
-        user_content = f"Context:\n{context.strip()}\n\nQuestion:\n{question.strip()}" if context.strip() else question.strip()
+        user_content = f"Context:\n{str(context).strip()}\n\nQuestion:\n{str(question).strip()}" if str(context).strip() else str(question).strip()
 
         return [
             {"role": "system", "content": "You are a helpful and accurate HDFC Bank assistant."},

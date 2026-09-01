@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -42,45 +42,20 @@ import { toast } from "sonner";
 // Mini Sparkline SVG component for smooth area curves
 function SparklineChart({ data = [], type = "loss", height = 80, className = "" }) {
   if (!data || data.length === 0) {
-    // Generate standard graceful curve if history is empty
-    if (type === "loss") {
-      return (
-        <svg viewBox="0 0 200 80" className={`w-full h-${height} ${className}`}>
-          <defs>
-            <linearGradient id="lossGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1E293B" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#1E293B" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-          <path d="M 0 70 Q 40 60 70 50 T 130 35 T 200 15 L 200 80 L 0 80 Z" fill="url(#lossGrad)" />
-          <path d="M 0 70 Q 40 60 70 50 T 130 35 T 200 15" fill="none" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" />
-        </svg>
-      );
-    }
-    if (type === "lr") {
-      return (
-        <svg viewBox="0 0 200 80" className={`w-full h-${height} ${className}`}>
-          <defs>
-            <linearGradient id="lrGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1E293B" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#1E293B" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-          <path d="M 0 75 L 30 20 L 160 20 L 195 75 L 200 80 L 0 80 Z" fill="url(#lrGrad)" />
-          <path d="M 0 75 L 30 20 L 160 20 L 195 75" fill="none" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" />
-        </svg>
-      );
-    }
     return (
-      <svg viewBox="0 0 200 80" className={`w-full h-${height} ${className}`}>
-        <defs>
-          <linearGradient id="accGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1E293B" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#1E293B" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        <path d="M 0 75 Q 50 65 90 45 T 160 25 T 200 12 L 200 80 L 0 80 Z" fill="url(#accGrad)" />
-        <path d="M 0 75 Q 50 65 90 45 T 160 25 T 200 12" fill="none" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" />
+      <svg viewBox="0 0 200 80" className={`w-full h-full ${className}`}>
+        <text
+          x="100"
+          y="44"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize="11"
+          fill="#94a3b8"
+          fontFamily="ui-monospace, monospace"
+        >
+          No data yet
+        </text>
+        <line x1="20" y1="60" x2="180" y2="60" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
       </svg>
     );
   }
@@ -131,10 +106,11 @@ function SparklineChart({ data = [], type = "loss", height = 80, className = "" 
   );
 }
 
-export default function TrainingDetailPage() {
-  const params = useParams();
+export default function TrainingDetailPage({ params: pageParams }) {
+  const routeParams = useParams();
   const router = useRouter();
-  const id = params?.id;
+  // Support both hook and props for max compatibility across Next.js versions
+  const id = routeParams?.id || pageParams?.id;
 
   const [trainingRun, setTrainingRun] = useState(null);
   const [logsData, setLogsData] = useState([]);
@@ -146,6 +122,11 @@ export default function TrainingDetailPage() {
   const [showArtifactsModal, setShowArtifactsModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(null);
+
+  // Ref to track whether we have received initial data (avoids adding trainingRun to useCallback deps)
+  const hasDataRef = useRef(false);
+  // Ref to hold the polling interval so a second effect can clear it on terminal status
+  const pollingRef = useRef(null);
 
   const fetchDetail = useCallback(async (isSilent = false) => {
     if (!id) return;
@@ -161,8 +142,13 @@ export default function TrainingDetailPage() {
       if (detailRes.status === "fulfilled" && detailRes.value) {
         setTrainingRun(detailRes.value);
         setError(null);
-      } else if (!trainingRun) {
-        setError(`Training run #${id} not found`);
+        hasDataRef.current = true;
+      } else if (!hasDataRef.current) {
+        const errMsg =
+          detailRes.status === "rejected"
+            ? detailRes.reason?.response?.data?.detail || detailRes.reason?.message
+            : null;
+        setError(errMsg || `Training run #${id} not found`);
       }
 
       if (logsRes.status === "fulfilled" && logsRes.value?.logs) {
@@ -170,23 +156,41 @@ export default function TrainingDetailPage() {
       }
     } catch (err) {
       console.error("Failed to fetch training run detail:", err);
-      setError(err?.response?.data?.detail || "Failed to load training run detail");
+      if (!hasDataRef.current) {
+        setError(err?.response?.data?.detail || "Failed to load training run detail");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [id, trainingRun]);
+  }, [id]); // trainingRun intentionally excluded — causes infinite re-render via interval restart
 
-  // Real-time polling every 3 seconds
+  // Start polling once on mount; the interval reference is stable across re-renders
   useEffect(() => {
     fetchDetail();
 
-    const interval = setInterval(() => {
+    pollingRef.current = setInterval(() => {
       fetchDetail(true);
     }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
   }, [fetchDetail]);
+
+  // Stop polling as soon as training reaches a terminal status
+  useEffect(() => {
+    const s = (trainingRun?.status || "").toUpperCase();
+    if (s === "COMPLETED" || s === "FAILED" || s === "STOPPED" || s === "CANCELLED") {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }
+  }, [trainingRun?.status]);
 
   const handleStart = async () => {
     try {
@@ -229,10 +233,10 @@ export default function TrainingDetailPage() {
     typeof trainingRun?.job_progress === "number"
       ? trainingRun.job_progress
       : typeof trainingRun?.progress === "number"
-      ? trainingRun.progress
-      : status === "COMPLETED"
-      ? 100
-      : 0;
+        ? trainingRun.progress
+        : status === "COMPLETED"
+          ? 100
+          : 0;
 
   // Format display id: TRN-2024-001
   const displayId = `TRN-2024-${String(trainingRun?.id || id).padStart(3, "0")}`;
@@ -267,53 +271,72 @@ export default function TrainingDetailPage() {
       </main>
     );
   }
-
+  // status badge for different status className
+  const statusConfig = {
+    CREATED: {
+      label: "Created",
+      badge: "bg-slate-100 text-slate-700 border-slate-200",
+      dot: "bg-slate-500",
+    },
+    QUEUED: {
+      label: "Queued",
+      badge: "bg-yellow-50 text-yellow-700 border-yellow-200",
+      dot: "bg-yellow-500",
+    },
+    PREPARING: {
+      label: "Preparing",
+      badge: "bg-purple-50 text-purple-700 border-purple-200",
+      dot: "bg-purple-500",
+    },
+    RUNNING: {
+      label: "Running",
+      badge: "bg-blue-50 text-blue-700 border-blue-200",
+      dot: "bg-blue-500 animate-pulse",
+    },
+    COMPLETED: {
+      label: "Completed",
+      badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      dot: "bg-emerald-500",
+    },
+    FAILED: {
+      label: "Failed",
+      badge: "bg-rose-50 text-rose-700 border-rose-200",
+      dot: "bg-rose-500",
+    },
+    CANCELLED: {
+      label: "Cancelled",
+      badge: "bg-orange-50 text-orange-700 border-orange-200",
+      dot: "bg-orange-500",
+    },
+    STOPPED: {
+      label: "Stopped",
+      badge: "bg-red-50 text-red-700 border-red-200",
+      dot: "bg-red-500",
+    },
+  };
+  const currentStatus = statusConfig[status] || { label: status, badge: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-500" };
   return (
-    <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-4 lg:px-8 lg:ml-[280px] pb-16 font-sans">
+    <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-4 lg:px-8 lg:ml-[280px] pb-16">
+      {/* 1. Breadcrumbs & Back Button */}
+      <div>
+        <Breadcrumbs
+          backHref="/training"
+          backLabel="Back to Training Runs"
+        />
+      </div>
+
       {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 mb-6 border-b border-gray-200">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 mb-6 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl lg:text-3xl font-bold text-[#002B55] tracking-tight">
               Training Job: {displayId}
             </h1>
 
             {/* Status Badge */}
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                status === "RUNNING"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
-                  : status === "COMPLETED"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
-                  : status === "FAILED"
-                  ? "bg-rose-50 text-rose-700 border border-rose-200/80"
-                  : status === "STOPPED"
-                  ? "bg-amber-50 text-amber-700 border border-amber-200/80"
-                  : "bg-slate-100 text-slate-700 border border-slate-200"
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  status === "RUNNING"
-                    ? "bg-emerald-500 animate-pulse"
-                    : status === "COMPLETED"
-                    ? "bg-emerald-500"
-                    : status === "FAILED"
-                    ? "bg-rose-500"
-                    : status === "STOPPED"
-                    ? "bg-amber-500"
-                    : "bg-slate-400"
-                }`}
-              />
-              {status === "RUNNING"
-                ? "Running"
-                : status === "COMPLETED"
-                ? "Completed"
-                : status === "FAILED"
-                ? "Failed"
-                : status === "STOPPED"
-                ? "Stopped"
-                : "Created"}
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${currentStatus.badge}`}>
+              <span className={`w-2 h-2 rounded-full ${currentStatus.dot}`} />
+              {currentStatus.label}
             </span>
           </div>
 
@@ -332,7 +355,7 @@ export default function TrainingDetailPage() {
               <button
                 onClick={handleStop}
                 disabled={stopping}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-red-300 bg-white text-red-600 font-semibold text-xs hover:bg-red-50 hover:border-red-400 transition-colors shadow-sm cursor-pointer disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3j py-2 rounded-lg border border-rose-300 bg-white text-rose-600 font-semibold text-xs hover:bg-rose-50 hover:border-rose-400 transition-colors shadow-xs cursor-pointer disabled:opacity-60"
               >
                 <StopCircle size={15} />
                 {stopping ? "Stopping..." : "Stop Training"}
@@ -341,7 +364,7 @@ export default function TrainingDetailPage() {
               <button
                 onClick={handleStart}
                 disabled={starting}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer disabled:opacity-60"
               >
                 <Play size={15} />
                 {starting ? "Starting..." : "Start Training"}
@@ -350,7 +373,7 @@ export default function TrainingDetailPage() {
 
             <button
               onClick={() => router.push("/model")}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#0B1528] text-white font-semibold text-xs hover:bg-[#152340] transition-colors shadow-sm cursor-pointer"
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#002B55] text-white font-semibold text-xs hover:bg-[#001D3A] transition-colors shadow-xs cursor-pointer"
             >
               <Eye size={15} />
               View Model
@@ -359,7 +382,7 @@ export default function TrainingDetailPage() {
 
           <button
             onClick={() => setShowArtifactsModal(true)}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
           >
             <FolderArchive size={15} className="text-slate-500" />
             Artifacts
@@ -372,10 +395,10 @@ export default function TrainingDetailPage() {
         {/* Left Column (5 cols) */}
         <div className="lg:col-span-5 flex flex-col gap-6">
           {/* Progress Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-4xl font-extrabold text-slate-900 tracking-tight block">
+                <span className="text-4xl font-extrabold text-[#002B55] tracking-tight block">
                   {progress}%
                 </span>
                 <span className="text-xs font-medium text-slate-500 mt-0.5 block">
@@ -384,16 +407,16 @@ export default function TrainingDetailPage() {
               </div>
 
               {/* Time Remaining Pill */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-100 text-blue-900 text-xs font-semibold">
-                <Clock size={13} className="text-blue-600" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-200/80 text-sky-800 text-xs font-semibold">
+                <Clock size={13} className="text-sky-600" />
                 <span>{trainingRun.time_remaining_formatted || "Calculating..."}</span>
               </div>
             </div>
 
             {/* Custom Progress Bar */}
-            <div className="mt-5 mb-4 h-3.5 w-full rounded-full bg-slate-200 p-0.5 overflow-hidden">
+            <div className="mt-5 mb-4 h-3.5 w-full rounded-full bg-slate-100 p-0.5 border border-slate-200/60 overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#1E293B] transition-all duration-500 shadow-sm"
+                className="h-full rounded-full bg-[#002B55] transition-all duration-500 shadow-xs"
                 style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
               />
             </div>
@@ -417,10 +440,10 @@ export default function TrainingDetailPage() {
           </div>
 
           {/* Configuration Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
             <div className="flex items-center gap-2 pb-4 mb-4 border-b border-slate-100">
-              <Sliders size={16} className="text-slate-700" />
-              <h2 className="text-sm font-bold text-slate-900">Configuration</h2>
+              <Sliders size={16} className="text-[#002B55]" />
+              <h2 className="text-sm font-bold text-[#0F172A]">Configuration</h2>
             </div>
 
             <div className="space-y-4">
@@ -429,7 +452,7 @@ export default function TrainingDetailPage() {
                 <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
                   Dataset
                 </label>
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#F1F5F9] border border-slate-200/60 text-xs font-semibold text-slate-800">
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/60 text-xs font-semibold text-slate-800">
                   <div className="flex items-center gap-2.5">
                     <Database size={16} className="text-slate-600" />
                     <span>
@@ -450,7 +473,7 @@ export default function TrainingDetailPage() {
                 <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
                   Model Architecture
                 </label>
-                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-[#F1F5F9] border border-slate-200/60 text-xs font-semibold text-slate-800">
+                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/60 text-xs font-semibold text-slate-800">
                   <Cpu size={16} className="text-slate-600" />
                   <span>{trainingRun.base_model || "Qwen3-0.6B"}</span>
                 </div>
@@ -461,7 +484,7 @@ export default function TrainingDetailPage() {
                 <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
                   Training Method
                 </label>
-                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-[#F1F5F9] border border-slate-200/60 text-xs font-semibold text-slate-800">
+                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/60 text-xs font-semibold text-slate-800">
                   <Layers size={16} className="text-slate-600" />
                   <span>{trainingRun.training_method || "QLoRA"}</span>
                 </div>
@@ -490,33 +513,31 @@ export default function TrainingDetailPage() {
         {/* Right Column (7 cols) */}
         <div className="lg:col-span-7 flex flex-col gap-6">
           {/* Live Metrics Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
             <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <Activity size={16} className="text-slate-700" />
-                <h2 className="text-sm font-bold text-slate-900">Live Metrics</h2>
+                <Activity size={16} className="text-[#002B55]" />
+                <h2 className="text-sm font-bold text-[#0F172A]">Live Metrics</h2>
               </div>
 
               {/* Toggle Pills */}
               <div className="flex items-center p-0.5 rounded-lg bg-slate-100 text-xs font-medium">
                 <button
                   onClick={() => setActiveMetricTab("primary")}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                    activeMetricTab === "primary"
-                      ? "bg-[#0B1528] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${activeMetricTab === "primary"
+                    ? "bg-[#002B55] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                    }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
                   Primary
                 </button>
                 <button
                   onClick={() => setActiveMetricTab("baseline")}
-                  className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                    activeMetricTab === "baseline"
-                      ? "bg-[#0B1528] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
+                  className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${activeMetricTab === "baseline"
+                    ? "bg-[#002B55] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                    }`}
                 >
                   Baseline
                 </button>
@@ -531,11 +552,11 @@ export default function TrainingDetailPage() {
                   <span className="text-xs text-slate-500 font-medium">Training Loss</span>
                   <span className="text-lg font-bold text-slate-900">
                     {typeof trainingRun.training_loss === "number"
-                      ? trainingRun.training_loss.toFixed(3)
-                      : "1.204"}
+                      ? trainingRun.training_loss.toFixed(4)
+                      : <span className="text-slate-400 font-mono text-sm">—</span>}
                   </span>
                 </div>
-                <div className="rounded-xl bg-[#F1F5F9] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
                   <SparklineChart
                     data={trainingRun.metric_history}
                     type="loss"
@@ -549,12 +570,12 @@ export default function TrainingDetailPage() {
                 <div className="flex items-baseline justify-between mb-2">
                   <span className="text-xs text-slate-500 font-medium">Learning Rate</span>
                   <span className="text-lg font-bold text-slate-900 font-mono">
-                    {typeof trainingRun.current_lr === "number" && trainingRun.current_lr < 0.001
-                      ? trainingRun.current_lr.toExponential(0)
-                      : trainingRun.current_lr || "2e-4"}
+                    {typeof trainingRun.current_lr === "number"
+                      ? trainingRun.current_lr.toExponential(2)
+                      : <span className="text-slate-400 font-mono text-sm">—</span>}
                   </span>
                 </div>
-                <div className="rounded-xl bg-[#F1F5F9] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
                   <SparklineChart
                     data={trainingRun.metric_history}
                     type="lr"
@@ -563,17 +584,15 @@ export default function TrainingDetailPage() {
                 </div>
               </div>
 
-              {/* Metric 3: Token Accuracy */}
+              {/* Metric 3: Token Accuracy — not produced by SFTTrainer */}
               <div>
                 <div className="flex items-baseline justify-between mb-2">
                   <span className="text-xs text-slate-500 font-medium">Token Accuracy</span>
                   <span className="text-lg font-bold text-slate-900">
-                    {typeof trainingRun.token_accuracy === "number" && trainingRun.token_accuracy > 0
-                      ? `${trainingRun.token_accuracy.toFixed(1)}%`
-                      : "78.4%"}
+                    <span className="text-slate-400 font-mono text-sm">—</span>
                   </span>
                 </div>
-                <div className="rounded-xl bg-[#F1F5F9] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
                   <SparklineChart
                     data={trainingRun.metric_history}
                     type="accuracy"
@@ -635,7 +654,7 @@ export default function TrainingDetailPage() {
                   );
                 })
               ) : (
-                <div className="text-slate-500 py-4 text-center font-sans text-xs">
+                <div className="text-slate-500 py-4 text-center text-xs">
                   Awaiting output from background worker...
                 </div>
               )}
@@ -650,8 +669,8 @@ export default function TrainingDetailPage() {
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <FolderArchive size={18} className="text-blue-600" />
-                <h3 className="text-base font-bold text-slate-900">
+                <FolderArchive size={18} className="text-[#002B55]" />
+                <h3 className="text-base font-bold text-[#0F172A]">
                   Cloud Model Artifacts (Hugging Face Hub)
                 </h3>
               </div>
@@ -705,7 +724,7 @@ export default function TrainingDetailPage() {
               </button>
               <button
                 onClick={() => setShowArtifactsModal(false)}
-                className="px-4 py-2 rounded-lg bg-[#0B1528] text-white font-semibold text-xs hover:bg-[#152340] transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-[#002B55] text-white font-semibold text-xs hover:bg-[#001D3A] transition-colors cursor-pointer"
               >
                 Close
               </button>
