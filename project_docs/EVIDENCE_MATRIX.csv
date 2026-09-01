@@ -1,0 +1,9 @@
+Area,Owner,Source,Current Status,Needed From
+Dataset,Member 2,data_manifest.json + final report,Available/Verify,Final quality sign-off
+AI,Member 1,AI handoff + training/evaluation snapshots,Available,Final AI sign-off if changed
+Prompt/QA,Member 4,Final QA report,Pending,Final evaluation + security + model comparison
+Backend/API,Member 3,API docs + code/screenshots,Pending,Final endpoint and integration evidence
+Frontend,Member 3,Screenshots/demo notes,Pending,Final UI evidence
+MLflow,Member 5,this package,Complete,Tracking run + screenshots
+Report,Member 6,this package,Pending,All finalized evidence
+PPT,Member 6,this package,Pending,All finalized evidence
