@@ -14,7 +14,9 @@ import { createTrainingColumns } from "@/components/tables/TrainingTableColumns/
 import {
   getTrainingRuns,
   startTrainingRun,
+  stopTrainingRun,
 } from "@/app/services/trainingService/trainingServices";
+
 import {
   Plus,
   RefreshCw,
@@ -29,7 +31,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/app/context/AuthContext";
 
 export default function Training() {
-  const { hasRole } = useAuth();
+  const { hasRole, isAuthenticated, loading: authLoading } = useAuth();
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,8 +102,10 @@ export default function Training() {
 
   // Initial load
   useEffect(() => {
-    loadRuns();
-  }, [loadRuns]);
+    if (!authLoading && isAuthenticated) {
+      loadRuns();
+    }
+  }, [authLoading, isAuthenticated, loadRuns]);
 
   // Check if any training run is actively running or queued
   const hasActiveRuns = useMemo(() => {
@@ -135,8 +139,16 @@ export default function Training() {
     }
   };
 
-  const handleStopRun = (run) => {
-    toast.info(`Stop request sent for Training Run #${run.id}`);
+  const handleStopRun = async (run) => {
+    try {
+      await stopTrainingRun(run.id);
+      toast.success(`Training Run #${run.id} stopped successfully.`);
+      loadRuns(true);
+    } catch (err) {
+      console.error("Failed to stop training run:", err);
+      const detail = err?.response?.data?.detail || "Failed to stop training run.";
+      toast.error(typeof detail === "string" ? detail : "Stop failed.");
+    }
   };
 
   const handleViewMetrics = (run) => {
@@ -147,9 +159,18 @@ export default function Training() {
     toast.error(`Viewing error logs for Training Run #${run.id}: ${run.error_message || "No specific error logs recorded."}`);
   };
 
-  const handleCancelRun = (run) => {
-    toast.info(`Cancelled Training Run #${run.id}`);
+  const handleCancelRun = async (run) => {
+    try {
+      await stopTrainingRun(run.id);
+      toast.success(`Training Run #${run.id} cancelled successfully.`);
+      loadRuns(true);
+    } catch (err) {
+      console.error("Failed to cancel training run:", err);
+      const detail = err?.response?.data?.detail || "Failed to cancel training run.";
+      toast.error(typeof detail === "string" ? detail : "Cancel failed.");
+    }
   };
+
 
   // Build table columns
   const columns = useMemo(

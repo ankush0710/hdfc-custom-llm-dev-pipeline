@@ -105,6 +105,7 @@ class AITrainingAdapter:
         batch_size: int = 1,
         max_seq_length: int = 256,
         progress_callback: Optional[Any] = None,
+        should_stop_callback: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """Execute full training pipeline for a given base model and dataset."""
         data_p = Path(dataset_path)
@@ -135,20 +136,21 @@ class AITrainingAdapter:
 
         callbacks = []
 
-        if progress_callback is not None:
-            logger.info("Training progress callback CONNECTED")
+        if progress_callback is not None or should_stop_callback is not None:
+            logger.info("Training callbacks configured (progress=%s, should_stop=%s)", bool(progress_callback), bool(should_stop_callback))
 
             callbacks.append(
                 TrainingProgressCallback(
                     on_progress=progress_callback,
+                    should_stop=should_stop_callback,
                     start_pct=20,
                     end_pct=95,
                 )
             )
         else:
-            logger.warning("Training progress callback NOT PROVIDED")
+            logger.warning("Training progress/cancellation callbacks NOT PROVIDED")
 
         logger.info("Executing training for %d examples...", len(train_dataset))
         result = train_model(model, tokenizer, train_dataset, config, callbacks=callbacks)
 
-        return result.to_dict()
+        return result.to_dict()

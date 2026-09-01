@@ -20,6 +20,10 @@ from app.schema.training_schema.training_schema import TrainingRunCreate
 
 logger = logging.getLogger(__name__)
 
+# Active training cancellation events mapped by run_id
+_ACTIVE_TRAINING_EVENTS: dict[int, threading.Event] = {}
+
+
 
 # ================= create new training run ========================================= #
 def create_training_run(db: Session, data: TrainingRunCreate):
@@ -159,7 +163,34 @@ def _execute_training_run_worker(run_id: int):
         canonical_base_model = resolve_hf_model_id(training_run.base_model)
         logger.info("Starting AI training adapter for run %d with base model '%s'...", run_id, canonical_base_model)
 
+        def _should_stop() -> bool:
+            """Check if stop was requested via in-memory event or database record."""
+            # 1. Check in-memory event
+            stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
+            if stop_evt and stop_evt.is_set():
+                logger.info("Cancellation check: In-memory stop event is SET for run %d", run_id)
+                return True
+
+            # 2. Check DB status in Neon in case stop API updated the DB directly
+            check_db = None
+            try:
+                check_db = SessionLocal()
+                run_record = check_db.query(Training_Model).filter(Training_Model.id == run_id).first()
+                if run_record:
+                    status_str = str(run_record.status or "").upper()
+                    if status_str in {training_status.STOPPED, training_status.CANCELLED, "STOP_REQUESTED", "STOPPED", "CANCELLED"}:
+                        logger.info("Cancellation check: DB status is '%s' for run %d", status_str, run_id)
+                        return True
+            except Exception as check_err:
+                logger.debug("DB status check during training callback for run %d: %s", run_id, check_err)
+            finally:
+                if check_db:
+                    check_db.close()
+
+            return False
+
         def _on_step_progress(pct: int, step: int, max_steps: int):
+            """Persist real-time step progress in Neon PostgreSQL without throwing exceptions."""
             logger.info(
                 "DATABASE CALLBACK RECEIVED: percentage=%d, step=%d, max_steps=%d",
                 pct,
@@ -227,8 +258,48 @@ def _execute_training_run_worker(run_id: int):
             learning_rate=float(training_run.learning_rate),
             batch_size=int(training_run.batch_size),
             progress_callback=_on_step_progress,
+            should_stop_callback=_should_stop,
         )
-        logger.info("Training finished for run %d: %s", run_id, train_result)
+        logger.info("Training execution returned for run %d: %s", run_id, train_result)
+
+        # Check if the training was stopped during execution
+        was_stopped = False
+        stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
+        if stop_evt and stop_evt.is_set():
+            was_stopped = True
+        else:
+            db.expire_all()
+            run_check = db.query(Training_Model).filter(Training_Model.id == run_id).first()
+            if run_check and str(run_check.status or "").upper() in {training_status.STOPPED, training_status.CANCELLED, "STOP_REQUESTED", "STOPPED", "CANCELLED"}:
+                was_stopped = True
+
+        if was_stopped:
+            logger.info("Training run %d was stopped by user request. Recording STOPPED status.", run_id)
+            now = datetime.utcnow()
+            db.expire_all()
+            training_run = db.query(Training_Model).filter(Training_Model.id == run_id).first()
+            training_job = (
+                db.query(TrainingJobModel)
+                .filter(TrainingJobModel.training_run_id == run_id)
+                .order_by(TrainingJobModel.id.desc())
+                .first()
+            )
+            if training_run:
+                training_run.status = training_status.STOPPED
+                training_run.error_message = "Training run stopped by user request."
+                training_run.completed_at = now
+            if training_job:
+                training_job.status = training_status.STOPPED
+                training_job.error_message = "Training run stopped by user request."
+                training_job.completed_at = now
+            db.commit()
+
+            if temp_dataset_downloaded and ds_path and os.path.exists(ds_path):
+                try:
+                    os.remove(ds_path)
+                except Exception:
+                    pass
+            return
 
         # Upload trained model / LoRA adapter artifacts to Hugging Face Hub
         clean_model_name = training_run.base_model.split("/")[-1].replace("-", "_").lower()
@@ -299,13 +370,34 @@ def _execute_training_run_worker(run_id: int):
                 pass
 
     except Exception as exc:
-        logger.exception("Training run %d failed: %s", run_id, exc)
         now = datetime.utcnow()
+
+        # Differentiate between normal user stop and actual failure
+        stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
+        is_user_stopped = bool(stop_evt and stop_evt.is_set())
+        if not is_user_stopped:
+            try:
+                db.expire_all()
+                tr_check = db.query(Training_Model).filter(Training_Model.id == run_id).first()
+                if tr_check and str(tr_check.status or "").upper() in {training_status.STOPPED, training_status.CANCELLED, "STOP_REQUESTED", "STOPPED", "CANCELLED"}:
+                    is_user_stopped = True
+            except Exception:
+                pass
+
+        if is_user_stopped:
+            logger.info("Training run %d exited following cancellation request.", run_id)
+            target_status = training_status.STOPPED
+            err_msg = "Training run stopped by user request."
+        else:
+            logger.exception("Training run %d failed with unexpected error: %s", run_id, exc)
+            target_status = training_status.FAILED
+            err_msg = str(exc)
+
         try:
             training_run = db.query(Training_Model).filter(Training_Model.id == run_id).first()
             if training_run:
-                training_run.status = training_status.FAILED
-                training_run.error_message = str(exc)
+                training_run.status = target_status
+                training_run.error_message = err_msg
                 training_run.completed_at = now
 
             training_job = (
@@ -315,15 +407,17 @@ def _execute_training_run_worker(run_id: int):
                 .first()
             )
             if training_job:
-                training_job.status = training_status.FAILED
-                training_job.error_message = str(exc)
+                training_job.status = target_status
+                training_job.error_message = err_msg
                 training_job.completed_at = now
 
             db.commit()
         except Exception as rollback_err:
-            logger.error("Failed to commit training error state: %s", rollback_err)
+            logger.error("Failed to commit training error/stopped state: %s", rollback_err)
     finally:
+        _ACTIVE_TRAINING_EVENTS.pop(run_id, None)
         db.close()
+
 
 
 
@@ -401,6 +495,9 @@ def start_training_run(db: Session, run_id: int, background_tasks: Optional[Back
     db.commit()
     db.refresh(training_run)
 
+    # Register cancellation event
+    _ACTIVE_TRAINING_EVENTS[run_id] = threading.Event()
+
     # Launch background worker
     if background_tasks is not None:
         background_tasks.add_task(_execute_training_run_worker, run_id)
@@ -414,6 +511,52 @@ def start_training_run(db: Session, run_id: int, background_tasks: Optional[Back
     setattr(training_run, "progress", training_job.progress)
 
     return training_run
+
+
+# ================= stop the training run ================================= #
+def stop_training_run(db: Session, run_id: int):
+    """Signal worker to cancel training and mark DB run/job as STOPPED."""
+    training_run = (
+        db.query(Training_Model)
+        .filter(Training_Model.id == run_id)
+        .first()
+    )
+
+    if not training_run:
+        raise HTTPException(status_code=404, detail=f"Training run #{run_id} not found")
+
+    # Signal in-memory worker thread to stop
+    stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
+    if stop_evt:
+        stop_evt.set()
+
+    now = datetime.utcnow()
+    training_run.status = training_status.STOPPED
+    training_run.error_message = "Training run stopped by user request."
+    training_run.completed_at = now
+
+    training_job = (
+        db.query(TrainingJobModel)
+        .filter(TrainingJobModel.training_run_id == run_id)
+        .order_by(TrainingJobModel.id.desc())
+        .first()
+    )
+    if training_job:
+        training_job.status = training_status.STOPPED
+        training_job.error_message = "Training run stopped by user request."
+        training_job.completed_at = now
+
+    db.commit()
+    db.refresh(training_run)
+
+    prog = training_job.progress if training_job else 0
+    setattr(training_run, "job_id", training_job.id if training_job else None)
+    setattr(training_run, "job_status", training_job.status if training_job else None)
+    setattr(training_run, "job_progress", prog)
+    setattr(training_run, "progress", prog)
+
+    return training_run
+
 
 
 # ================= get all training runs ================================== #

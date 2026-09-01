@@ -125,9 +125,52 @@ class TestTrainingProgressSynchronization(unittest.TestCase):
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].progress, 100)
 
+    def test_cancellation_callback_sets_should_training_stop(self):
+        """Verify that should_stop() sets control.should_training_stop = True gracefully without throwing."""
+        stop_requested = True
+        cb = TrainingProgressCallback(
+            on_progress=lambda p, s, m: None,
+            should_stop=lambda: stop_requested,
+            start_pct=20,
+            end_pct=95,
+        )
+
+        state = MagicMock()
+        state.max_steps = 100
+        state.global_step = 25
+
+        control = MagicMock()
+        control.should_training_stop = False
+
+        res_control = cb.on_step_end(args=None, state=state, control=control)
+        self.assertTrue(control.should_training_stop)
+        self.assertTrue(res_control.should_training_stop)
+
+    def test_independent_cancellation_state_across_runs(self):
+        """Verify that cancellation flag for Run 1 does not trigger cancellation for Run 2."""
+        from app.services.training_service.training_service import _ACTIVE_TRAINING_EVENTS
+        import threading
+
+        evt_run_1 = threading.Event()
+        evt_run_2 = threading.Event()
+
+        _ACTIVE_TRAINING_EVENTS[101] = evt_run_1
+        _ACTIVE_TRAINING_EVENTS[102] = evt_run_2
+
+        # Trigger stop on Run 101 only
+        evt_run_1.set()
+
+        self.assertTrue(_ACTIVE_TRAINING_EVENTS[101].is_set())
+        self.assertFalse(_ACTIVE_TRAINING_EVENTS[102].is_set())
+
+        # Clean up
+        _ACTIVE_TRAINING_EVENTS.pop(101, None)
+        _ACTIVE_TRAINING_EVENTS.pop(102, None)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestTrainingProgressSynchronization)
     runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=2)
     result = runner.run(suite)
     sys.exit(0 if result.wasSuccessful() else 1)
+

@@ -17,7 +17,7 @@ import { Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ModelRegistryPage() {
-    const { hasRole } = useAuth();
+    const { hasRole, isAuthenticated, loading: authLoading } = useAuth();
     const [models, setModels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -54,8 +54,11 @@ export default function ModelRegistryPage() {
     }, []);
 
     useEffect(() => {
-        fetchModels();
-    }, [fetchModels]);
+        if (!authLoading && isAuthenticated) {
+            fetchModels();
+        }
+    }, [authLoading, isAuthenticated, fetchModels]);
+
 
     // Filter options for ModelsTable filter dropdown
     const filterOptions = useMemo(

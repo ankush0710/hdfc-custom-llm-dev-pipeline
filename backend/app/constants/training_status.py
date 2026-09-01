@@ -6,3 +6,4 @@ class training_status:
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    STOPPED = "STOPPED"
