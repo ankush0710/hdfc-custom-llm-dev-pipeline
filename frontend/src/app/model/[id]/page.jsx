@@ -28,10 +28,10 @@ import { getModelDetail } from "@/app/services/modelService/modelServices";
 import { deployModel } from "@/app/services/deploymentService/deploymentServices";
 import { toast } from "sonner";
 
-export default function ModelDetailPage() {
-  const params = useParams();
+export default function ModelDetailPage({ params: pageParams }) {
+  const routeParams = useParams();
   const router = useRouter();
-  const id = params?.id;
+  const id = routeParams?.id || pageParams?.id;
 
   const [modelDetail, setModelDetail] = useState(null);
   const [loading, setLoading] = useState(true);

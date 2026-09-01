@@ -6,6 +6,7 @@ Training Jobs Dashboard: Monitor and manage foundation model fine-tuning pipelin
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import StatCard from "@/components/ui/StatCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
@@ -31,6 +32,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/app/context/AuthContext";
 
 export default function Training() {
+  const router = useRouter();
   const { hasRole, isAuthenticated, loading: authLoading } = useAuth();
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -152,11 +154,11 @@ export default function Training() {
   };
 
   const handleViewMetrics = (run) => {
-    toast.success(`Opening metrics for Training Run #${run.id}`);
+    router.push(`/training/${run.id}`);
   };
 
   const handleViewLogs = (run) => {
-    toast.error(`Viewing error logs for Training Run #${run.id}: ${run.error_message || "No specific error logs recorded."}`);
+    router.push(`/training/${run.id}`);
   };
 
   const handleCancelRun = async (run) => {

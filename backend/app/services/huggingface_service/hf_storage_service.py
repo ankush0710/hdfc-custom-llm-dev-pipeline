@@ -61,6 +61,7 @@ class HuggingFaceStorageService:
         version: str,
         category: str = "raw",
         commit_message: Optional[str] = None,
+        timeout_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Uploads a dataset file to the Hugging Face dataset repository.
@@ -183,6 +184,7 @@ class HuggingFaceStorageService:
         version: str,
         run_id: Optional[Union[int, str]] = None,
         commit_message: Optional[str] = None,
+        timeout_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Uploads model / LoRA adapter artifacts folder to the Hugging Face model repository.
@@ -206,13 +208,19 @@ class HuggingFaceStorageService:
         )
 
         try:
-            commit_info = self.api.upload_folder(
+            upload_result = self.api.upload_folder(
                 folder_path=str(local_path),
                 path_in_repo=path_in_repo,
                 repo_id=self.model_repo,
                 repo_type="model",
                 commit_message=commit_message,
                 token=self.token,
+                run_as_future=timeout_seconds is not None,
+            )
+            commit_info = (
+                upload_result.result(timeout=timeout_seconds)
+                if timeout_seconds is not None
+                else upload_result
             )
 
             commit_hash = getattr(commit_info, "commit_id", None) or getattr(
@@ -257,6 +265,17 @@ class HuggingFaceStorageService:
             target_dir = Path(local_destination or (self.temp_dir / "models" / path_in_repo.replace("/", "_"))).resolve()
             target_dir.mkdir(parents=True, exist_ok=True)
 
+            nested_path = target_dir / path_in_repo
+            # If already downloaded and valid on local disk, skip re-downloading
+            if nested_path.exists() and nested_path.is_dir():
+                if (nested_path / "adapter_config.json").is_file() or (nested_path / "config.json").is_file():
+                    logger.info("Model artifacts already cached locally at '%s', skipping download.", nested_path)
+                    return nested_path
+
+            if (target_dir / "adapter_config.json").is_file() or (target_dir / "config.json").is_file():
+                logger.info("Model artifacts already cached locally at '%s', skipping download.", target_dir)
+                return target_dir
+
             snapshot_download(
                 repo_id=target_repo,
                 repo_type="model",
@@ -266,7 +285,6 @@ class HuggingFaceStorageService:
             )
 
             # Check if nested inside path_in_repo in local_dir
-            nested_path = target_dir / path_in_repo
             if nested_path.exists() and nested_path.is_dir():
                 return nested_path
 

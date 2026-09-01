@@ -59,6 +59,7 @@ class InferenceResponse(BaseModel):
     raw_response: str
 
     latency_seconds: Optional[float] = None
+    tokens_generated: Optional[int] = None
     device: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

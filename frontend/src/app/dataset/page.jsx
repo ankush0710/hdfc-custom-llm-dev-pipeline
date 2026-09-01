@@ -96,14 +96,12 @@ export default function Dataset() {
       const latest = versions[versions.length - 1];
       const status = (latest?.status || d.status || "").toLowerCase();
 
-      if (status === "validated" || status === "processed" || status === "uploaded") {
+      if (status === "validated" || status === "processed") {
         validated++;
       } else if (status === "processing" || status === "running") {
         processing++;
       } else if (status === "failed" || status === "error") {
         failed++;
-      } else {
-        validated++;
       }
     });
 

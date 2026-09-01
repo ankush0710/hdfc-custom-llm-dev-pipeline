@@ -15,6 +15,9 @@ ARTIFACT_SEARCH_DIRS = [
     PROJECT_ROOT / "ai" / "artifacts",
     PROJECT_ROOT / "backend" / "ai" / "artifacts",
     PROJECT_ROOT / "artifacts",
+    PROJECT_ROOT / "backend" / "storage" / "temp_hf",
+    PROJECT_ROOT / "backend" / "storage" / "temp_hf" / "models",
+    PROJECT_ROOT / "backend" / "storage" / "temp_hf" / "runs",
 ]
 
 # Required file signatures
@@ -49,7 +52,16 @@ def resolve_artifact_path(path_input: Union[str, Path, None]) -> Optional[Path]:
 
     # 3. Check stripped prefix variations (e.g. if path starts with "ai/" or "backend/")
     norm_path = cleaned_str.replace("\\", "/").lstrip("/")
-    prefixes_to_strip = ["backend/ai/artifacts/", "backend/ai/", "backend/", "ai/artifacts/", "ai/", "artifacts/"]
+    prefixes_to_strip = [
+        "backend/storage/temp_hf/",
+        "storage/temp_hf/",
+        "backend/ai/artifacts/",
+        "backend/ai/",
+        "backend/",
+        "ai/artifacts/",
+        "ai/",
+        "artifacts/",
+    ]
     
     sub_path = norm_path
     for pfx in prefixes_to_strip:

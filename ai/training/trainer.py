@@ -91,19 +91,52 @@ class TrainingProgressCallback(TrainerCallback):
             except Exception as exc:
                 logger.exception("Trainer callback should_stop check failed: %s", exc)
 
-        # 2. Progress update notification
+        # 2. Extract real metrics from the trainer state's log history
+        loss: Optional[float] = None
+        lr: Optional[float] = None
+        if state.log_history:
+            last_log = state.log_history[-1]
+            raw_loss = last_log.get("loss")
+            raw_lr = last_log.get("learning_rate")
+            if raw_loss is not None:
+                try:
+                    loss = float(raw_loss)
+                except (TypeError, ValueError):
+                    pass
+            if raw_lr is not None:
+                try:
+                    lr = float(raw_lr)
+                except (TypeError, ValueError):
+                    pass
+
+        # 3. Progress update — sample every N steps (max ~100 points) + always on last step
         if state.max_steps and state.max_steps > 0:
             ratio = min(1.0, max(0.0, state.global_step / state.max_steps))
             current_pct = int(self.start_pct + (self.end_pct - self.start_pct) * ratio)
+
+            # Fire at least every 5 steps so early progress is visible
+            stride = max(1, min(5, state.max_steps // 100))
+            is_sampled_step = (state.global_step % stride == 0)
+            is_last_step = (state.global_step >= state.max_steps)
+
             logger.info(
-                "TRAINER CALLBACK: percentage=%d, global_step=%d, max_steps=%d",
+                "TRAINER CALLBACK: pct=%d, step=%d/%d, loss=%s, lr=%s",
                 current_pct,
                 state.global_step,
                 state.max_steps,
+                loss,
+                lr,
             )
-            if self.on_progress:
+
+            if self.on_progress and (is_sampled_step or is_last_step):
                 try:
-                    self.on_progress(current_pct, state.global_step, state.max_steps)
+                    self.on_progress(
+                        current_pct,
+                        state.global_step,
+                        state.max_steps,
+                        loss=loss,
+                        lr=lr,
+                    )
                 except Exception as exc:
                     logger.exception("Progress callback notification failed: %s", exc)
 

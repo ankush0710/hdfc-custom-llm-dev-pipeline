@@ -70,10 +70,7 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASE_MODEL = "Qwen/Qwen3-0.6B"
 DEFAULT_ADAPTER_PATH = PROJECT_ROOT / "ai" / "artifacts" / "full_training"
-DEFAULT_SYSTEM_PROMPT = (
-    "You are an official HDFC Bank AI Assistant. Provide accurate, domain-specific, "
-    "policy-grounded, and secure banking assistance using the provided authoritative context."
-)
+DEFAULT_SYSTEM_PROMPT = "You are a helpful and accurate HDFC Bank assistant."
 REQUIRED_ADAPTER_FILES = ("adapter_config.json", "adapter_model.safetensors")
 
 
@@ -284,16 +281,19 @@ def build_conversation(
     """
     Build the system/user message list in the exact format the HDFC
     adapter was trained on: a system instruction, and a user turn of
-    "Authoritative Context: ...\\n\\nQuestion: ..." when context is given,
+    "Context:\n...\n\nQuestion:\n..." when context is given,
     or just the raw question otherwise.
     """
     if not question or not isinstance(question, str):
         raise ValueError("question must be a non-empty string.")
 
-    if context:
-        user_content = f"Authoritative Context: {context}\n\nQuestion: {question}"
+    q_clean = question.strip()
+    c_clean = context.strip() if context and isinstance(context, str) else ""
+
+    if c_clean:
+        user_content = f"Context:\n{c_clean}\n\nQuestion:\n{q_clean}"
     else:
-        user_content = question
+        user_content = q_clean
 
     return [
         {"role": "system", "content": system_prompt},
@@ -306,18 +306,21 @@ def _render_generation_prompt(
 ) -> str:
     """
     Render messages for GENERATION: add_generation_prompt=True opens the
-    assistant turn for the model to continue, and enable_thinking=False
-    matches how the adapter was trained (training used
-    enable_thinking=False - see ai/training/train.py's
-    tokenizer.apply_chat_template call). Using a different setting here
-    would feed the model a prompt shape it never saw during training.
+    assistant turn for the model to continue (<|im_start|>assistant\n).
     """
-    return tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-        enable_thinking=False,
-    )
+    try:
+        return tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+    except Exception:
+        # Fallback if tokenizer does not support chat template
+        content_parts = []
+        for m in messages:
+            content_parts.append(f"{m.get('role', 'user').title()}: {m.get('content', '')}")
+        content_parts.append("Assistant:")
+        return "\n\n".join(content_parts)
 
 
 # ---------------------------------------------------------------------------
@@ -373,12 +376,16 @@ def generate_finetuned(
             "--max-new-tokens value, or device='cpu'."
         ) from exc
 
+    resp = raw_result["response"]
+    if isinstance(resp, str) and "</think>" in resp:
+        resp = resp.split("</think>")[-1].strip()
+
     return {
         "base_model": bundle.base_model_name,
         "adapter_path": str(bundle.adapter_path),
         "prompt": question,
         "context": context,
-        "response": raw_result["response"],
+        "response": resp,
         "latency_seconds": raw_result["latency_seconds"],
         "device": raw_result["device"],
         "generation_config": raw_result["generation_config"],

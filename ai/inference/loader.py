@@ -113,6 +113,12 @@ def resolve_device(requested_device: str = "auto") -> ResolvedDevice:
     #   so float32 is used there instead.
     dtype = torch.float16 if device == "cuda" else torch.float32
 
+    if device == "cpu":
+        import os
+        optimal_threads = min(8, os.cpu_count() or 4)
+        if torch.get_num_threads() < optimal_threads:
+            torch.set_num_threads(optimal_threads)
+
     logger.info(
         "Resolved device=%s dtype=%s (requested=%s)", device, dtype, requested_device
     )

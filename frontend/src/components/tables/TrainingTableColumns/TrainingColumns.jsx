@@ -51,44 +51,83 @@ export const createTrainingColumns = ({ onStartRun, onStopRun, onViewMetrics, on
     key: "status",
     label: "Status",
     render: (row) => {
-      const rawStatus = (row.status || "QUEUED").toUpperCase();
+      const rawStatus = (row.status || "CREATED").toUpperCase();
 
-      if (rawStatus === "RUNNING") {
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/80 px-2.5 py-1 text-xs font-medium text-blue-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
-            <span>Running</span>
-          </span>
-        );
-      }
+      const statusConfig = {
+        CREATED: {
+          label: "Created",
+          className:
+            "bg-gray-50 border-gray-200 text-gray-700",
+          dot: "bg-gray-500",
+        },
+        QUEUED: {
+          label: "Queued",
+          className:
+            "bg-yellow-50 border-yellow-200 text-yellow-700",
+          dot: "bg-yellow-500",
+        },
+        PREPARING: {
+          label: "Preparing",
+          className:
+            "bg-purple-50 border-purple-200 text-purple-700",
+          dot: "bg-purple-500",
+        },
+        RUNNING: {
+          label: "Running",
+          className:
+            "bg-blue-50 border-blue-200 text-blue-700",
+          dot: "bg-blue-600",
+          animate: true,
+        },
+        COMPLETED: {
+          label: "Completed",
+          className:
+            "bg-emerald-50 border-emerald-200 text-emerald-700",
+          dot: "bg-emerald-500",
+        },
+        FAILED: {
+          label: "Failed",
+          className:
+            "bg-rose-50 border-rose-200 text-rose-700",
+          dot: "bg-rose-500",
+        },
+        CANCELLED: {
+          label: "Cancelled",
+          className:
+            "bg-orange-50 border-orange-200 text-orange-700",
+          dot: "bg-orange-500",
+        },
+        STOPPED: {
+          label: "Stopped",
+          className:
+            "bg-red-50 border-red-200 text-red-700",
+          dot: "bg-red-500",
+        },
+      };
 
-      if (rawStatus === "COMPLETED") {
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 text-xs font-medium text-emerald-700">
-            <Check size={12} strokeWidth={2.5} />
-            <span>Completed</span>
-          </span>
-        );
-      }
+      const config =
+        statusConfig[rawStatus] || {
+          label: rawStatus,
+          className:
+            "bg-gray-50 border-gray-200 text-gray-700",
+          dot: "bg-gray-500",
+        };
 
-      if (rawStatus === "FAILED") {
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200/80 px-2.5 py-1 text-xs font-medium text-rose-700">
-            <X size={12} strokeWidth={2.5} />
-            <span>Failed</span>
-          </span>
-        );
-      }
-
-      // Default: QUEUED / CREATED
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200/80 px-2.5 py-1 text-xs font-medium text-sky-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-          <span>{rawStatus === "CREATED" ? "Created" : "Queued"}</span>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${config.className}`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${config.dot} ${config.animate ? "animate-pulse" : ""
+              }`}
+          />
+
+          <span>{config.label}</span>
         </span>
       );
     },
   },
+
   {
     key: "progress",
     label: "Progress",

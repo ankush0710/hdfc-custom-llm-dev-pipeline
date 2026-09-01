@@ -25,10 +25,10 @@ import ModelLogsModal from "@/components/model/ModelLogsModal";
 import { getDeploymentById } from "@/app/services/deploymentService/deploymentServices";
 import { toast } from "sonner";
 
-export default function DeploymentDetailPage() {
-  const params = useParams();
+export default function DeploymentDetailPage({ params: pageParams }) {
+  const routeParams = useParams();
   const router = useRouter();
-  const id = params?.id;
+  const id = routeParams?.id || pageParams?.id;
 
   const [deployment, setDeployment] = useState(null);
   const [loading, setLoading] = useState(true);
