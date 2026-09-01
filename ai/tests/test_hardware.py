@@ -1,6 +1,11 @@
+import pytest
 import torch
 
 
+@pytest.mark.skipif(
+    not torch.cuda.is_available(),
+    reason="CUDA GPU is not available on this test runner",
+)
 def test_cuda_available():
     assert torch.cuda.is_available(), (
         "CUDA is not available. "

@@ -84,12 +84,16 @@ def resolve_device(requested_device: str = "auto") -> ResolvedDevice:
         If an unrecognized device string is given.
     """
     if not isinstance(requested_device, str):
-        raise ValueError(f"device must be a string, got {type(requested_device)!r}.")
+        raise ValueError(
+            f"device must be a string, got {type(requested_device)!r}."
+        )
 
     normalized = requested_device.lower().strip()
+
     if normalized not in {"auto", "cuda", "cpu"}:
         raise ValueError(
-            f"Invalid device '{requested_device}'. Expected one of: auto, cuda, cpu."
+            f"Invalid device '{requested_device}'. "
+            "Expected one of: auto, cuda, cpu."
         )
 
     cuda_available = torch.cuda.is_available()
@@ -115,13 +119,19 @@ def resolve_device(requested_device: str = "auto") -> ResolvedDevice:
 
     if device == "cpu":
         import os
+
         optimal_threads = min(8, os.cpu_count() or 4)
+
         if torch.get_num_threads() < optimal_threads:
             torch.set_num_threads(optimal_threads)
 
     logger.info(
-        "Resolved device=%s dtype=%s (requested=%s)", device, dtype, requested_device
+        "Resolved device=%s dtype=%s (requested=%s)",
+        device,
+        dtype,
+        requested_device,
     )
+
     return ResolvedDevice(device=device, dtype=dtype)
 
 
@@ -188,7 +198,8 @@ class ModelLoader:
 
         try:
             tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name, trust_remote_code=self.trust_remote_code
+                self.model_name,
+                trust_remote_code=self.trust_remote_code,
             )
         except OSError as exc:
             raise ModelLoadError(
@@ -229,7 +240,7 @@ class ModelLoader:
         try:
             model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
-                torch_dtype=dtype,
+                dtype=dtype,
                 low_cpu_mem_usage=True,
                 trust_remote_code=self.trust_remote_code,
             )
