@@ -89,8 +89,8 @@ COLUMN_MAP = {
     "PAN": {"pan", "pan_no", "pan_number", "pan_card"},
     "AADHAAR": {"aadhaar", "aadhar", "uidai", "aadhaar_no", "aadhaar_number", "aadhar_no"},
     "PASSPORT": {"passport", "passport_no", "passport_number"},
-    "BANK_ACCOUNT": {"account_number", "acc_no", "bank_account", "acct_num", "acct_no", "account_num"},
-    "CUSTOMER_ID": {"customer_id", "cif", "cif_no", "cust_id", "cif_number", "customer_no"},
+    "BANK_ACCOUNT": {"account_number", "acc_no", "bank_account", "acct_num", "acct_no", "account_num", "customer_account", "account", "account_no"},
+    "CUSTOMER_ID": {"customer_id", "cif", "cif_no", "cust_id", "cif_number", "customer_no", "customer_num"},
     "CARD_NUMBER": {"card_number", "credit_card", "debit_card", "card_no", "credit_card_number", "debit_card_number"},
     "CVV": {"cvv", "cvv2", "cvc", "security_code"},
     "UPI_ID": {"upi", "upi_id", "vpa"},
@@ -98,6 +98,7 @@ COLUMN_MAP = {
     "ADDRESS": {"address", "residential_address", "home_address", "street_address", "billing_address", "shipping_address"},
     "DOB": {"dob", "date_of_birth", "birth_date"},
 }
+
 
 
 def normalize_column_name(col: str) -> str:
@@ -341,9 +342,10 @@ def deidentify_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]
     Returns:
         (sanitized_df, summary_metrics)
     """
-    cleaned_df = df.copy()
+    cleaned_df = df.astype(object)
     total_pii_hits: Dict[str, int] = {}
     records_sanitized = 0
+
 
     # Iterate row by row and cell by cell
     for idx, row in cleaned_df.iterrows():
@@ -368,6 +370,14 @@ def deidentify_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]
                     for k, count in hits.items():
                         total_pii_hits[k] = total_pii_hits.get(k, 0) + count
                 cleaned_df.at[idx, col] = s_val
+            else:
+                s_val, hits = deidentify_text(str(val))
+                if hits:
+                    row_modified = True
+                    for k, count in hits.items():
+                        total_pii_hits[k] = total_pii_hits.get(k, 0) + count
+                    cleaned_df.at[idx, col] = s_val
+
 
         if row_modified:
             records_sanitized += 1

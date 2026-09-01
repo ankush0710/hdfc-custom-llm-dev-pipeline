@@ -36,3 +36,5 @@ peft==0.20.0
 accelerate>=0.28.0
 safetensors>=0.4.0
 PyYAML>=6.0
+huggingface_hub>=0.20.0
+

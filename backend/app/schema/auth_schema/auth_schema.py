@@ -8,6 +8,8 @@ class UserSignup(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
     confirm_password: str = Field(..., min_length=8, max_length=128)
+    role: Optional[str] = "DS"
+
 
 
 class UserLogin(BaseModel):

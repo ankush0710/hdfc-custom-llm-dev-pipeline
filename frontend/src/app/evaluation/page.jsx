@@ -16,7 +16,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
 
 export default function EvaluationPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, isAuthenticated, loading: authLoading } = useAuth();
   const [evaluations, setEvaluations] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,8 +49,11 @@ export default function EvaluationPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!authLoading && isAuthenticated) {
+      fetchData();
+    }
+  }, [authLoading, isAuthenticated, fetchData]);
+
 
   // Filter options for ModelsTable dropdown
   const filterOptions = useMemo(

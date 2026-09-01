@@ -18,10 +18,10 @@ export default function Navbar({ onMenuClick }) {
     role === "ADMIN"
       ? "bg-red-100 text-red-700 border-red-200"
       : role === "DS" || role === "DATA_SCIENTIST"
-      ? "bg-purple-100 text-purple-700 border-purple-200"
-      : role === "REVIEWER"
-      ? "bg-amber-100 text-amber-700 border-amber-200"
-      : "bg-blue-100 text-blue-700 border-blue-200";
+        ? "bg-purple-100 text-purple-700 border-purple-200"
+        : role === "REVIEWER"
+          ? "bg-amber-100 text-amber-700 border-amber-200"
+          : "bg-blue-100 text-blue-700 border-blue-200";
 
   return (
     <nav className="fixed top-0 z-30 w-full bg-white border-b border-gray-200 px-4 py-2 shadow-sm">
@@ -39,7 +39,7 @@ export default function Navbar({ onMenuClick }) {
             className="flex items-center gap-2 text-[#000000] font-bold text-lg tracking-tight"
           >
             <img
-              src="/HDFC_Forge_logo.png"
+              src="./images/HDFC_Forge_logo.png"
               alt="logo"
               className="h-10 lg:h-12 w-auto object-contain"
             />

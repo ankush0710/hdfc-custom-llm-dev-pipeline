@@ -10,9 +10,9 @@ const AuthContext = createContext({
   role: "VIEWER",
   isAuthenticated: false,
   loading: true,
-  login: async () => {},
-  signup: async () => {},
-  logout: () => {},
+  login: async () => { },
+  signup: async () => { },
+  logout: () => { },
   hasRole: () => false,
 });
 
@@ -43,7 +43,6 @@ export function AuthProvider({ children }) {
             setUser(me);
             localStorage.setItem("user", JSON.stringify(me));
           } catch (err) {
-            console.error("Session verification failed:", err);
             localStorage.removeItem("token");
             localStorage.removeItem("user");
             setToken(null);
@@ -100,21 +99,22 @@ export function AuthProvider({ children }) {
     return loggedUser;
   };
 
-  const signup = async (full_name, email, password, confirm_password) => {
+  const signup = async (full_name, email, password, confirm_password, role = "DS") => {
     const registeredUser = await apiSignup({
       full_name,
       email,
       password,
       confirm_password,
+      role,
     });
     return registeredUser;
   };
+
 
   const logout = async () => {
     try {
       await apiLogout();
     } catch (err) {
-      // Ignore network errors on logout
     } finally {
       setUser(null);
       setToken(null);
@@ -133,7 +133,6 @@ export function AuthProvider({ children }) {
       }
       return me;
     } catch (err) {
-      console.error("Profile refresh failed:", err);
       return null;
     }
   }, []);

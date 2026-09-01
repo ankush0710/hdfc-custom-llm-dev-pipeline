@@ -20,6 +20,10 @@ from app.schema.training_schema.training_schema import TrainingRunCreate
 
 logger = logging.getLogger(__name__)
 
+# Active training cancellation events mapped by run_id
+_ACTIVE_TRAINING_EVENTS: dict[int, threading.Event] = {}
+
+
 
 # ================= create new training run ========================================= #
 def create_training_run(db: Session, data: TrainingRunCreate):
@@ -94,7 +98,16 @@ def create_training_run(db: Session, data: TrainingRunCreate):
 # ================= training background worker ===================================== #
 def _execute_training_run_worker(run_id: int):
     """Background worker executing model training and updating DB status/registry."""
+    from app.services.huggingface_service.hf_storage_service import get_hf_storage_service
+    from app.core.config import HF_LOCAL_TEMP_DIR
+    import shutil
+
     db = SessionLocal()
+    hf_service = get_hf_storage_service()
+    temp_dataset_downloaded = False
+    ds_path = None
+    output_dir = None
+
     try:
         training_run = db.query(Training_Model).filter(Training_Model.id == run_id).first()
         if not training_run:
@@ -123,15 +136,25 @@ def _execute_training_run_worker(run_id: int):
             .filter(Dataset_Version_Model.id == training_run.dataset_version_id)
             .first()
         )
-        raw_path = dataset_version.file_path if dataset_version else None
-        if not raw_path:
-            raise FileNotFoundError(f"Dataset version {training_run.dataset_version_id} has no file path configured.")
+        if not dataset_version:
+            raise FileNotFoundError(f"Dataset version {training_run.dataset_version_id} not found.")
 
-        ds_path = raw_path if os.path.exists(raw_path) else str(Path(raw_path).resolve())
-        if not os.path.exists(ds_path):
-            raise FileNotFoundError(f"Dataset file '{raw_path}' not found on disk.")
+        # Download dataset from Hugging Face if needed
+        raw_path = dataset_version.file_path or dataset_version.huggingface_path
+        if raw_path and os.path.exists(raw_path):
+            ds_path = raw_path
+        elif dataset_version.huggingface_path:
+            ds_path = str(hf_service.download_dataset(dataset_version.huggingface_path))
+            temp_dataset_downloaded = True
+        else:
+            ds_path = str(Path(raw_path).resolve()) if raw_path else None
 
-        output_dir = str(Path(f"ai/artifacts/runs/run_{run_id}").resolve())
+        if not ds_path or not os.path.exists(ds_path):
+            raise FileNotFoundError(f"Dataset file '{raw_path}' could not be located locally or downloaded from Hugging Face.")
+
+        # Staging directory for model artifacts during training
+        output_dir = str(Path(HF_LOCAL_TEMP_DIR) / "runs" / f"run_{run_id}")
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         # Update progress to indicate preparation complete
         training_job.progress = 20
@@ -140,7 +163,34 @@ def _execute_training_run_worker(run_id: int):
         canonical_base_model = resolve_hf_model_id(training_run.base_model)
         logger.info("Starting AI training adapter for run %d with base model '%s'...", run_id, canonical_base_model)
 
+        def _should_stop() -> bool:
+            """Check if stop was requested via in-memory event or database record."""
+            # 1. Check in-memory event
+            stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
+            if stop_evt and stop_evt.is_set():
+                logger.info("Cancellation check: In-memory stop event is SET for run %d", run_id)
+                return True
+
+            # 2. Check DB status in Neon in case stop API updated the DB directly
+            check_db = None
+            try:
+                check_db = SessionLocal()
+                run_record = check_db.query(Training_Model).filter(Training_Model.id == run_id).first()
+                if run_record:
+                    status_str = str(run_record.status or "").upper()
+                    if status_str in {training_status.STOPPED, training_status.CANCELLED, "STOP_REQUESTED", "STOPPED", "CANCELLED"}:
+                        logger.info("Cancellation check: DB status is '%s' for run %d", status_str, run_id)
+                        return True
+            except Exception as check_err:
+                logger.debug("DB status check during training callback for run %d: %s", run_id, check_err)
+            finally:
+                if check_db:
+                    check_db.close()
+
+            return False
+
         def _on_step_progress(pct: int, step: int, max_steps: int):
+            """Persist real-time step progress in Neon PostgreSQL without throwing exceptions."""
             logger.info(
                 "DATABASE CALLBACK RECEIVED: percentage=%d, step=%d, max_steps=%d",
                 pct,
@@ -173,7 +223,7 @@ def _execute_training_run_worker(run_id: int):
                 if job.progress is not None and safe_progress < job.progress:
                     safe_progress = job.progress
 
-                # Save the actual trainer progress immediately
+                # Save the actual trainer progress immediately in Neon
                 job.progress = safe_progress
                 job.status = training_status.RUNNING
 
@@ -208,10 +258,64 @@ def _execute_training_run_worker(run_id: int):
             learning_rate=float(training_run.learning_rate),
             batch_size=int(training_run.batch_size),
             progress_callback=_on_step_progress,
+            should_stop_callback=_should_stop,
         )
-        logger.info("Training finished for run %d: %s", run_id, train_result)
+        logger.info("Training execution returned for run %d: %s", run_id, train_result)
 
-        # Mark Run & Job as COMPLETED
+        # Check if the training was stopped during execution
+        was_stopped = False
+        stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
+        if stop_evt and stop_evt.is_set():
+            was_stopped = True
+        else:
+            db.expire_all()
+            run_check = db.query(Training_Model).filter(Training_Model.id == run_id).first()
+            if run_check and str(run_check.status or "").upper() in {training_status.STOPPED, training_status.CANCELLED, "STOP_REQUESTED", "STOPPED", "CANCELLED"}:
+                was_stopped = True
+
+        if was_stopped:
+            logger.info("Training run %d was stopped by user request. Recording STOPPED status.", run_id)
+            now = datetime.utcnow()
+            db.expire_all()
+            training_run = db.query(Training_Model).filter(Training_Model.id == run_id).first()
+            training_job = (
+                db.query(TrainingJobModel)
+                .filter(TrainingJobModel.training_run_id == run_id)
+                .order_by(TrainingJobModel.id.desc())
+                .first()
+            )
+            if training_run:
+                training_run.status = training_status.STOPPED
+                training_run.error_message = "Training run stopped by user request."
+                training_run.completed_at = now
+            if training_job:
+                training_job.status = training_status.STOPPED
+                training_job.error_message = "Training run stopped by user request."
+                training_job.completed_at = now
+            db.commit()
+
+            if temp_dataset_downloaded and ds_path and os.path.exists(ds_path):
+                try:
+                    os.remove(ds_path)
+                except Exception:
+                    pass
+            return
+
+        # Upload trained model / LoRA adapter artifacts to Hugging Face Hub
+        clean_model_name = training_run.base_model.split("/")[-1].replace("-", "_").lower()
+        reg_model_name = f"hdfc_{clean_model_name}_run_{run_id}"
+        model_version = f"1.{run_id}.0"
+
+        logger.info("Uploading trained model artifacts to Hugging Face repo '%s'...", hf_service.model_repo)
+        hf_model_upload = hf_service.upload_model(
+            local_dir=output_dir,
+            model_name=reg_model_name,
+            version=model_version,
+            run_id=run_id,
+            commit_message=f"Upload trained model {reg_model_name} v{model_version} from Run #{run_id}",
+        )
+
+        # Mark Run & Job as COMPLETED in Neon
         now = datetime.utcnow()
 
         # Expire all cached objects in worker session to avoid stale state
@@ -240,31 +344,60 @@ def _execute_training_run_worker(run_id: int):
 
         db.commit()
 
-        # Auto-register trained model in Model_Registry
-        clean_model_name = training_run.base_model.split("/")[-1].replace("-", "_").lower()
-        reg_model_name = f"hdfc_{clean_model_name}_run_{run_id}"
-
+        # Auto-register trained model in Neon Model_Registry
         registered_model = Model_Registry(
             model_name=reg_model_name,
-            version=f"1.{run_id}.0",
+            version=model_version,
             base_model=training_run.base_model,
-            artifact_path=output_dir,
-            adapter_path=output_dir,
+            artifact_path=hf_model_upload["huggingface_path"],
+            adapter_path=hf_model_upload["huggingface_path"],
+            huggingface_repo=hf_model_upload["huggingface_repo"],
+            huggingface_path=hf_model_upload["huggingface_path"],
+            commit_hash=hf_model_upload["commit_hash"],
+            model_size=hf_model_upload["model_size_mb"],
             training_job_id=training_job.id,
             status="READY",
         )
         db.add(registered_model)
         db.commit()
-        logger.info("Model '%s' registered with status READY.", reg_model_name)
+        logger.info("Model '%s' registered in Neon with status READY and HF path '%s'.", reg_model_name, hf_model_upload["huggingface_path"])
+
+        # Safely clean temporary downloaded dataset and training scratch files
+        if temp_dataset_downloaded and ds_path and os.path.exists(ds_path):
+            try:
+                os.remove(ds_path)
+            except Exception:
+                pass
 
     except Exception as exc:
-        logger.exception("Training run %d failed: %s", run_id, exc)
         now = datetime.utcnow()
+
+        # Differentiate between normal user stop and actual failure
+        stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
+        is_user_stopped = bool(stop_evt and stop_evt.is_set())
+        if not is_user_stopped:
+            try:
+                db.expire_all()
+                tr_check = db.query(Training_Model).filter(Training_Model.id == run_id).first()
+                if tr_check and str(tr_check.status or "").upper() in {training_status.STOPPED, training_status.CANCELLED, "STOP_REQUESTED", "STOPPED", "CANCELLED"}:
+                    is_user_stopped = True
+            except Exception:
+                pass
+
+        if is_user_stopped:
+            logger.info("Training run %d exited following cancellation request.", run_id)
+            target_status = training_status.STOPPED
+            err_msg = "Training run stopped by user request."
+        else:
+            logger.exception("Training run %d failed with unexpected error: %s", run_id, exc)
+            target_status = training_status.FAILED
+            err_msg = str(exc)
+
         try:
             training_run = db.query(Training_Model).filter(Training_Model.id == run_id).first()
             if training_run:
-                training_run.status = training_status.FAILED
-                training_run.error_message = str(exc)
+                training_run.status = target_status
+                training_run.error_message = err_msg
                 training_run.completed_at = now
 
             training_job = (
@@ -274,15 +407,18 @@ def _execute_training_run_worker(run_id: int):
                 .first()
             )
             if training_job:
-                training_job.status = training_status.FAILED
-                training_job.error_message = str(exc)
+                training_job.status = target_status
+                training_job.error_message = err_msg
                 training_job.completed_at = now
 
             db.commit()
         except Exception as rollback_err:
-            logger.error("Failed to commit training error state: %s", rollback_err)
+            logger.error("Failed to commit training error/stopped state: %s", rollback_err)
     finally:
+        _ACTIVE_TRAINING_EVENTS.pop(run_id, None)
         db.close()
+
+
 
 
 # ================= start the training run ================================ #
@@ -308,7 +444,7 @@ def start_training_run(db: Session, run_id: int, background_tasks: Optional[Back
     if not dataset_version:
         raise ValueError(f"Dataset version {training_run.dataset_version_id} not found in database.")
 
-    norm_path = (dataset_version.file_path or "").replace("\\", "/").lower()
+    norm_path = (dataset_version.file_path or dataset_version.huggingface_path or "").replace("\\", "/").lower()
     is_raw_path = "uploads/" in norm_path or "storage/raw" in norm_path or "/raw/" in norm_path
 
     if is_raw_path or str(dataset_version.status).strip().lower() != "processed" or not dataset_version.is_safe_for_training:
@@ -317,14 +453,17 @@ def start_training_run(db: Session, run_id: int, background_tasks: Optional[Back
             f"Only processed, PII-sanitized datasets can be trained."
         )
 
-    file_exists = False
-    if dataset_version.file_path:
-        file_exists = os.path.exists(dataset_version.file_path) or Path(dataset_version.file_path).resolve().exists()
+    file_available = False
+    if dataset_version.file_path and (os.path.exists(dataset_version.file_path) or Path(dataset_version.file_path).resolve().exists()):
+        file_available = True
+    elif dataset_version.huggingface_path:
+        file_available = True
 
-    if not file_exists:
+    if not file_available:
         raise ValueError(
-            f"Cannot start training run: Dataset version {training_run.dataset_version_id} file not found on disk at '{dataset_version.file_path}'."
+            f"Cannot start training run: Dataset version {training_run.dataset_version_id} has no valid file on disk or reference in Hugging Face repository."
         )
+
 
     now = datetime.utcnow()
     training_run.status = training_status.RUNNING
@@ -356,6 +495,9 @@ def start_training_run(db: Session, run_id: int, background_tasks: Optional[Back
     db.commit()
     db.refresh(training_run)
 
+    # Register cancellation event
+    _ACTIVE_TRAINING_EVENTS[run_id] = threading.Event()
+
     # Launch background worker
     if background_tasks is not None:
         background_tasks.add_task(_execute_training_run_worker, run_id)
@@ -369,6 +511,52 @@ def start_training_run(db: Session, run_id: int, background_tasks: Optional[Back
     setattr(training_run, "progress", training_job.progress)
 
     return training_run
+
+
+# ================= stop the training run ================================= #
+def stop_training_run(db: Session, run_id: int):
+    """Signal worker to cancel training and mark DB run/job as STOPPED."""
+    training_run = (
+        db.query(Training_Model)
+        .filter(Training_Model.id == run_id)
+        .first()
+    )
+
+    if not training_run:
+        raise HTTPException(status_code=404, detail=f"Training run #{run_id} not found")
+
+    # Signal in-memory worker thread to stop
+    stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
+    if stop_evt:
+        stop_evt.set()
+
+    now = datetime.utcnow()
+    training_run.status = training_status.STOPPED
+    training_run.error_message = "Training run stopped by user request."
+    training_run.completed_at = now
+
+    training_job = (
+        db.query(TrainingJobModel)
+        .filter(TrainingJobModel.training_run_id == run_id)
+        .order_by(TrainingJobModel.id.desc())
+        .first()
+    )
+    if training_job:
+        training_job.status = training_status.STOPPED
+        training_job.error_message = "Training run stopped by user request."
+        training_job.completed_at = now
+
+    db.commit()
+    db.refresh(training_run)
+
+    prog = training_job.progress if training_job else 0
+    setattr(training_run, "job_id", training_job.id if training_job else None)
+    setattr(training_run, "job_status", training_job.status if training_job else None)
+    setattr(training_run, "job_progress", prog)
+    setattr(training_run, "progress", prog)
+
+    return training_run
+
 
 
 # ================= get all training runs ================================== #

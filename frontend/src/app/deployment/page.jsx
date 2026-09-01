@@ -16,7 +16,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
 
 export default function DeploymentPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, isAuthenticated, loading: authLoading } = useAuth();
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,8 +48,11 @@ export default function DeploymentPage() {
   }, []);
 
   useEffect(() => {
-    fetchDeployments();
-  }, [fetchDeployments]);
+    if (!authLoading && isAuthenticated) {
+      fetchDeployments();
+    }
+  }, [authLoading, isAuthenticated, fetchDeployments]);
+
 
   // Filter options for ModelsTable dropdown
   const filterOptions = useMemo(

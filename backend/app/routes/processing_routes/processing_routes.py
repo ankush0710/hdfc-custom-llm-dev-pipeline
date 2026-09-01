@@ -162,11 +162,23 @@ def get_version_quality_metrics(
                 "pii_scan_status": version.pii_scan_status,
             }
 
-    # 3. Calculate statistics directly from the physical file on disk
+    # 3. Calculate statistics directly from the physical file on disk or Hugging Face
     try:
-        if version.file_path:
-            resolved_p = resolve_file_path(version.file_path)
-            if os.path.exists(resolved_p):
+        target_path = version.file_path or version.huggingface_path
+        if target_path:
+            resolved_p = None
+            if os.path.exists(target_path):
+                resolved_p = target_path
+            elif version.huggingface_path:
+                from app.services.huggingface_service.hf_storage_service import get_hf_storage_service
+                try:
+                    resolved_p = str(get_hf_storage_service().download_dataset(version.huggingface_path))
+                except Exception:
+                    resolved_p = resolve_file_path(target_path)
+            else:
+                resolved_p = resolve_file_path(target_path)
+
+            if resolved_p and os.path.exists(resolved_p):
                 df = load_file(resolved_p)
                 stats = calculate_quality_metrics(df)
                 return {
@@ -191,3 +203,4 @@ def get_version_quality_metrics(
         pass
 
     return None
+

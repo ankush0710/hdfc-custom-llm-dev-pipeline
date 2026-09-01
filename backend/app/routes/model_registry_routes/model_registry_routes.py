@@ -102,6 +102,10 @@ def get_models(
             "base_model": m.base_model,
             "artifact_path": m.artifact_path,
             "adapter_path": m.adapter_path,
+            "huggingface_repo": m.huggingface_repo,
+            "huggingface_path": m.huggingface_path,
+            "commit_hash": m.commit_hash,
+            "model_size": m.model_size,
             "training_job_id": m.training_job_id,
             "evaluation_id": m.evaluation_id,
             "accuracy": acc_str,
@@ -111,6 +115,7 @@ def get_models(
         }
         result.append(Model_Response(**m_dict))
     return result
+
 
 
 @router.get(
@@ -348,7 +353,8 @@ def change_model_status(
     model_id: int,
     payload: Model_Update_Status,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "REVIEWER")),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS", "REVIEWER")),
+
 ):
     try:
         return update_status(

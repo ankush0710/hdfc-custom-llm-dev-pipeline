@@ -10,6 +10,10 @@ class Model_Create(BaseModel):
     base_model: str
     artifact_path: Optional[str] = None
     adapter_path: Optional[str] = None
+    huggingface_repo: Optional[str] = None
+    huggingface_path: Optional[str] = None
+    commit_hash: Optional[str] = None
+    model_size: Optional[float] = None
     training_job_id: Optional[int] = None
     evaluation_id: Optional[int] = None
     status: Optional[str] = "CREATED"
@@ -27,6 +31,10 @@ class Model_Response(BaseModel):
     base_model: str
     artifact_path: Optional[str] = None
     adapter_path: Optional[str] = None
+    huggingface_repo: Optional[str] = None
+    huggingface_path: Optional[str] = None
+    commit_hash: Optional[str] = None
+    model_size: Optional[float] = None
     training_job_id: Optional[int] = None
     evaluation_id: Optional[int] = None
     accuracy: Optional[str] = None
@@ -35,6 +43,7 @@ class Model_Response(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class ModelOverview(BaseModel):

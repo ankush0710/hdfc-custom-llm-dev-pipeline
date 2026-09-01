@@ -54,17 +54,23 @@ def signup(
             detail=f"An account with email '{payload.email}' already exists.",
         )
 
-    # Safe Default Role: Public signup always creates a VIEWER account
+    # Assign role: default to DS (Data Scientist) or requested role
+    raw_role = (payload.role or "DS").upper().strip()
+    role = "DS" if raw_role in {"DATA_SCIENTIST", "DS"} else raw_role
+    if role not in VALID_ROLES:
+        role = "DS"
+
     user = User_Model(
         full_name=payload.full_name.strip(),
         email=payload.email.lower().strip(),
         password_hash=hash_password(payload.password),
-        role="VIEWER",
+        role=role,
         is_active=True,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+
 
     return user
 

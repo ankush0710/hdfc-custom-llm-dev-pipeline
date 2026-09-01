@@ -61,15 +61,37 @@ logger = logging.getLogger(__name__)
 
 
 class TrainingProgressCallback(TrainerCallback):
-    """Callback to report step-level training progress percentage to external listeners."""
+    """Callback to report step-level training progress percentage and check cancellation."""
 
-    def __init__(self, on_progress: Optional[Any] = None, start_pct: int = 20, end_pct: int = 95):
+    def __init__(
+        self,
+        on_progress: Optional[Any] = None,
+        should_stop: Optional[Any] = None,
+        start_pct: int = 20,
+        end_pct: int = 95,
+    ):
         super().__init__()
         self.on_progress = on_progress
+        self.should_stop = should_stop
         self.start_pct = start_pct
         self.end_pct = end_pct
 
     def on_step_end(self, args, state, control, **kwargs):
+        # 1. Check for cancellation request
+        if self.should_stop:
+            try:
+                if self.should_stop():
+                    logger.info(
+                        "TRAINER CALLBACK: Stop requested at step %d/%d. Setting control.should_training_stop = True.",
+                        state.global_step,
+                        state.max_steps or 0,
+                    )
+                    control.should_training_stop = True
+                    return control
+            except Exception as exc:
+                logger.exception("Trainer callback should_stop check failed: %s", exc)
+
+        # 2. Progress update notification
         if state.max_steps and state.max_steps > 0:
             ratio = min(1.0, max(0.0, state.global_step / state.max_steps))
             current_pct = int(self.start_pct + (self.end_pct - self.start_pct) * ratio)
@@ -84,6 +106,9 @@ class TrainingProgressCallback(TrainerCallback):
                     self.on_progress(current_pct, state.global_step, state.max_steps)
                 except Exception as exc:
                     logger.exception("Progress callback notification failed: %s", exc)
+
+        return control
+
 
 
 class TrainerError(RuntimeError):

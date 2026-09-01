@@ -25,7 +25,7 @@ import { useAuth } from "@/app/context/AuthContext";
 
 export default function Dataset() {
   const router = useRouter();
-  const { hasRole } = useAuth();
+  const { hasRole, isAuthenticated, loading: authLoading } = useAuth();
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,8 +50,11 @@ export default function Dataset() {
   }, []);
 
   useEffect(() => {
-    loadDatasets();
-  }, [loadDatasets]);
+    if (!authLoading && isAuthenticated) {
+      loadDatasets();
+    }
+  }, [authLoading, isAuthenticated, loadDatasets]);
+
 
   const handleDelete = async (dataset) => {
     if (

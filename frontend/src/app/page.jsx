@@ -28,6 +28,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { DashboardModelColumns as ModelColumns } from "@/components/tables/DashboardDeploymentColumns";
+import { useAuth } from "@/app/context/AuthContext";
+
 
 // ─── Icon & styling constants (no business data here) ──────────────────────── //
 const STAT_CARD_META = [
@@ -66,6 +68,7 @@ const STAT_CARD_META = [
 ];
 
 export default function Dashboard() {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [stats, setStats] = useState(null);
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,8 +102,11 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    if (!authLoading && isAuthenticated) {
+      loadDashboardData();
+    }
+  }, [authLoading, isAuthenticated, loadDashboardData]);
+
 
   // Build stat card data from real backend response
   const statCardData = useMemo(() => {

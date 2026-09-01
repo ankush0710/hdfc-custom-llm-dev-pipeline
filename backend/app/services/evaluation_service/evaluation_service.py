@@ -300,21 +300,21 @@ def _execute_evaluation_worker(evaluation_id: int):
 
         base_model = model.base_model if model and model.base_model else "Qwen/Qwen3-0.6B"
 
-        # --- BUG 3 FIX: robust adapter path resolution ---
-        # Priority: DB adapter_path (resolved) → full_training fallback (resolved)
-        raw_adapter_path = model.adapter_path if model and model.adapter_path else None
+        from app.services.huggingface_service.hf_storage_service import get_hf_storage_service
+        hf_service = get_hf_storage_service()
+
+        # Priority: Local path -> Download from Hugging Face -> full_training fallback
+        raw_adapter_path = model.adapter_path or model.huggingface_path if model else None
         adapter_path = None
 
-        if raw_adapter_path:
-            resolved = Path(raw_adapter_path).resolve()
-            if resolved.exists():
-                adapter_path = str(resolved)
-            else:
-                logger.warning(
-                    "Adapter path from DB '%s' (resolved: '%s') does not exist. "
-                    "Falling back to full_training adapter.",
-                    raw_adapter_path, resolved,
-                )
+        if raw_adapter_path and Path(raw_adapter_path).exists():
+            adapter_path = str(Path(raw_adapter_path).resolve())
+        elif model and model.huggingface_path:
+            try:
+                adapter_path = str(hf_service.download_model(model.huggingface_path))
+                logger.info("Downloaded model adapter from HF '%s' to '%s'", model.huggingface_path, adapter_path)
+            except Exception as hf_err:
+                logger.warning("Could not download adapter from HF (%s): %s", model.huggingface_path, hf_err)
 
         if adapter_path is None:
             fallback = (Path(__file__).resolve().parents[4] / "ai" / "artifacts" / "full_training")
@@ -328,11 +328,20 @@ def _execute_evaluation_worker(evaluation_id: int):
                 )
 
         # Resolve test file path
-        test_file = dataset_version.file_path if dataset_version else "data/hdfc_llm_test.jsonl"
-        resolved_test = resolve_file_path(test_file)
+        test_file = dataset_version.file_path or dataset_version.huggingface_path if dataset_version else "data/hdfc_llm_test.jsonl"
+        resolved_test = None
+        if test_file and Path(test_file).exists():
+            resolved_test = str(Path(test_file).resolve())
+        elif dataset_version and dataset_version.huggingface_path:
+            try:
+                resolved_test = str(hf_service.download_dataset(dataset_version.huggingface_path))
+            except Exception:
+                resolved_test = resolve_file_path(test_file)
+        else:
+            resolved_test = resolve_file_path(test_file)
 
         # If the resolved test file still doesn't exist, use bundled fallback
-        if not os.path.exists(resolved_test):
+        if not resolved_test or not os.path.exists(resolved_test):
             project_root = Path(__file__).resolve().parents[4]
             fallback_test = project_root / "data" / "hdfc_llm_test.jsonl"
             if fallback_test.exists():
@@ -341,6 +350,7 @@ def _execute_evaluation_worker(evaluation_id: int):
                     "Test dataset file '%s' not found. Using fallback: %s",
                     test_file, resolved_test,
                 )
+
 
         out_dir = Path(__file__).resolve().parents[4] / "ai" / "artifacts" / "evaluation" / f"eval_{evaluation_id}"
 

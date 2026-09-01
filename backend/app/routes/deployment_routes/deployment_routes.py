@@ -25,7 +25,7 @@ router = APIRouter(
 def deploy_model(
     payload: Deployment_Create,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN")),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     service = DeploymentService(db)
     try:
@@ -63,13 +63,32 @@ def get_deployment(
     current_user: User_Model = Depends(get_current_user),
 ):
     service = DeploymentService(db)
-    deployment = service.get_deployment_by_id(deployment_id)
-    if not deployment:
+    try:
+        return service.get_deployment(deployment_id)
+    except ValueError as exc:
         raise HTTPException(
             status_code=404,
-            detail=f"Deployment with id {deployment_id} not found",
+            detail=str(exc),
         )
-    return deployment
+
+
+@router.post(
+    "/{deployment_id}/rollback",
+    response_model=Deployment_Response,
+)
+def rollback_deployment(
+    deployment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+):
+    service = DeploymentService(db)
+    try:
+        return service.rollback_deployment(deployment_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
 
 
 @router.post(
@@ -79,7 +98,7 @@ def get_deployment(
 def undeploy_model(
     deployment_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN")),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     service = DeploymentService(db)
     try:
@@ -98,7 +117,7 @@ def undeploy_model(
 def unload_model(
     deployment_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN")),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     service = DeploymentService(db)
     try:
@@ -117,7 +136,7 @@ def unload_model(
 def reload_model(
     deployment_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN")),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     service = DeploymentService(db)
     try:
@@ -136,7 +155,7 @@ def reload_model(
 def restart_model(
     deployment_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN")),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     service = DeploymentService(db)
     try:
@@ -155,7 +174,7 @@ def restart_model(
 def start_model(
     deployment_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN")),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     service = DeploymentService(db)
     try:
@@ -174,7 +193,7 @@ def start_model(
 def delete_deployment(
     deployment_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN")),
+    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
     service = DeploymentService(db)
     try:
@@ -183,4 +202,4 @@ def delete_deployment(
         raise HTTPException(
             status_code=404,
             detail=str(exc),
-        )
+        )

@@ -28,7 +28,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     response_model=DatasetResponse
 )
 async def upload_dataset(
-    datasetName:str = Form(...),
+    datasetName: str | None = Form(None),
+    dataset_name: str | None = Form(None),
     category: str = Form(...),
     version: str = Form(...),
     source: str = Form(...),
@@ -37,6 +38,12 @@ async def upload_dataset(
     db: Session = Depends(get_db),
     current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
 ):
+    final_dataset_name = datasetName or dataset_name
+    if not final_dataset_name:
+        raise HTTPException(
+            status_code=422,
+            detail="datasetName or dataset_name is required"
+        )
 
     file_extension=Path(file.filename).suffix.lower()
 
@@ -56,13 +63,14 @@ async def upload_dataset(
     try:
         return await create_dataset(
             db=db,
-            dataset_name=datasetName,
+            dataset_name=final_dataset_name,
             category=category,
             version=version,
             source=source,
             description=description,
             file=file,
         )
+
     except ValueError as e:
         raise HTTPException(
             status_code=400,
@@ -125,12 +133,21 @@ def download_dataset(
 
     # Sort or pick the latest version
     latest_version = sorted(dataset.versions, key=lambda v: v.created_at or 0, reverse=True)[0]
-    file_path = Path(latest_version.file_path)
+    
+    file_path = None
+    if latest_version.file_path and Path(latest_version.file_path).exists():
+        file_path = Path(latest_version.file_path)
+    elif latest_version.huggingface_path:
+        from app.services.huggingface_service.hf_storage_service import get_hf_storage_service
+        try:
+            file_path = get_hf_storage_service().download_dataset(latest_version.huggingface_path)
+        except Exception as err:
+            raise HTTPException(status_code=404, detail=f"Failed to fetch dataset file from Hugging Face: {err}")
 
-    if not file_path.exists():
+    if not file_path or not Path(file_path).exists():
         raise HTTPException(
             status_code=404,
-            detail="Dataset file not found on server"
+            detail="Dataset file not found on server or Hugging Face repository"
         )
 
     return FileResponse(
@@ -187,11 +204,20 @@ def download_dataset_version(
             detail="Dataset version not found"
         )
 
-    file_path = Path(version.file_path)
-    if not file_path.exists():
+    file_path = None
+    if version.file_path and Path(version.file_path).exists():
+        file_path = Path(version.file_path)
+    elif version.huggingface_path:
+        from app.services.huggingface_service.hf_storage_service import get_hf_storage_service
+        try:
+            file_path = get_hf_storage_service().download_dataset(version.huggingface_path)
+        except Exception as err:
+            raise HTTPException(status_code=404, detail=f"Failed to fetch dataset version from Hugging Face: {err}")
+
+    if not file_path or not Path(file_path).exists():
         raise HTTPException(
             status_code=404,
-            detail="Dataset version file not found on disk"
+            detail="Dataset version file not found on disk or Hugging Face repository"
         )
 
     return FileResponse(
@@ -199,3 +225,4 @@ def download_dataset_version(
         filename=version.file_name,
         media_type="application/octet-stream"
     )
+
