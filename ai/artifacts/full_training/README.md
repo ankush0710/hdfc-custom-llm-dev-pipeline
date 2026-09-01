@@ -3,207 +3,222 @@ base_model: Qwen/Qwen3-0.6B
 library_name: peft
 pipeline_tag: text-generation
 tags:
-- base_model:adapter:Qwen/Qwen3-0.6B
+- qwen3
 - lora
 - sft
+- peft
 - transformers
 - trl
+- banking-domain
 ---
 
-# Model Card for Model ID
+# HDFC Qwen3-0.6B LoRA Adapter
 
-<!-- Provide a quick summary of what the model is/does. -->
+## Model Summary
 
+This artifact contains the HDFC banking-domain LoRA adapter produced by supervised fine-tuning of `Qwen/Qwen3-0.6B`.
 
+The adapter is intended to improve domain-specific instruction-following and structured response behavior for the HDFC Custom LLM Development Pipeline.
+
+This repository separates model behavior adaptation from dynamic enterprise knowledge retrieval. The current artifact represents the model-adaptation component; it should not be interpreted as a complete production RAG implementation.
 
 ## Model Details
 
-### Model Description
+- **Base model:** `Qwen/Qwen3-0.6B`
+- **Fine-tuning method:** LoRA / PEFT
+- **PEFT type:** LORA
+- **Task type:** CAUSAL_LM
+- **PEFT version:** 0.20.0
+- **Model family:** Qwen3
+- **Pipeline task:** Text generation
+- **Artifact directory:** `ai/artifacts/full_training/`
 
-<!-- Provide a longer summary of what this model is. -->
+## Intended Use
 
+The adapter is intended for controlled development and evaluation of HDFC banking-domain language-model behavior, including:
 
+- domain-oriented question answering;
+- instruction-following;
+- structured generation;
+- banking terminology and task patterns;
+- evaluation and benchmarking within the project pipeline.
 
-- **Developed by:** [More Information Needed]
-- **Funded by [optional]:** [More Information Needed]
-- **Shared by [optional]:** [More Information Needed]
-- **Model type:** [More Information Needed]
-- **Language(s) (NLP):** [More Information Needed]
-- **License:** [More Information Needed]
-- **Finetuned from model [optional]:** [More Information Needed]
+The model should be used only within approved application and security boundaries.
 
-### Model Sources [optional]
+## Out-of-Scope Use
 
-<!-- Provide the basic links for the model. -->
+This artifact is not intended for:
 
-- **Repository:** [More Information Needed]
-- **Paper [optional]:** [More Information Needed]
-- **Demo [optional]:** [More Information Needed]
+- unrestricted general-purpose public chatbot deployment;
+- autonomous financial decision-making;
+- autonomous approval/rejection of banking transactions;
+- unsupervised regulatory or compliance decisions;
+- replacing qualified human reviewers in high-impact banking processes;
+- use with confidential customer information without appropriate controls.
 
-## Uses
+## Dataset Lineage
 
-<!-- Address questions around how the model is intended to be used, including the foreseeable users of the model and those affected by the model. -->
+The current Qwen3 adapter is associated with the project dataset lineage:
 
-### Direct Use
+**Release A**
 
-<!-- This section is for the model use without fine-tuning or plugging into a larger ecosystem/app. -->
+| Split | Records |
+|---|---:|
+| Train | 19,476 |
+| Validation | 2,434 |
+| Test | 2,436 |
+| Total | 24,346 |
 
-[More Information Needed]
+The later expanded dataset release `v2.0.0-expanded` contains 59,346 records but was not used to retrain this adapter.
 
-### Downstream Use [optional]
+## Training Configuration
 
-<!-- This section is for the model use when fine-tuned for a task, or when plugged into a larger ecosystem/app -->
+The saved training configuration in `training_args.bin` records the following primary parameters:
 
-[More Information Needed]
+| Parameter | Value |
+|---|---|
+| Epochs | 1.0 |
+| Learning rate | 0.0002 |
+| Per-device train batch size | 1 |
+| Gradient accumulation steps | 8 |
+| Maximum sequence length | 256 |
+| Seed | 42 |
+| FP16 | true |
+| Weight decay | 0.0 |
+| Warmup steps | 0 |
+| Optimizer | AdamW Torch Fused |
+| Dataset text field | `text` |
 
-### Out-of-Scope Use
+## LoRA Configuration
 
-<!-- This section addresses misuse, malicious use, and uses that the model will not work well for. -->
+The saved `adapter_config.json` records:
 
-[More Information Needed]
+| Parameter | Value |
+|---|---|
+| PEFT type | LORA |
+| LoRA rank (`r`) | 8 |
+| LoRA alpha | 16 |
+| LoRA dropout | 0.05 |
+| Bias | none |
+| Task type | CAUSAL_LM |
+| Target modules | `q_proj`, `k_proj`, `v_proj`, `o_proj` |
+| Inference mode | true |
 
-## Bias, Risks, and Limitations
+## Artifact Contents
 
-<!-- This section is meant to convey both technical and sociotechnical limitations. -->
+The adapter package contains:
 
-[More Information Needed]
-
-### Recommendations
-
-<!-- This section is meant to convey recommendations with respect to the bias, risk, and technical limitations. -->
-
-Users (both direct and downstream) should be made aware of the risks, biases and limitations of the model. More information needed for further recommendations.
-
-## How to Get Started with the Model
-
-Use the code below to get started with the model.
-
-[More Information Needed]
-
-## Training Details
-
-### Training Data
-
-<!-- This should link to a Dataset Card, perhaps with a short stub of information on what the training data is all about as well as documentation related to data pre-processing or additional filtering. -->
-
-[More Information Needed]
-
-### Training Procedure
-
-<!-- This relates heavily to the Technical Specifications. Content here should link to that section when it is relevant to the training procedure. -->
-
-#### Preprocessing [optional]
-
-[More Information Needed]
-
-
-#### Training Hyperparameters
-
-- **Training regime:** [More Information Needed] <!--fp32, fp16 mixed precision, bf16 mixed precision, bf16 non-mixed precision, fp16 non-mixed precision, fp8 mixed precision -->
-
-#### Speeds, Sizes, Times [optional]
-
-<!-- This section provides information about throughput, start/end time, checkpoint size if relevant, etc. -->
-
-[More Information Needed]
+- `adapter_config.json`
+- `adapter_model.safetensors`
+- `chat_template.jinja`
+- `tokenizer.json`
+- `tokenizer_config.json`
+- `training_args.bin`
+- this model card
 
 ## Evaluation
 
-<!-- This section describes the evaluation protocols and provides the results. -->
+### AI Test Suite
 
-### Testing Data, Factors & Metrics
+The verified project AI test suite currently reports:
 
-#### Testing Data
+- **44 passed**
+- **3 skipped**
+- **0 failed**
 
-<!-- This should link to a Dataset Card if possible. -->
+The 44-test result includes the model-registry regression test added during final AI release hardening.
 
-[More Information Needed]
+### Model Evaluation
 
-#### Factors
+Verified evaluation evidence for the current model includes:
 
-<!-- These are the things the evaluation is disaggregating by, e.g., subpopulations or domains. -->
+| Metric | Result |
+|---|---:|
+| Test examples | 2,436 |
+| Intent JSON validity | 1.0000 |
+| Intent structured accuracy | 0.8290 |
+| Answer accuracy | 1.0000 |
+| Citation accuracy | 0.0000 |
+| Policy flag accuracy | 1.0000 |
+| Escalation accuracy | 1.0000 |
+| Critical safety failures | 0 |
+| Infrastructure errors | 0 |
+| Average latency | ~3.83 seconds |
 
-[More Information Needed]
+### Independent QA
 
-#### Metrics
+The Member 4 QA suite reported:
 
-<!-- These are the evaluation metrics being used, ideally with a description of why. -->
+- **28 tests executed**
+- **27 automated PASS**
+- **1 automated FAIL**
+- **0 runtime errors**
+- **Average latency: 12.606 seconds**
 
-[More Information Needed]
+The failed case was `SFT-006`, related to groundedness/citation integrity.
 
-### Results
+The failure indicates that a generated citation was not supported by the supplied fixture context. The issue remains a known limitation requiring human semantic review.
 
-[More Information Needed]
+## Known Limitations
 
-#### Summary
+The adapter should not be treated as a fully autonomous banking decision system.
 
+Known limitations include:
 
+1. Citation grounding is not guaranteed by the fine-tuned model alone.
+2. Model outputs require application-level validation and policy controls.
+3. High-impact banking decisions require appropriate human and system governance.
+4. The model does not replace a governed retrieval system for frequently changing enterprise knowledge.
+5. Evaluation results apply to the supplied project evaluation data and should not be generalized to all banking workloads.
 
-## Model Examination [optional]
+## Safety and Governance
 
-<!-- Relevant interpretability work for the model goes here -->
+Production use should enforce:
 
-[More Information Needed]
+- authenticated access;
+- authorization and role controls;
+- input validation;
+- output validation;
+- PII and sensitive-data controls;
+- audit logging;
+- model/version tracking;
+- evaluation gates;
+- approved deployment procedures;
+- rollback capability.
 
-## Environmental Impact
+This adapter should remain associated with its dataset lineage, training configuration, evaluation evidence, and registered model identity.
 
-<!-- Total emissions (in grams of CO2eq) and additional considerations, such as electricity usage, go here. Edit the suggested text below accordingly -->
+## Privacy
 
-Carbon emissions can be estimated using the [Machine Learning Impact calculator](https://mlco2.github.io/impact#compute) presented in [Lacoste et al. (2019)](https://arxiv.org/abs/1910.09700).
+No production customer data should be introduced into the training or inference pipeline without appropriate authorization, privacy controls, and data-governance review.
 
-- **Hardware Type:** [More Information Needed]
-- **Hours used:** [More Information Needed]
-- **Cloud Provider:** [More Information Needed]
-- **Compute Region:** [More Information Needed]
-- **Carbon Emitted:** [More Information Needed]
+Sensitive information should be minimized, protected, and handled according to the project's applicable privacy and security controls.
 
-## Technical Specifications [optional]
+## Hardware and Reproducibility
 
-### Model Architecture and Objective
+The development environment used for local AI verification included:
 
-[More Information Needed]
+- Python 3.11.9
+- NVIDIA GeForce GTX 1650 Ti
+- 4 GB VRAM
 
-### Compute Infrastructure
+The saved training configuration provides reproducibility metadata including the random seed, optimizer, learning rate, batch size, gradient accumulation, sequence length, and LoRA configuration.
 
-[More Information Needed]
+## Loading the Adapter
 
-#### Hardware
+The adapter is a PEFT LoRA artifact and must be loaded together with its compatible base model:
 
-[More Information Needed]
+`Qwen/Qwen3-0.6B`
 
-#### Software
+The project inference layer is responsible for model loading and generation.
 
-[More Information Needed]
+The expected project model identifier is:
 
-## Citation [optional]
+`qwen3_0_6b`
 
-<!-- If there is a paper or blog post introducing the model, the APA and Bibtex information for that should go in this section. -->
+## Release Validation
 
-**BibTeX:**
+Before using this artifact, the project release validation script can be executed with:
 
-[More Information Needed]
-
-**APA:**
-
-[More Information Needed]
-
-## Glossary [optional]
-
-<!-- If relevant, include terms and calculations in this section that can help readers understand the model or model card. -->
-
-[More Information Needed]
-
-## More Information [optional]
-
-[More Information Needed]
-
-## Model Card Authors [optional]
-
-[More Information Needed]
-
-## Model Card Contact
-
-[More Information Needed]
-### Framework versions
-
-- PEFT 0.20.0
+```powershell
+python ai/scripts/validate_release.py

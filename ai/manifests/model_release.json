@@ -1,0 +1,53 @@
+{
+  "release_name": "HDFC Qwen3 LoRA Adapter",
+  "model_id": "qwen3_0_6b",
+  "base_model": "Qwen/Qwen3-0.6B",
+  "fine_tuning_method": "LoRA",
+  "peft_type": "LORA",
+  "task_type": "CAUSAL_LM",
+  "dataset_release": "Release A",
+  "artifact_directory": "ai/artifacts/full_training/",
+  "artifact_files": [
+    "adapter_config.json",
+    "adapter_model.safetensors",
+    "chat_template.jinja",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "training_args.bin",
+    "README.md"
+  ],
+  "adapter_configuration": {
+    "r": 8,
+    "lora_alpha": 16,
+    "lora_dropout": 0.05,
+    "bias": "none",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj"
+    ]
+  },
+  "training_configuration": {
+    "epochs": 1,
+    "learning_rate": 0.0002,
+    "per_device_train_batch_size": 1,
+    "gradient_accumulation_steps": 8,
+    "max_seq_length": 256,
+    "seed": 42
+  },
+  "verification": {
+    "ai_tests_passed": 44,
+    "ai_tests_skipped": 3,
+    "ai_tests_failed": 0,
+    "member4_qa_tests": 28,
+    "member4_qa_automated_pass": 27,
+    "member4_qa_automated_fail": 1,
+    "member4_qa_runtime_errors": 0
+  },
+  "qa_notes": {
+    "failed_test": "SFT-006",
+    "failure_category": "groundedness/citation integrity",
+    "status": "requires human semantic review"
+  }
+}
