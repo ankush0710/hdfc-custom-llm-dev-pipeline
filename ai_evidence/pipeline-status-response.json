@@ -1,0 +1,8 @@
+{
+  "run_id": "run-123",
+  "status": "TRAINING",
+  "progress": 65,
+  "current_step": "Qwen3 LoRA fine-tuning",
+  "started_at": "2026-08-19T10:00:00Z",
+  "estimated_completion": null
+}

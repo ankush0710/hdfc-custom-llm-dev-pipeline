@@ -1,0 +1,27 @@
+{
+  "base_model": "Qwen/Qwen3-0.6B",
+  "training_method": "LoRA",
+  "epochs": 1.0,
+  "learning_rate": 0.0002,
+  "per_device_train_batch_size": 1,
+  "gradient_accumulation_steps": 8,
+  "max_seq_length": 256,
+  "lora_r": 8,
+  "lora_alpha": 16,
+  "lora_dropout": 0.05,
+  "seed": 42,
+  "train_records": 19476,
+  "global_steps": 2435,
+  "train_loss": 0.42605914677009443,
+  "train_runtime_seconds": 30406.9,
+  "trainable_parameters": 2293760,
+  "total_parameters": 598343680,
+  "trainable_percentage": 0.3834,
+  "hardware": {
+    "gpu": "NVIDIA GeForce GTX 1650 Ti",
+    "vram_gb": 4.0,
+    "python": "3.11",
+    "pytorch": "2.10.0+cu126",
+    "cuda": "12.6"
+  }
+}

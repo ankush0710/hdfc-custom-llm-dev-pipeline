@@ -1,0 +1,21 @@
+{
+  "model_id": "qwen3_0_6b",
+  "model_name": "HDFC Qwen3-0.6B",
+  "version": "1.0.0",
+  "base_model": "Qwen/Qwen3-0.6B",
+  "training_method": "LoRA",
+  "status": "EVALUATION_READY",
+  "artifact_location": "ai/artifacts/full_training",
+  "adapter": {
+    "type": "LoRA",
+    "rank": 8,
+    "alpha": 16,
+    "dropout": 0.05
+  },
+  "evaluation": {
+    "test_examples": 2436,
+    "critical_safety_failures": 0,
+    "intent_structured_accuracy": 0.829
+  },
+  "readiness_note": "Artifact is available for controlled evaluation/runtime testing; this status does not imply production approval or regulatory approval."
+}
