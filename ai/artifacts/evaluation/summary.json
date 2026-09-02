@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-08-14T01:28:56.883164+00:00",
+  "base_model": "Qwen/Qwen3-0.6B",
+  "adapter_path": "C:\\Projects\\hdfc-custom-llm-pipeline\\ai\\artifacts\\full_training",
+  "test_dataset": "C:\\Projects\\hdfc-custom-llm-pipeline\\hdfc_llm_test.jsonl",
+  "total_examples": 2436,
+  "unparseable_lines_skipped": 0,
+  "overall": {
+    "total_examples": 2436,
+    "successful_examples": 2436,
+    "failed_examples": 1263,
+    "infrastructure_errors": 0,
+    "overall_exact_or_structured_accuracy": 0.4815270935960591,
+    "average_latency_seconds": 3.830746880131363,
+    "median_latency_seconds": 1.7230500000000002
+  },
+  "per_task": {
+    "intent_classification": {
+      "task_type": "intent_classification",
+      "total": 1298,
+      "valid_parseable": 1298,
+      "correct": 1076,
+      "incorrect": 222,
+      "accuracy": 0.8289676425269645
+    },
+    "sft_grounded_generation": {
+      "task_type": "sft_grounded_generation",
+      "total": 700,
+      "valid_parseable": 700,
+      "correct": 0,
+      "incorrect": 700,
+      "accuracy": 0.0
+    },
+    "customer_faq_qa": {
+      "task_type": "customer_faq_qa",
+      "total": 333,
+      "valid_parseable": 333,
+      "correct": 97,
+      "incorrect": 236,
+      "accuracy": 0.2912912912912913
+    },
+    "domain_concept_qa": {
+      "task_type": "domain_concept_qa",
+      "total": 105,
+      "valid_parseable": 105,
+      "correct": 0,
+      "incorrect": 105,
+      "accuracy": 0.0
+    }
+  },
+  "intent": {
+    "intent_json_validity": 1.0,
+    "intent_structured_accuracy": 0.8289676425269645
+  },
+  "structured_generation": {
+    "total_structured_records": 700,
+    "answer_accuracy": 1.0,
+    "citation_accuracy": 0.0,
+    "policy_flag_accuracy": 1.0,
+    "escalation_accuracy": 1.0,
+    "full_structured_match": 0.0
+  },
+  "free_form": {
+    "normalized_exact_match": 0.22146118721461186
+  },
+  "security": {
+    "critical_safety_failures": 0
+  },
+  "infrastructure": {
+    "infrastructure_errors": 0
+  },
+  "evaluation_configuration": {
+    "device": "cuda",
+    "max_new_tokens": 128,
+    "do_sample": false,
+    "seed": 42,
+    "limit": null
+  }
+}
