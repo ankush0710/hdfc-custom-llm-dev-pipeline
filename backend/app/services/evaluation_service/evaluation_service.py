@@ -151,7 +151,16 @@ def get_evaluation_stats(db: Session):
         }
 
     completed = [e for e in evals if str(e.evaluation_status).upper() == "COMPLETED"]
-    passed_count = len(completed)
+
+    passed_count = 0
+    for evaluation in completed:
+        model = db.query(Model_Registry).filter(
+            Model_Registry.id == evaluation.model_id
+        ).first()
+
+        if model and str(model.status).upper() == "APPROVED":
+            passed_count += 1
+
     success_rate = (passed_count / total_count) * 100
 
     scores = []
@@ -387,8 +396,12 @@ def _execute_evaluation_worker(evaluation_id: int):
         evaluation.completed_at = now
 
         # Quality Gate Enforcer Evaluation
-        from app.constants.quality_gate_config import MIN_OVERALL_SCORE, MIN_ACCURACY, MAX_CRITICAL_SAFETY_FAILURES
-
+        from app.constants.quality_gate_config import (
+            MIN_OVERALL_SCORE,
+            MIN_ACCURACY,
+            MAX_CRITICAL_SAFETY_FAILURES,
+            MAX_INFRASTRUCTURE_ERRORS,
+)
         ans_acc = evaluation.answer_accuracy if evaluation.answer_accuracy is not None else (evaluation.normalized_exact_match or 0.0)
         ans_pct = ans_acc * 100 if ans_acc <= 1.0 else ans_acc
         prec_acc = evaluation.intent_structured_accuracy if evaluation.intent_structured_accuracy is not None else ans_acc
@@ -404,18 +417,35 @@ def _execute_evaluation_worker(evaluation_id: int):
             overall_score >= MIN_OVERALL_SCORE
             and ans_pct >= MIN_ACCURACY
             and safety_fails <= MAX_CRITICAL_SAFETY_FAILURES
-        )
+            and (evaluation.infrastructure_errors or 0) <= MAX_INFRASTRUCTURE_ERRORS
+)
 
         if model:
             model.evaluation_id = evaluation.evaluation_id
+
             if passed_gate:
+                evaluation.evaluation_status = "COMPLETED"
                 model.status = "APPROVED"
-                logger.info("Quality Gate PASSED for Model #%d (Score: %.1f%% >= %.1f%%)", model.id, overall_score, MIN_OVERALL_SCORE)
+                logger.info(
+                    "Quality Gate PASSED for Model #%d (Score: %.1f%% >= %.1f%%)",
+                    model.id,
+                    overall_score,
+                    MIN_OVERALL_SCORE,
+        )
             else:
+                evaluation.evaluation_status = "COMPLETED"
                 model.status = "REJECTED"
-                reason = f"Quality Gate Rejected: Score {overall_score:.1f}% < threshold {MIN_OVERALL_SCORE:.1f}% (Safety Fails: {safety_fails})"
+                reason = (
+                    f"Quality Gate Rejected: Score {overall_score:.1f}% < "
+                    f"threshold {MIN_OVERALL_SCORE:.1f}% "
+                    f"(Safety Fails: {safety_fails})"
+        )
                 evaluation.error_message = reason
-                logger.warning("Quality Gate REJECTED for Model #%d: %s", model.id, reason)
+                logger.warning(
+                    "Quality Gate REJECTED for Model #%d: %s",
+                     model.id,
+                    reason,
+        )
 
         db.commit()
         logger.info("Evaluation %d finished successfully — metrics saved to DB.", evaluation_id)

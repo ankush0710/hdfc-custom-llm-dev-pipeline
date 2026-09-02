@@ -64,7 +64,7 @@ def get_deployment(
 ):
     service = DeploymentService(db)
     try:
-        return service.get_deployment(deployment_id)
+        return service.get_deployment_by_id(deployment_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=404,

@@ -113,16 +113,27 @@ export default function DeploymentPage() {
 
       {/* Deployments Table with built-in Status Filter */}
       <div className="min-w-0">
-        <ModelsTable
-          title="Active Deployments"
-          columns={columns}
-          data={filteredDeployments}
-          pageSize={10}
-          showFilter={true}
-          filterOptions={filterOptions}
-          selectedFilter={statusFilter}
-          onFilterChange={(val) => setStatusFilter(val)}
-        />
+        {loading ? (
+          <div className="flex min-h-[280px] items-center justify-center rounded-2xl border border-gray-200/80 bg-white shadow-sm">
+            <div className="flex flex-col items-center gap-3 text-gray-500">
+              <RefreshCw size={24} className="animate-spin text-[#002B55]" />
+              <span className="text-sm font-medium">
+                Loading deployment records...
+              </span>
+            </div>
+          </div>
+        ) : (
+          <ModelsTable
+            title="Active Deployments"
+            columns={columns}
+            data={filteredDeployments}
+            pageSize={10}
+            showFilter={true}
+            filterOptions={filterOptions}
+            selectedFilter={statusFilter}
+            onFilterChange={(val) => setStatusFilter(val)}
+          />
+        )}
       </div>
 
       {/* Deploy New Model Modal */}

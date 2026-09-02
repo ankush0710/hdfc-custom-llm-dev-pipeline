@@ -25,11 +25,11 @@ export default function PlaygroundPage() {
   const [parameters, setParameters] = useState({
     temperature: 0.2,
     topP: 0.9,
-    maxTokens: 1024,
+    maxTokens: 256,
     systemInstruction: SYSTEM_ROLE_PRESETS[0].instruction,
   });
 
-  // Start with empty chat — the playground shows real inference results only
+  // Start with empty chat â€” the playground shows real inference results only
   const [messages, setMessages] = useState([]);
   const [tokenCount, setTokenCount] = useState(0);
 
@@ -109,7 +109,7 @@ export default function PlaygroundPage() {
         max_new_tokens: parameters.maxTokens,
         temperature: parameters.temperature,
         top_p: parameters.topP,
-        do_sample: parameters.temperature > 0.05,
+        do_sample: false,
       });
 
       let assistantText = "";
@@ -145,7 +145,7 @@ export default function PlaygroundPage() {
         ...newMessages,
         {
           role: "assistant",
-          content: `⚠️ Failed to generate response: ${
+          content: `âš ï¸ Failed to generate response: ${
             err?.response?.data?.detail || err?.message || "Server Error"
           }`,
         },
@@ -165,7 +165,7 @@ export default function PlaygroundPage() {
     setParameters({
       temperature: 0.2,
       topP: 0.9,
-      maxTokens: 1024,
+      maxTokens: 256,
       systemInstruction: SYSTEM_ROLE_PRESETS[0].instruction,
     });
     toast.success("Parameters reset to default");

@@ -87,7 +87,7 @@ export const createEvaluationColumns = ({ onStartEval } = {}) => [
     render: (row) => {
       const status = (row.evaluation_status || "QUEUED").toUpperCase();
 
-      if (status === "COMPLETED" || status === "PASSED") {
+      if (status === "PASSED") {
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -108,15 +108,23 @@ export const createEvaluationColumns = ({ onStartEval } = {}) => [
       if (status === "RUNNING") {
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-            <span>RUNNING</span>
-          </span>
-        );
-      }
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+          <span>RUNNING</span>
+        </span>
+  );
+}
+
+      if (status === "COMPLETED") {
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+          <span>COMPLETED</span>
+        </span>
+  );
+}
 
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
           <span>QUEUED</span>
         </span>
       );

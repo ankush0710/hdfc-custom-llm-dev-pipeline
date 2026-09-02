@@ -1,6 +1,4 @@
 """
-ai/training/trainer.py
-
 Training execution layer for a controlled smoke test. This module runs a
 short SFT job using an ALREADY-PREPARED PEFT model (see
 ai.training.model.prepare_model) and a caller-supplied dataset. It does
@@ -48,7 +46,7 @@ import logging
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase, TrainerCallback
@@ -82,42 +80,56 @@ class TrainingProgressCallback(TrainerCallback):
             try:
                 if self.should_stop():
                     logger.info(
-                        "TRAINER CALLBACK: Stop requested at step %d/%d. Setting control.should_training_stop = True.",
+                        "TRAINER CALLBACK: Stop requested at step %d/%d. "
+                        "Setting control.should_training_stop = True.",
                         state.global_step,
                         state.max_steps or 0,
                     )
                     control.should_training_stop = True
                     return control
             except Exception as exc:
-                logger.exception("Trainer callback should_stop check failed: %s", exc)
+                logger.exception(
+                    "Trainer callback should_stop check failed: %s", exc
+                )
 
         # 2. Extract real metrics from the trainer state's log history
         loss: Optional[float] = None
         lr: Optional[float] = None
+
         if state.log_history:
             last_log = state.log_history[-1]
+
             raw_loss = last_log.get("loss")
             raw_lr = last_log.get("learning_rate")
+
             if raw_loss is not None:
                 try:
                     loss = float(raw_loss)
                 except (TypeError, ValueError):
                     pass
+
             if raw_lr is not None:
                 try:
                     lr = float(raw_lr)
                 except (TypeError, ValueError):
                     pass
 
-        # 3. Progress update — sample every N steps (max ~100 points) + always on last step
+        # 3. Progress update - sample every N steps (max ~100 points)
+        #    + always on last step
         if state.max_steps and state.max_steps > 0:
-            ratio = min(1.0, max(0.0, state.global_step / state.max_steps))
-            current_pct = int(self.start_pct + (self.end_pct - self.start_pct) * ratio)
+            ratio = min(
+                1.0,
+                max(0.0, state.global_step / state.max_steps),
+            )
+            current_pct = int(
+                self.start_pct
+                + (self.end_pct - self.start_pct) * ratio
+            )
 
             # Fire at least every 5 steps so early progress is visible
             stride = max(1, min(5, state.max_steps // 100))
-            is_sampled_step = (state.global_step % stride == 0)
-            is_last_step = (state.global_step >= state.max_steps)
+            is_sampled_step = state.global_step % stride == 0
+            is_last_step = state.global_step >= state.max_steps
 
             logger.info(
                 "TRAINER CALLBACK: pct=%d, step=%d/%d, loss=%s, lr=%s",
@@ -130,6 +142,8 @@ class TrainingProgressCallback(TrainerCallback):
 
             if self.on_progress and (is_sampled_step or is_last_step):
                 try:
+                    # Preferred production callback contract.
+                    # The real backend callback accepts loss/lr.
                     self.on_progress(
                         current_pct,
                         state.global_step,
@@ -137,11 +151,23 @@ class TrainingProgressCallback(TrainerCallback):
                         loss=loss,
                         lr=lr,
                     )
+                except TypeError as exc:
+                    # Backward-compatible fallback for simpler callbacks
+                    # that implement only (pct, step, max_steps).
+                    if "unexpected keyword argument" in str(exc):
+                        self.on_progress(
+                            current_pct,
+                            state.global_step,
+                            state.max_steps,
+                        )
+                    else:
+                        raise
                 except Exception as exc:
-                    logger.exception("Progress callback notification failed: %s", exc)
+                    logger.exception(
+                        "Progress callback notification failed: %s", exc
+                    )
 
         return control
-
 
 
 class TrainerError(RuntimeError):
@@ -231,8 +257,8 @@ def _build_sft_config(
     - `tokenizer=`/`max_seq_length=` are no longer accepted directly by
       SFTTrainer; the tokenizer goes through `processing_class=` on the
       trainer, and sequence length is `max_length` here on SFTConfig.
-    - `dataset_text_field` and `packing` also live on SFTConfig, not on
-      the trainer constructor.
+    - `dataset_text_field` and `packing` also live on SFTConfig, not on the
+      trainer constructor.
     """
     return SFTConfig(
         output_dir=str(output_dir),
@@ -312,19 +338,30 @@ def train_model(
     try:
         config.validate()
     except ValueError as exc:
-        raise TrainingConfigError(f"Invalid TrainingConfig: {exc}") from exc
+        raise TrainingConfigError(
+            f"Invalid TrainingConfig: {exc}"
+        ) from exc
 
-    resolved_output_dir = Path(output_dir) if output_dir else Path(config.output_dir)
+    resolved_output_dir = (
+        Path(output_dir) if output_dir else Path(config.output_dir)
+    )
     resolved_output_dir.mkdir(parents=True, exist_ok=True)
 
     device = _resolve_training_device(model)
-    logger.info("Training on device=%s, output_dir=%s", device, resolved_output_dir)
+    logger.info(
+        "Training on device=%s, output_dir=%s",
+        device,
+        resolved_output_dir,
+    )
 
     gpu_before = _gpu_allocated_mb()
     _reset_peak_gpu_memory()
 
     sft_config = _build_sft_config(
-        config, resolved_output_dir, device, dataset_text_field
+        config,
+        resolved_output_dir,
+        device,
+        dataset_text_field,
     )
 
     try:
@@ -341,6 +378,7 @@ def train_model(
         ) from exc
 
     start = time.perf_counter()
+
     try:
         train_output = trainer.train()
     except torch.cuda.OutOfMemoryError as exc:
@@ -351,11 +389,16 @@ def train_model(
             f"gradient_accumulation_steps in TrainingConfig. Original error: {exc}"
         ) from exc
     except Exception as exc:  # noqa: BLE001 - re-raised as a domain error
-        raise TrainingExecutionError(f"Training failed: {exc}") from exc
+        raise TrainingExecutionError(
+            f"Training failed: {exc}"
+        ) from exc
+
     wall_runtime = time.perf_counter() - start
 
     metrics = getattr(train_output, "metrics", {}) or {}
-    train_runtime = float(metrics.get("train_runtime", wall_runtime))
+    train_runtime = float(
+        metrics.get("train_runtime", wall_runtime)
+    )
     train_loss = metrics.get("train_loss")
     global_step = getattr(train_output, "global_step", None) or metrics.get(
         "global_step"
@@ -372,6 +415,7 @@ def train_model(
     peak_gpu = _peak_gpu_allocated_mb()
 
     summary = count_parameters(model)
+
     logger.info(
         "Training complete: runtime=%.2fs loss=%s trainable=%s/%s (%.4f%%)",
         train_runtime,

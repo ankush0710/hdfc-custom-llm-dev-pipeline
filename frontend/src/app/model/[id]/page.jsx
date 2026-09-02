@@ -234,14 +234,16 @@ export default function ModelDetailPage({ params: pageParams }) {
                 View Logs
               </Button>
 
-              <Button
-                variant="primary"
-                icon={deploying ? Loader2 : Rocket}
-                onClick={handleDeploy}
-                disabled={deploying}
-              >
-                {deploying ? "Deploying..." : "Deploy Model"}
-              </Button>
+              {rawStatus !== "REJECTED" && (
+                <Button
+                  variant="primary"
+                  icon={deploying ? Loader2 : Rocket}
+                  onClick={handleDeploy}
+                  disabled={deploying}
+                >
+                  {deploying ? "Deploying..." : "Deploy Model"}
+                </Button>
+              )}
             </>
           }
         />
