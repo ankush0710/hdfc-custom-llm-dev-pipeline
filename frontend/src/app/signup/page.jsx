@@ -119,17 +119,17 @@ export default function SignupPage() {
       {/* Left Side: Signup Form (Full Height Split Screen) */}
       <div className="w-full md:w-1/2 min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 bg-white text-slate-800 z-10 shadow-2xl overflow-y-auto shrink-0">
         {/* Brand Header */}
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-[#002B55] flex items-center justify-center overflow-hidden p-1.5 shadow-md">
+        <div className="flex items-center justify-between gap-3">
+          <div className="h-14 w-35 flex items-center justify-center overflow-hidden">
             <img
-              src="/Images/HDFC_Forge_logo.png"
-              alt="HDFC LLM Forge"
+              src="/Images/HDFC-Bank-Logo.png"
+              alt="HDFC Bank"
               className="h-full w-full object-contain"
             />
           </div>
           <div>
             <span className="text-base font-bold tracking-tight text-[#002B55] block">
-              HDFC LLM Forge
+              HDFC Bank
             </span>
             <span className="text-[11px] text-slate-500 font-medium block">
               Enterprise LLM Development Platform

@@ -123,19 +123,12 @@ export default function Sidebar({ isOpen, onClose }) {
           </button>
           <div className="px-6 pt-6 pb-6 border-b border-blue-900/60">
             <Link href="/" className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#003A70]">
-                <img
-                  src="./images/HDFC_Forge_logo.png"
-                  alt="HDFC Forge"
-                  className="h-9 w-9 object-contain"
-                />
-              </div>
               <div>
                 <h1 className="text-xl font-bold leading-none tracking-tight text-white">
                   HDFC Bank
                 </h1>
                 <p className="mt-1 text-xs font-medium text-blue-200">
-                  AI Enterprise Pipeline
+                  Enterprise LLM Development Platform
                 </p>
               </div>
             </Link>
