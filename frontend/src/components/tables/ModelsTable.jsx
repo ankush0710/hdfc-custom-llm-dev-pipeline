@@ -14,10 +14,21 @@ export default function ModelsTable({
   selectedFilter = "ALL",
   onFilterChange = null,
   loading = false,
+  loadingMessage = null,
   error = null,
   onRetry = null,
   emptyMessage = "No records available",
 }) {
+  const getLoadingText = () => {
+    if (loadingMessage) return loadingMessage;
+    const t = (title || "").toLowerCase();
+    if (t.includes("model")) return "Loading models. Please wait...";
+    if (t.includes("deploy")) return "Loading deployments. Please wait...";
+    if (t.includes("eval")) return "Loading evaluations. Please wait...";
+    if (t.includes("dataset")) return "Loading datasets. Please wait...";
+    if (t.includes("training") || t.includes("run")) return "Loading training runs. Please wait...";
+    return `Loading ${title ? title.toLowerCase() : "records"}. Please wait...`;
+  };
   const [currentPage, setCurrentPage] = useState(1);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -199,7 +210,7 @@ export default function ModelsTable({
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Loader2 className="h-6 w-6 animate-spin text-[#002B55]" />
                     <p className="text-xs font-semibold text-gray-500">
-                      Loading data from backend...
+                      {getLoadingText()}
                     </p>
                   </div>
                 </td>
@@ -221,7 +232,7 @@ export default function ModelsTable({
                         onClick={onRetry}
                         className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 underline"
                       >
-                        <RefreshCw size={12} />
+                        <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
                         <span>Retry</span>
                       </button>
                     )}

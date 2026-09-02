@@ -355,7 +355,7 @@ function UserManagementContent() {
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mb-3" />
             <p className="text-sm text-gray-600 font-medium">
-              Loading platform accounts from database...
+              Loading platform accounts. Please wait...
             </p>
           </div>
         ) : filteredUsers.length === 0 ? (

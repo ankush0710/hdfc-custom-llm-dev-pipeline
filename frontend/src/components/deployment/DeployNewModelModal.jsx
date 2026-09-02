@@ -120,7 +120,7 @@ export default function DeployNewModelModal({ isOpen, onClose, onModelDeployed }
           <div className="p-12 flex flex-col items-center justify-center gap-3">
             <Loader2 className="h-7 w-7 animate-spin text-[#002B55]" />
             <p className="text-xs text-gray-500 font-medium">
-              Loading available models...
+              Loading models. Please wait...
             </p>
           </div>
         ) : (

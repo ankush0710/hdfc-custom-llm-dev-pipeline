@@ -38,73 +38,102 @@ import {
   stopTrainingRun,
 } from "@/app/services/trainingService/trainingServices";
 import { toast } from "sonner";
+import {
+  LineChart as RechartsLineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
-// Mini Sparkline SVG component for smooth area curves
-function SparklineChart({ data = [], type = "loss", height = 80, className = "" }) {
-  if (!data || data.length === 0) {
+function formatDuration(totalSecs) {
+  if (totalSecs == null || isNaN(totalSecs) || totalSecs < 0) return "0s";
+  const hrs = Math.floor(totalSecs / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = Math.floor(totalSecs % 60);
+  if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
+// Line chart component for Live Metrics
+function MetricLineChart({ data = [], dataKey = "loss", stroke = "#002B55", name = "Loss" }) {
+  const validData = useMemo(() => {
+    if (!Array.isArray(data) || data.length === 0) return [];
+    return data.filter((d) => d && typeof d[dataKey] === "number" && !isNaN(d[dataKey]));
+  }, [data, dataKey]);
+
+  if (validData.length === 0) {
     return (
-      <svg viewBox="0 0 200 80" className={`w-full h-full ${className}`}>
-        <text
-          x="100"
-          y="44"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontSize="11"
-          fill="#94a3b8"
-          fontFamily="ui-monospace, monospace"
-        >
-          No data yet
-        </text>
-        <line x1="20" y1="60" x2="180" y2="60" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
-      </svg>
+      <div className="w-full h-full flex flex-col items-center justify-center text-center p-2">
+        <span className="text-xs font-medium text-slate-400">No data recorded yet</span>
+      </div>
     );
   }
 
-  // Map values to coordinates
-  const values = data.map((d) => {
-    if (type === "loss") return typeof d.loss === "number" ? d.loss : 1.0;
-    if (type === "lr") return typeof d.lr === "number" ? d.lr : 0.0002;
-    return typeof d.accuracy === "number" ? d.accuracy : 50;
-  });
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-
-  const points = values.map((val, idx) => {
-    const x = (idx / (values.length - 1 || 1)) * 200;
-    let y = 80 - ((val - min) / range) * 55 - 12;
-    if (type === "loss") {
-      // Invert so higher loss is at top, lower is at bottom
-      y = 15 + ((val - min) / range) * 55;
-    }
-    return { x, y: Math.max(8, Math.min(74, y)) };
-  });
-
-  let linePath = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const cpX = (prev.x + curr.x) / 2;
-    linePath += ` C ${cpX} ${prev.y}, ${cpX} ${curr.y}, ${curr.x} ${curr.y}`;
-  }
-
-  const areaPath = `${linePath} L 200 80 L 0 80 Z`;
-  const gradId = `sparkline-grad-${type}`;
-
   return (
-    <svg viewBox="0 0 200 80" className="w-full h-full">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#1E293B" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#1E293B" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${gradId})`} />
-      <path d={linePath} fill="none" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
+    <div className="w-full h-full min-w-0">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={80}>
+        <RechartsLineChart
+          data={validData}
+          margin={{ top: 8, right: 10, left: -24, bottom: 2 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+          <XAxis
+            dataKey="step"
+            stroke="#94a3b8"
+            fontSize={10}
+            tickLine={false}
+            tickFormatter={(val) => `${val}`}
+          />
+          <YAxis
+            stroke="#94a3b8"
+            fontSize={10}
+            tickLine={false}
+            axisLine={false}
+            domain={["auto", "auto"]}
+            tickFormatter={(val) => {
+              if (typeof val !== "number") return val;
+              if (val < 0.001 && val > 0) return val.toExponential(1);
+              return val < 10 ? val.toFixed(2) : Math.round(val);
+            }}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: "0.375rem",
+              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+              fontSize: "11px",
+              padding: "4px 8px",
+            }}
+            labelStyle={{ color: "#0f172a", fontWeight: "600", fontSize: "11px" }}
+            formatter={(value) => {
+              if (typeof value === "number") {
+                if (value < 0.001) return [value.toExponential(3), name];
+                return [value.toFixed(4), name];
+              }
+              return [value, name];
+            }}
+            labelFormatter={(label) => `Step ${label}`}
+          />
+          <Line
+            type="monotone"
+            dataKey={dataKey}
+            stroke={stroke}
+            strokeWidth={2}
+            dot={validData.length <= 15 ? { r: 2.5, fill: stroke } : false}
+            activeDot={{ r: 4, strokeWidth: 0, fill: stroke }}
+            isAnimationActive={false}
+          />
+        </RechartsLineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
+
 
 export default function TrainingDetailPage({ params: pageParams }) {
   const routeParams = useParams();
@@ -165,32 +194,59 @@ export default function TrainingDetailPage({ params: pageParams }) {
     }
   }, [id]); // trainingRun intentionally excluded — causes infinite re-render via interval restart
 
-  // Start polling once on mount; the interval reference is stable across re-renders
+  // Fetch initial detail once on mount or when ID changes
   useEffect(() => {
     fetchDetail();
-
-    pollingRef.current = setInterval(() => {
-      fetchDetail(true);
-    }, 3000);
-
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
   }, [fetchDetail]);
 
-  // Stop polling as soon as training reaches a terminal status
+  // Dynamic polling: poll every 2.5s while in an active running state
   useEffect(() => {
     const s = (trainingRun?.status || "").toUpperCase();
-    if (s === "COMPLETED" || s === "FAILED" || s === "STOPPED" || s === "CANCELLED") {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
+    const isActive = s === "RUNNING" || s === "PREPARING" || s === "QUEUED";
+
+    if (!isActive) return;
+
+    const intervalId = setInterval(() => {
+      fetchDetail(true);
+    }, 2500);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [trainingRun?.status, fetchDetail]);
+
+  // Synchronized real-time elapsed training timer
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!trainingRun?.started_at) {
+      setElapsedSeconds(0);
+      return;
     }
-  }, [trainingRun?.status]);
+    const startTime = new Date(trainingRun.started_at).getTime();
+    if (isNaN(startTime)) return;
+
+    const isRunning = (trainingRun.status || "").toUpperCase() === "RUNNING";
+    const endTime = trainingRun.completed_at
+      ? new Date(trainingRun.completed_at).getTime()
+      : Date.now();
+
+    const initialSecs = Math.max(0, Math.floor((endTime - startTime) / 1000));
+    setElapsedSeconds(initialSecs);
+
+    if (isRunning) {
+      const timer = setInterval(() => {
+        const currentSecs = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+        setElapsedSeconds(currentSecs);
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [trainingRun?.started_at, trainingRun?.completed_at, trainingRun?.status]);
+
+  const displayElapsedTime = useMemo(() => {
+    if (!trainingRun?.started_at) return trainingRun?.elapsed_formatted || "0s";
+    return formatDuration(elapsedSeconds);
+  }, [elapsedSeconds, trainingRun?.started_at, trainingRun?.elapsed_formatted]);
 
   const handleStart = async () => {
     try {
@@ -246,7 +302,7 @@ export default function TrainingDetailPage({ params: pageParams }) {
       <div className="flex h-96 w-full items-center justify-center lg:ml-[280px]">
         <div className="flex flex-col items-center gap-3 text-gray-500">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm font-medium">Loading real-time training telemetry...</p>
+          <p className="text-sm font-medium">Loading training telemetry. Please wait...</p>
         </div>
       </div>
     );
@@ -343,7 +399,9 @@ export default function TrainingDetailPage({ params: pageParams }) {
           <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
             <Clock size={14} className="text-slate-400" />
             <span>
-              {trainingRun.started_time_ago || "Started recently"} by {trainingRun.creator_name || "Data Scientist"}
+              {displayElapsedTime} elapsed
+              {trainingRun.started_time_ago ? ` • ${trainingRun.started_time_ago}` : ""}
+              {` by ${trainingRun.creator_name || "Data Scientist"}`}
             </span>
           </div>
         </div>
@@ -355,10 +413,14 @@ export default function TrainingDetailPage({ params: pageParams }) {
               <button
                 onClick={handleStop}
                 disabled={stopping}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-3j py-2 rounded-lg border border-rose-300 bg-white text-rose-600 font-semibold text-xs hover:bg-rose-50 hover:border-rose-400 transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-rose-300 bg-white text-rose-600 font-semibold text-xs hover:bg-rose-50 hover:border-rose-400 transition-colors shadow-xs cursor-pointer disabled:opacity-60"
               >
-                <StopCircle size={15} />
-                {stopping ? "Stopping..." : "Stop Training"}
+                {stopping ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <StopCircle size={15} />
+                )}
+                <span>{stopping ? "Stopping..." : "Stop Training"}</span>
               </button>
             ) : status === "CREATED" ? (
               <button
@@ -366,8 +428,12 @@ export default function TrainingDetailPage({ params: pageParams }) {
                 disabled={starting}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer disabled:opacity-60"
               >
-                <Play size={15} />
-                {starting ? "Starting..." : "Start Training"}
+                {starting ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Play size={15} />
+                )}
+                <span>{starting ? "Starting..." : "Start Training"}</span>
               </button>
             ) : null}
 
@@ -406,10 +472,10 @@ export default function TrainingDetailPage({ params: pageParams }) {
                 </span>
               </div>
 
-              {/* Time Remaining Pill */}
+              {/* Elapsed Time Pill */}
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-200/80 text-sky-800 text-xs font-semibold">
                 <Clock size={13} className="text-sky-600" />
-                <span>{trainingRun.time_remaining_formatted || "Calculating..."}</span>
+                <span>{displayElapsedTime} elapsed</span>
               </div>
             </div>
 
@@ -433,7 +499,7 @@ export default function TrainingDetailPage({ params: pageParams }) {
               <div className="flex items-center gap-1.5">
                 <ArrowRightLeft size={14} className="text-slate-400" />
                 <span>
-                  Step {(trainingRun.current_step || 0).toLocaleString()} / {(trainingRun.total_steps || 10000).toLocaleString()}
+                  Step {(trainingRun.current_step != null ? trainingRun.current_step : 0).toLocaleString()} / {(trainingRun.total_steps || 1).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -556,11 +622,12 @@ export default function TrainingDetailPage({ params: pageParams }) {
                       : <span className="text-slate-400 font-mono text-sm">—</span>}
                   </span>
                 </div>
-                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
-                  <SparklineChart
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-28 p-2 overflow-hidden flex items-end">
+                  <MetricLineChart
                     data={trainingRun.metric_history}
-                    type="loss"
-                    height="full"
+                    dataKey="loss"
+                    stroke="#0284c7"
+                    name="Loss"
                   />
                 </div>
               </div>
@@ -575,11 +642,12 @@ export default function TrainingDetailPage({ params: pageParams }) {
                       : <span className="text-slate-400 font-mono text-sm">—</span>}
                   </span>
                 </div>
-                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
-                  <SparklineChart
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-28 p-2 overflow-hidden flex items-end">
+                  <MetricLineChart
                     data={trainingRun.metric_history}
-                    type="lr"
-                    height="full"
+                    dataKey="lr"
+                    stroke="#0d9488"
+                    name="Learning Rate"
                   />
                 </div>
               </div>
@@ -589,14 +657,17 @@ export default function TrainingDetailPage({ params: pageParams }) {
                 <div className="flex items-baseline justify-between mb-2">
                   <span className="text-xs text-slate-500 font-medium">Token Accuracy</span>
                   <span className="text-lg font-bold text-slate-900">
-                    <span className="text-slate-400 font-mono text-sm">—</span>
+                    {typeof trainingRun.token_accuracy === "number"
+                      ? `${trainingRun.token_accuracy.toFixed(1)}%`
+                      : <span className="text-slate-400 font-mono text-sm">—</span>}
                   </span>
                 </div>
-                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-24 p-2 overflow-hidden flex items-end">
-                  <SparklineChart
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-28 p-2 overflow-hidden flex items-end">
+                  <MetricLineChart
                     data={trainingRun.metric_history}
-                    type="accuracy"
-                    height="full"
+                    dataKey="accuracy"
+                    stroke="#8b5cf6"
+                    name="Token Accuracy"
                   />
                 </div>
               </div>

@@ -1,12 +1,13 @@
 //=======================================================================================//
 /*
-The main dashboard that shows all information about the deployed models.
-ALL data is fetched from the backend API — no static/hardcoded values.
+The main dashboard that shows all information about the deployed models and LLM pipeline.
+ALL data is fetched dynamically from the backend API — no hardcoded or mock values.
 Sources:
-  - Stats cards   → GET /pipeline/dashboard/stats
-  - Chart data    → GET /training/runs  (latest completed run metrics)
-  - Models table  → GET /deployments
-  - Activity feed → GET /pipeline/dashboard/stats (recent_activity field)
+  - Stats cards            → GET /pipeline/dashboard/stats
+  - Training chart         → GET /pipeline/dashboard/stats (training_performance field)
+  - Models table           → GET /deployments
+  - Recent activity feed   → GET /pipeline/dashboard/stats?limit=5 (recent_activity field)
+  - All activity (modal)   → GET /pipeline/activities (with backend pagination)
 */
 //=======================================================================================//
 "use client";
@@ -16,7 +17,7 @@ import ActivityCard from "@/components/ui/ActivityCard";
 import ModelsTable from "@/components/tables/ModelsTable";
 import Button from "@/components/ui/Button";
 import LineChart from "@/components/charts/LineChart";
-import { getDashboardStats } from "@/app/services/dashboardService/dashboardService";
+import { getDashboardStats, getTrainingPerformance } from "@/app/services/dashboardService/dashboardService";
 import { getDeployments } from "@/app/services/deploymentService/deploymentServices";
 import {
   Plus,
@@ -29,7 +30,6 @@ import {
 } from "lucide-react";
 import { DashboardModelColumns as ModelColumns } from "@/components/tables/DashboardDeploymentColumns";
 import { useAuth } from "@/app/context/AuthContext";
-
 
 // ─── Icon & styling constants (no business data here) ──────────────────────── //
 const STAT_CARD_META = [
@@ -67,6 +67,16 @@ const STAT_CARD_META = [
   },
 ];
 
+function formatLatency(d) {
+  if (d.latency && d.latency !== "—") return d.latency;
+  if (typeof d.average_latency_ms === "number" && !isNaN(d.average_latency_ms) && d.average_latency_ms > 0) {
+    return d.average_latency_ms >= 1000
+      ? `${(d.average_latency_ms / 1000).toFixed(2)} s`
+      : `${Math.round(d.average_latency_ms)} ms`;
+  }
+  return "N/A";
+}
+
 export default function Dashboard() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [stats, setStats] = useState(null);
@@ -75,6 +85,11 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [statsError, setStatsError] = useState(false);
 
+  // Training performance run selector states
+  const [currentPerformance, setCurrentPerformance] = useState(null);
+  const [selectedRunId, setSelectedRunId] = useState(null);
+  const [loadingRun, setLoadingRun] = useState(false);
+
   const loadDashboardData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     else setRefreshing(true);
@@ -82,7 +97,7 @@ export default function Dashboard() {
 
     try {
       const [statsData, deploymentsData] = await Promise.all([
-        getDashboardStats().catch((err) => {
+        getDashboardStats({ limit: 5 }).catch((err) => {
           console.error("Failed to load dashboard stats:", err);
           setStatsError(true);
           return null;
@@ -94,6 +109,10 @@ export default function Dashboard() {
       ]);
 
       setStats(statsData);
+      if (statsData?.training_performance) {
+        setCurrentPerformance(statsData.training_performance);
+        setSelectedRunId(statsData.training_performance.run_id);
+      }
       setDeployments(Array.isArray(deploymentsData) ? deploymentsData : []);
     } finally {
       setLoading(false);
@@ -101,12 +120,31 @@ export default function Dashboard() {
     }
   }, []);
 
+  const handleSelectRun = useCallback(async (runId) => {
+    if (!runId || runId === selectedRunId) return;
+    setSelectedRunId(runId);
+    setLoadingRun(true);
+    try {
+      const perfData = await getTrainingPerformance(runId);
+      if (perfData) {
+        setCurrentPerformance(perfData);
+      }
+    } catch (err) {
+      console.error("Failed to load training run performance:", err);
+    } finally {
+      setLoadingRun(false);
+    }
+  }, [selectedRunId]);
+
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       loadDashboardData();
     }
   }, [authLoading, isAuthenticated, loadDashboardData]);
 
+  // Active training performance summary
+  const activePerformance = currentPerformance || stats?.training_performance;
+  const availableRuns = activePerformance?.available_runs || [];
 
   // Build stat card data from real backend response
   const statCardData = useMemo(() => {
@@ -119,19 +157,29 @@ export default function Dashboard() {
     }));
   }, [stats]);
 
-  // Build chart data: use a placeholder message if no completed training metrics exist.
-  // The chart is intentionally empty until real training metrics are available.
-  const chartData = [];
+  // Map real step-level training performance points from backend
+  const chartData = useMemo(() => {
+    const rawPoints = activePerformance?.points;
+    if (!Array.isArray(rawPoints) || rawPoints.length === 0) return [];
+    return rawPoints.map((p) => ({
+      step: p.step,
+      epoch: p.epoch,
+      trainingLoss: p.training_loss,
+      learningRate: p.learning_rate,
+    }));
+  }, [activePerformance]);
 
-  // Map deployments to match the table columns shape
-  const tableData = deployments.map((d) => ({
-    id: d.id,
-    name: d.model_name || `Model-${d.model_id}`,
-    version: d.version,
-    status: d.status?.toLowerCase(),
-    latency: d.average_latency_ms ? `${d.average_latency_ms}ms` : "—",
-    action: d.status?.toUpperCase() === "ACTIVE" ? "Metrics" : "Start",
-  }));
+  // Map deployments to match the table columns shape with real latency
+  const tableData = useMemo(() => {
+    return deployments.map((d) => ({
+      id: d.id,
+      name: d.model_name || `Model-${d.model_id}`,
+      version: d.version,
+      status: d.status?.toLowerCase(),
+      latency: formatLatency(d),
+      action: d.status?.toUpperCase() === "ACTIVE" ? "Metrics" : "Start",
+    }));
+  }, [deployments]);
 
   return (
     <>
@@ -183,11 +231,30 @@ export default function Dashboard() {
         {/* Training Performance Chart + Activity */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3.5fr_1.5fr] my-10 px-5">
           <div className="min-w-0">
-            {chartData.length > 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl border border-gray-200 text-center h-[340px]">
+                <RefreshCw size={28} className="animate-spin text-[#002B55] mb-2" />
+                <p className="text-xs text-gray-500 font-medium">
+                  Loading training telemetry. Please wait...
+                </p>
+              </div>
+            ) : (
               <LineChart
-                title="Training Performance"
+                title={`Training Performance ${activePerformance?.run_name ? `— ${activePerformance.run_name}` : ""}`}
+                subtitle={
+                  activePerformance?.final_loss !== undefined && activePerformance?.final_loss !== null
+                    ? `Final Loss: ${activePerformance.final_loss} · Total Steps: ${activePerformance.total_steps || chartData.length}`
+                    : activePerformance?.run_name
+                    ? `Run: ${activePerformance.run_name}`
+                    : null
+                }
+                status={activePerformance?.status}
+                runs={availableRuns}
+                selectedRunId={selectedRunId || activePerformance?.run_id}
+                onSelectRun={handleSelectRun}
+                loadingRun={loadingRun}
                 data={chartData}
-                xKey="epoch"
+                xKey="step"
                 lines={[
                   {
                     dataKey: "trainingLoss",
@@ -196,16 +263,6 @@ export default function Dashboard() {
                   },
                 ]}
               />
-            ) : (
-              <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl border border-dashed border-gray-300 text-center h-[340px]">
-                <TrendingUp size={32} className="text-gray-300 mb-2" />
-                <h3 className="text-base font-semibold text-gray-700">
-                  Training Performance Chart
-                </h3>
-                <p className="mt-1 text-sm text-gray-400 max-w-sm">
-                  Loss curves will appear here automatically once fine-tuning runs complete.
-                </p>
-              </div>
             )}
           </div>
 
@@ -223,7 +280,7 @@ export default function Dashboard() {
             <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl border border-gray-200">
               <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mb-3" />
               <p className="text-gray-600 text-sm font-medium">
-                Loading deployed models...
+                Loading deployed models. Please wait...
               </p>
             </div>
           ) : tableData.length === 0 ? (

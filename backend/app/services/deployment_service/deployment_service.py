@@ -1,6 +1,7 @@
 import datetime
 from sqlalchemy.orm import Session
 from app.model.deployment_model import Deployment
+from app.model.evaluation_run_model import Evaluation_Model
 from app.model.model_registry import Model_Registry
 
 
@@ -30,6 +31,37 @@ class DeploymentService:
             deployment.base_model = None
             if not deployment.endpoint:
                 deployment.endpoint = f"https://inference.capital.ai/v1/models/model-{deployment.model_id}/generate"
+
+        # Resolve latency from real evaluation benchmarks
+        eval_record = None
+        if model and getattr(model, "evaluation_id", None):
+            eval_record = (
+                self.db.query(Evaluation_Model)
+                .filter(Evaluation_Model.evaluation_id == model.evaluation_id)
+                .first()
+            )
+        if not eval_record and deployment.model_id:
+            eval_record = (
+                self.db.query(Evaluation_Model)
+                .filter(
+                    Evaluation_Model.model_id == deployment.model_id,
+                    Evaluation_Model.evaluation_status == "COMPLETED",
+                )
+                .order_by(Evaluation_Model.evaluation_id.desc())
+                .first()
+            )
+
+        if eval_record and eval_record.average_latency_seconds is not None:
+            sec = float(eval_record.average_latency_seconds)
+            ms = round(sec * 1000, 1)
+            deployment.average_latency_ms = ms
+            if sec < 1.0:
+                deployment.latency = f"{int(ms) if ms.is_integer() else ms} ms"
+            else:
+                deployment.latency = f"{round(sec, 2)} s"
+        else:
+            deployment.average_latency_ms = None
+            deployment.latency = None
 
         return deployment
 

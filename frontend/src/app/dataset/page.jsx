@@ -194,7 +194,7 @@ export default function Dataset() {
         {loading ? (
           <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl border border-gray-200">
             <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mb-3" />
-            <p className="text-gray-600 text-sm font-medium">Loading datasets from server...</p>
+            <p className="text-gray-600 text-sm font-medium">Loading datasets. Please wait...</p>
           </div>
         ) : datasets.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl border border-dashed border-gray-300 text-center">

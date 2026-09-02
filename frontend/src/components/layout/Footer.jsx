@@ -4,7 +4,7 @@ export default function Footer() {
       <div className="flex flex-col gap-4 md:flex-row items-center justify-between px-6 max-w-7xl mx-auto">
         <div>
           <p className="text-xs lg:text-sm text-gray-500">
-            HDFC LLM Forge &copy; {new Date().getFullYear()}. All rights reserved.
+            HDFC Bank &copy; {new Date().getFullYear()}. All rights reserved.
           </p>
         </div>
         <div>
