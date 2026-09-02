@@ -9,6 +9,7 @@
 * [Project Overview](#-project-overview)
 * [Key Capabilities](#-key-capabilities)
 * [System Architecture](#-system-architecture)
+* [High-Level Application Flow](#-high-level-application-flow)
 * [Technology Stack](#-technology-stack)
 * [Repository Structure](#-repository-structure)
 * [Application Architecture](#-application-architecture)
@@ -28,7 +29,11 @@
 * [Troubleshooting](#-troubleshooting)
 * [Team Development Workflow](#-team-development-workflow)
 * [Future Improvements](#-future-improvements)
+* [Documentation](#-documentation)
+* [Contributing](#-contributing)
 * [License](#-license)
+* [Project Team](#-project-team)
+* [Project Status](#-project-status)
 
 ---
 
@@ -38,20 +43,17 @@ The **HDFC Bank Custom LLM Development Pipeline** is a full-stack AI/ML platform
 
 The platform brings together the major stages of the LLM lifecycle into a centralized application:
 
-* Dataset ingestion and management
-* Dataset processing
-* AI/ML training infrastructure
-* Fine-tuning using modern transformer technologies
-* Training artifact management
-* Model storage and distribution
-* Model evaluation infrastructure
-* Controlled inference
-* Authentication and role-based access control
-* Database-backed application management
+* Dataset ingestion, processing, and lineage management
+* Parameter-efficient fine-tuning (PEFT/LoRA) and model training infrastructure
+* Training artifact serialization and distribution
+* Model evaluation infrastructure and groundedness verification
+* Controlled inference and multi-model runtime
+* Role-based access control and enterprise authentication
+* Database-backed application state and audit history
 
 The system consists of three primary layers:
 
-1. **Frontend** — A Next.js-based user interface.
+1. **Frontend** — A Next.js-based modern user interface.
 2. **Backend** — A FastAPI application providing APIs, authentication, database access, and AI/ML orchestration.
 3. **AI/ML Layer** — PyTorch, Transformers, PEFT, Accelerate, and Hugging Face-based model training and inference infrastructure.
 
@@ -60,83 +62,22 @@ The system consists of three primary layers:
 # 🚀 Key Capabilities
 
 ## 🖥️ Full-Stack Web Application
+Provides a responsive, modern interface built with Next.js, React, Redux Toolkit, and Tailwind CSS for seamless interaction with every stage of the LLM workflow.
 
-The platform provides a modern web interface built with Next.js and React for interacting with the Custom LLM development workflow.
+## 📊 Dataset Ingestion & Processing
+Supports structured and unstructured dataset handling, spreadsheet parsing, validation checks, metadata tracking, and integration with remote dataset repositories.
 
----
+## 🧠 AI/ML Training & LoRA Fine-Tuning
+Enables parameter-efficient fine-tuning (PEFT/LoRA) workflows on domain-specific datasets with configurable training hyperparameters, checkpoints, and safetensors serialization.
 
-## 📊 Dataset Management
+## 🤗 Hugging Face Hub Synchronization
+Automates external AI/ML resource synchronization for models, adapters, and datasets with dedicated access token management and upload timeout handling.
 
-The system is designed to support dataset-related workflows, including:
+## 🗄️ Cloud Database & Schema Migrations
+Leverages managed PostgreSQL (Neon) with SQLAlchemy ORM and Alembic schema migrations for robust data persistence, auditability, and team collaboration.
 
-* Dataset ingestion
-* Dataset processing
-* Spreadsheet-based data handling
-* Dataset metadata management
-* Integration with external dataset repositories
-
-Dataset processing capabilities are supported through:
-
-* Pandas
-* OpenPyXL
-
----
-
-## 🧠 AI/ML Training Infrastructure
-
-The AI/ML layer supports modern transformer-based workflows using:
-
-* PyTorch
-* Hugging Face Transformers
-* PEFT
-* Accelerate
-* Safetensors
-
-The infrastructure is designed to support efficient parameter-efficient fine-tuning workflows.
-
----
-
-## 🤗 Hugging Face Integration
-
-The application integrates with Hugging Face Hub for external AI/ML resource management.
-
-Environment configuration supports:
-
-* Dataset repositories
-* Model repositories
-* Hugging Face authentication
-* Model artifact uploads
-
----
-
-## 🗄️ Cloud Database Integration
-
-The application uses **Neon PostgreSQL** as its database platform.
-
-Database functionality is supported through:
-
-* PostgreSQL
-* SQLAlchemy
-* Psycopg2
-* Alembic
-
----
-
-## 🔐 Authentication and RBAC
-
-The backend includes authentication and authorization dependencies supporting:
-
-* Password hashing
-* JWT-based authentication
-* Email validation
-* Role-based access control
-
-Technologies include:
-
-* PyJWT
-* bcrypt
-* Passlib
-* email-validator
+## 🔐 Enterprise Authentication & RBAC
+Implements secure user onboarding, bcrypt password hashing, JWT session handling, and granular 4-tier Role-Based Access Control.
 
 ---
 
@@ -321,6 +262,8 @@ sequenceDiagram
 | Safetensors      | Secure model serialization      |
 | Hugging Face Hub | Dataset and model management    |
 | PyYAML           | Configuration management        |
+| Pandas           | Dataset processing              |
+| OpenPyXL         | Excel spreadsheet data handling |
 
 ---
 
@@ -344,7 +287,7 @@ hdfc-custom-llm-dev-pipeline/
 │
 ├── backend/                    # FastAPI backend application
 │   ├── app/                    # Application source code
-│   ├── tests/                  # all tests
+│   ├── tests/                  # All backend tests
 │   ├── requirements.txt        # Python dependencies
 │   └── .env.example            # Environment variable template
 │
@@ -359,7 +302,7 @@ hdfc-custom-llm-dev-pipeline/
 ├── docs/                       # Project documentation
 │   ├── api/                    # API-related documentation
 │   ├── architecture/           # Architecture-related documentation
-|   ├── backend/                # All backend-related documentation
+│   ├── backend/                # All backend-related documentation
 │   ├── data-engineering/       # Data engineering-related documentation
 │   ├── frontend/               # All frontend-related documentation
 │   └── requirements/           # Requirements-related documentation
@@ -370,6 +313,7 @@ hdfc-custom-llm-dev-pipeline/
 ├── README.md
 └── hdfc.py
 ```
+
 ---
 
 # 🧩 Application Architecture
@@ -467,12 +411,6 @@ flowchart LR
     Processing --> HF
 ```
 
-Dataset processing is supported by:
-
-* Pandas
-* OpenPyXL
-* FastAPI file upload handling
-
 ---
 
 ## Model Lifecycle
@@ -510,22 +448,11 @@ Before running the project locally, install the following:
 ### Required
 
 * Git
-* Node.js
+* Node.js (18+ recommended)
 * npm
-* Python
-* PostgreSQL-compatible database access through Neon
-
-### Recommended Versions
-
-```text
-Node.js: 18+ recommended
-Python: 3.10+ recommended
-```
-
-You will also need access to:
-
-* Neon PostgreSQL
-* Hugging Face Hub
+* Python (3.10+ recommended)
+* Neon PostgreSQL access
+* Hugging Face Hub account & access token
 
 ---
 
@@ -537,24 +464,24 @@ Create a `.env` file inside the `backend` directory based on `.env.example`.
 
 ```env
 # Neon PostgreSQL Connection URL
-DATABASE_URL=
+DATABASE_URL=postgresql://<user>:<password>@<host>/<dbname>?sslmode=require
 
 # Hugging Face Hub Credentials & Repositories
-HF_TOKEN=
-HF_DATASET_REPO=
-HF_MODEL_REPO=
+HF_TOKEN=your_huggingface_token
+HF_DATASET_REPO=your-org/hdfc-dataset
+HF_MODEL_REPO=your-org/hdfc-custom-model
 
 # Maximum time a model artifact upload may wait before the run is marked FAILED
-HF_UPLOAD_TIMEOUT_SECONDS=
+HF_UPLOAD_TIMEOUT_SECONDS=600
 
 # Application Configuration
-ALLOW_ORIGIN=
+ALLOW_ORIGIN=http://localhost:3000
 
 # Set to 'development' to enable /docs and /redoc endpoints
 ENVIRONMENT=development
 
 # Debug configuration
-DEBUG=
+DEBUG=True
 ```
 
 ### Environment Variable Description
@@ -568,16 +495,16 @@ DEBUG=
 | `HF_UPLOAD_TIMEOUT_SECONDS` | Maximum model upload timeout      |
 | `ALLOW_ORIGIN`              | Allowed frontend origins for CORS |
 | `ENVIRONMENT`               | Application environment           |
-| `DEBUG`                     | Debug configuration               |
+| `DEBUG`                     | Debug configuration flag          |
 
 ---
 
 ## Frontend Environment Variables
 
-The frontend production configuration includes:
+Create a `.env.local` file in the `frontend` directory:
 
 ```env
-NEXT_PUBLIC_API_URL=
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ### Variable Description
@@ -585,14 +512,6 @@ NEXT_PUBLIC_API_URL=
 | Variable              | Description                     |
 | --------------------- | ------------------------------- |
 | `NEXT_PUBLIC_API_URL` | Base URL of the FastAPI backend |
-
-For local development, this should point to your locally running backend.
-
-Example:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
 
 ---
 
@@ -602,53 +521,25 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ```bash
 git clone https://github.com/ankush0710/hdfc-custom-llm-dev-pipeline.git
-```
-
-Navigate to the project:
-
-```bash
 cd hdfc-custom-llm-dev-pipeline
 ```
 
 ---
 
-# 🖥️ Frontend Setup
+## 2. Frontend Setup
 
-Navigate to the frontend directory:
+Navigate to the frontend directory and install dependencies:
 
 ```bash
 cd frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
 ```
 
-Configure the frontend API URL.
-
-Example:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-Start the development server:
-
-```bash
-npm run dev
-```
-
-The frontend development server is typically available at:
-
-```text
-http://localhost:3000
-```
+Ensure `.env.local` is configured with `NEXT_PUBLIC_API_URL=http://localhost:8000`.
 
 ---
 
-# ⚙️ Backend Setup
+## 3. Backend Setup
 
 Navigate to the backend directory:
 
@@ -656,53 +547,31 @@ Navigate to the backend directory:
 cd backend
 ```
 
-## Create a Virtual Environment
+### Create and Activate Virtual Environment
 
-### Windows
-
+**Windows:**
 ```bash
 python -m venv venv
-```
-
-Activate the environment:
-
-```bash
 venv\Scripts\activate
 ```
 
-### macOS / Linux
-
+**macOS / Linux:**
 ```bash
 python3 -m venv venv
-```
-
-Activate the environment:
-
-```bash
 source venv/bin/activate
 ```
 
----
-
-## Install Dependencies
+### Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
+### Configure Environment Variables
 
-## Configure Environment Variables
+Create your local `backend/.env` file with your Neon and Hugging Face credentials.
 
-Create your local `.env` file:
-
-```text
-backend/.env
-```
-
-Add your Neon and Hugging Face configuration.
-
-⚠️ Never commit your `.env` file, Hugging Face token, database credentials, or other secrets to GitHub.
+> ⚠️ Never commit your `.env` file, Hugging Face token, database credentials, or other secrets to GitHub.
 
 ---
 
@@ -712,27 +581,27 @@ The frontend and backend should run in separate terminals.
 
 ## Terminal 1 — Backend
 
-From the backend directory, start the FastAPI application using the project's configured Uvicorn entry point.
-
-Example format:
+From the `backend` directory (with virtual environment active):
 
 ```bash
-uvicorn <your_application_module>:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-> Use the exact application module configured in your backend project.
+* API Base: `http://localhost:8000`
+* Swagger Docs: `http://localhost:8000/docs`
+* ReDoc: `http://localhost:8000/redoc`
 
 ---
 
 ## Terminal 2 — Frontend
 
+From the `frontend` directory:
+
 ```bash
-cd frontend
 npm run dev
 ```
 
 Open:
-
 ```text
 http://localhost:3000
 ```
@@ -743,16 +612,14 @@ http://localhost:3000
 
 The project uses **Neon PostgreSQL** as its database platform.
 
-The backend interacts with the database using:
-
 ```text
 FastAPI
    │
    ▼
-SQLAlchemy
+SQLAlchemy ORM
    │
    ▼
-Psycopg2
+Psycopg2 Driver
    │
    ▼
 Neon PostgreSQL
@@ -762,67 +629,39 @@ Neon PostgreSQL
 
 ## Database Migrations
 
-The project includes:
+Database schema changes are managed with **Alembic**:
 
 ```text
-Alembic
+Model Changes ──► Create Migration (alembic revision) ──► Review ──► Apply (alembic upgrade head) ──► Neon PostgreSQL
 ```
 
-Alembic should be used to manage database schema changes rather than manually modifying production tables.
+To run migrations:
 
-Recommended workflow:
-
-```text
-Model Changes
-      │
-      ▼
-Create Migration
-      │
-      ▼
-Review Migration
-      │
-      ▼
-Apply Migration
-      │
-      ▼
-Neon PostgreSQL
+```bash
+cd backend
+alembic upgrade head
 ```
 
 ---
 
 # 🤗 Hugging Face Integration
 
-The project integrates with Hugging Face Hub for AI/ML resource management.
+The project integrates with Hugging Face Hub for AI/ML resource management:
 
-The backend environment supports:
-
-```env
-HF_TOKEN
-HF_DATASET_REPO
-HF_MODEL_REPO
-```
-
-The Hugging Face integration is intended to support:
-
-* Dataset repository access
-* Model repository access
-* Model artifact uploads
+* Dataset repository synchronization and versioning
+* Model repository access and checkpoint downloads
+* Fine-tuned LoRA adapter and model artifact uploads
 
 ```mermaid
 flowchart LR
 
     Backend["FastAPI Backend"]
-
     HF["Hugging Face Hub"]
-
     Dataset["Dataset Repository"]
-
     Model["Model Repository"]
 
     Backend --> HF
-
     HF --> Dataset
-
     HF --> Model
 ```
 
@@ -867,33 +706,11 @@ sequenceDiagram
     end
 ```
 
-## Authentication Architecture
-
-The authentication process follows these steps:
-
-1. The user enters their credentials in the Next.js frontend.
-2. The frontend sends the login request to the FastAPI backend.
-3. The backend validates the authentication request.
-4. The system searches for the user in Neon PostgreSQL.
-5. The submitted password is verified against the securely hashed password.
-6. If authentication is successful, a JWT access token is generated.
-7. The access token is returned to the frontend.
-8. The authenticated user can use the token to access protected API endpoints.
-
-### Authentication Technologies
-
-* **FastAPI** — Authentication API
-* **Neon PostgreSQL** — User data storage
-* **SQLAlchemy** — Database interaction
-* **bcrypt / Passlib** — Password hashing and verification
-* **PyJWT** — JWT access token generation and validation
-* **Next.js** — Authentication user interface
-
-Authorization can be implemented through role-based access control to restrict access to protected resources and operations.
+---
 
 ## 🛡️ Role-Based Access Control (RBAC)
 
-The platform uses RBAC to control access based on four user roles.
+The platform enforces RBAC across four predefined user roles:
 
 ```mermaid
 flowchart TB
@@ -924,78 +741,30 @@ flowchart TB
 | 🔎 **Reviewer**       | Review datasets, results, and approvals    |
 | 👁️ **Viewer**        | Read-only access to authorized information |
 
-
 ---
 
 # 🧠 AI/ML Runtime
 
-The AI/ML runtime includes:
-
 ```text
-PyTorch
-    │
-    ▼
-Hugging Face Transformers
-    │
-    ▼
-PEFT
-    │
-    ▼
-Accelerate
-    │
-    ▼
-Model Training / Fine-Tuning
+PyTorch ──► Hugging Face Transformers ──► PEFT (LoRA) ──► Accelerate ──► Model Training / Fine-Tuning
 ```
 
 ## Core Libraries
 
-### PyTorch
-
-Used as the deep learning runtime.
-
-### Transformers
-
-Used for transformer-based language model operations.
-
-### PEFT
-
-Supports parameter-efficient fine-tuning approaches.
-
-### Accelerate
-
-Provides utilities for efficient training workflows.
-
-### Safetensors
-
-Supports secure and efficient model artifact serialization.
+* **PyTorch** — Deep learning framework and GPU runtime.
+* **Transformers** — Pretrained language model architectures and tokenization.
+* **PEFT** — Parameter-efficient fine-tuning (LoRA / QLoRA).
+* **Accelerate** — Hardware acceleration and multi-GPU utilities.
+* **Safetensors** — Safe, high-speed model tensor serialization.
 
 ---
 
 # 📊 API Documentation
 
-FastAPI can provide interactive API documentation.
+When the backend is running in `ENVIRONMENT=development`, interactive API documentation is automatically accessible:
 
-When the application environment is configured for development:
-
-```env
-ENVIRONMENT=development
-```
-
-API documentation can be accessed through:
-
-### Swagger UI
-
-```text
-http://localhost:8000/docs
-```
-
-### ReDoc
-
-```text
-http://localhost:8000/redoc
-```
-
-> API documentation availability depends on the application's environment configuration.
+* **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ---
 
@@ -1003,49 +772,30 @@ http://localhost:8000/redoc
 
 ## Frontend
 
-### Start Development Server
-
-```bash
-npm run dev
-```
-
-### Create Production Build
-
-```bash
-npm run build
-```
-
-### Start Production Server
-
-```bash
-npm run start
-```
-
-### Run Linting
-
-```bash
-npm run lint
-```
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start Next.js local development server |
+| `npm run build` | Create optimized production bundle |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint static analysis |
 
 ---
 
 ## Backend
 
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Start the backend using the project's configured Uvicorn application entry point.
+| Command | Purpose |
+| --- | --- |
+| `pip install -r requirements.txt` | Install Python dependencies |
+| `uvicorn app.main:app --reload` | Start FastAPI development server |
+| `alembic revision --autogenerate -m "message"` | Generate database migration script |
+| `alembic upgrade head` | Apply database migrations |
+| `pytest` | Run backend test suite |
 
 ---
 
 # 🌐 Deployment Architecture
 
-The application is **Deployed**.
-
-The production architecture can follow this structure:
+The application is deployed across cloud infrastructure:
 
 ```mermaid
 flowchart TB
@@ -1069,259 +819,132 @@ flowchart TB
     Render --> HF
 ```
 
-## Planned Deployment Components
+## Deployment Platform Mapping
 
-| Component | Platform         |
-| --------- | ---------------- |
-| Frontend  | Vercel           |
-| Backend   | Render           |
-| Database  | Neon PostgreSQL  |
-| AI Models | Hugging Face Hub |
-| Datasets  | Hugging Face Hub |
-
-> Deployment configuration should be finalized and updated in this README once production URLs are available.
+| Component | Platform | Description |
+| --------- | -------- | ----------- |
+| Frontend | Vercel | Production Next.js edge deployment |
+| Backend | Render | FastAPI containerized web service |
+| Database | Neon PostgreSQL | Serverless cloud PostgreSQL |
+| AI Models | Hugging Face Hub | Model repository & adapter storage |
+| Datasets | Hugging Face Hub | Dataset repository & versioning |
 
 ---
 
 # 🔒 Security Guidelines
 
-The following sensitive information must never be committed to GitHub:
+The following sensitive information must never be committed to Git:
 
-❌ Database passwords
-❌ Neon connection credentials
-❌ Hugging Face tokens
-❌ JWT secrets
-❌ Production environment files
-❌ API keys
+* ❌ Database passwords & Neon connection strings
+* ❌ Hugging Face API tokens
+* ❌ JWT secret keys
+* ❌ Production `.env` files
 
-Always use environment variables:
-
-```text
-.env
-.env.local
-.env.production
-```
-
-Only commit safe templates such as:
-
-```text
-.env.example
-```
+Always use `.env.example` templates and configure environment secrets directly in the host platform (Vercel / Render).
 
 ---
 
 # 🛠️ Troubleshooting
 
 ## Frontend Cannot Connect to Backend
-
-Check:
-
-* Is the FastAPI backend running?
-* Is `NEXT_PUBLIC_API_URL` configured correctly?
-* Is the backend port correct?
-* Is CORS configured correctly through `ALLOW_ORIGIN`?
-
----
+* Verify FastAPI is running at `http://localhost:8000`.
+* Check `NEXT_PUBLIC_API_URL` in `.env.local`.
+* Confirm backend `ALLOW_ORIGIN` includes the frontend URL (`http://localhost:3000`).
 
 ## Database Connection Error
-
-Check:
-
-* `DATABASE_URL`
-* Neon database status
-* PostgreSQL connection string format
-* Network connectivity
-
----
+* Check `DATABASE_URL` connection string and credentials.
+* Ensure Neon project compute is active and SSL mode is enabled (`?sslmode=require`).
 
 ## Hugging Face Authentication Error
-
-Check:
-
-* `HF_TOKEN`
-* Token permissions
-* Repository access
-* Dataset repository name
-* Model repository name
-
----
-
-## Backend Dependency Error
-
-Activate your virtual environment and reinstall dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## Frontend Build Error
-
-Remove installed dependencies and reinstall:
-
-```bash
-rm -rf node_modules
-npm install
-```
-
-On Windows, remove the `node_modules` folder manually or using PowerShell.
+* Verify `HF_TOKEN` permissions (read/write access).
+* Check repository name formatting (`org/repo-name`).
 
 ---
 
 # 🌿 Team Development Workflow
 
-A recommended workflow for contributors:
-
 ```text
 main
  │
  ├── feature/frontend-feature
- │
  ├── feature/backend-feature
- │
  ├── feature/ai-training
- │
  └── feature/evaluation
 ```
 
-## Recommended Process
-
-1. Pull the latest changes.
-2. Create or switch to your feature branch.
-3. Implement your changes.
-4. Run the application locally.
-5. Test your changes.
-6. Commit changes with a meaningful message.
-7. Push your branch.
-8. Create a Pull Request.
-9. Review and merge changes.
-
-Example:
-
-```bash
-git checkout main
-git pull origin main
-
-git checkout -b feature/your-feature-name
-
-git add .
-git commit -m "feat: add your feature"
-
-git push origin feature/your-feature-name
-```
+1. Create a feature branch: `git checkout -b feature/your-feature-name`
+2. Implement changes and test locally.
+3. Commit with standard convention: `git commit -m "feat: add feature description"`
+4. Push and open a Pull Request against `main`.
 
 ---
 
 # 🔮 Future Improvements
 
-Potential future enhancements include:
-
-* Advanced automated model evaluation
-* Model comparison dashboards
-* Training experiment tracking
-* Redis Caching, Load Balancing
-* Improved monitoring and observability
-* Production-grade model serving
-* Background job processing for long-running training tasks
-* Advanced dataset validation
-* Model version management
-* CI/CD automation
-* Automated testing pipelines
-* Production monitoring
-* Enhanced audit logging
+* Advanced automated model evaluation & benchmark suites
+* Model comparison dashboards with latency/groundedness metrics
+* Redis caching and API rate limiting
+* Asynchronous distributed background training jobs (Celery / Redis)
+* Production monitoring, OpenTelemetry tracing, and audit logs
 
 ---
 
 # 📚 Documentation
 
-Additional project documentation is organized under:
+Detailed sub-module documentation:
 
 ```text
 docs/
-├── api/
-├── architecture/
-├── backend/
-├── data-engineering/
-├── frontend/
-└── requirements/
+├── api/                    # API request & response schemas
+├── architecture/           # Deep-dive architecture specs
+├── backend/                # Backend service design
+├── data-engineering/       # Dataset pipelines & validation
+├── frontend/               # UI components & state patterns
+└── requirements/           # Functional specifications
 ```
-
-This structure is intended to keep detailed technical documentation separate from the primary project README.
 
 ---
 
 # 🤝 Contributing
 
-Contributions should follow the project's development workflow.
-
-Before submitting changes:
-
-* Ensure the application runs locally.
-* Test affected functionality.
-* Do not commit secrets.
-* Keep commits focused.
-* Use meaningful commit messages.
-* Update documentation when necessary.
+1. Ensure the application builds and tests pass locally before committing.
+2. Follow coding standards and formatting rules for Python and TypeScript/JavaScript.
+3. Never commit sensitive credentials or large data binaries directly to Git.
 
 ---
 
 # 📄 License
 
-This project is currently intended for development, educational, and project demonstration purposes.
-
-License terms can be updated based on future project or organizational requirements.
+This project is intended for internal development, educational, and demonstration purposes for HDFC Bank Custom LLM workflows.
 
 ---
 
 # 👨‍💻 Project Team
 
-This project is developed collaboratively by a multidisciplinary team working across:
+Developed collaboratively by a multidisciplinary team:
 
-* Frontend Development
-* Backend Development
-* AI/ML Engineering
-* Data Science
-* Model Training
-* Integration
-
-Team member details and responsibilities can be added here as the final project team structure is confirmed.
+* **Frontend Development**
+* **Backend Development**
+* **AI/ML Engineering**
+* **Data Science & Model Training**
+* **Evaluation & MLOps**
 
 ---
 
 # 📌 Project Status
 
-**Currently In Production**
+**Status:** In Production / Active Development
 
-Current infrastructure includes:
-
-* Next.js frontend
-* FastAPI backend
-* Neon PostgreSQL integration
-* SQLAlchemy ORM
-* Alembic migrations
-* Authentication and RBAC dependencies
-* Hugging Face integration
-* PyTorch and Transformers runtime
-* PEFT-based AI/ML infrastructure
-
-### Deployment Status
-
-| Service                  | Status                     |
-| ------------------------ | -------------------------- |
-| Frontend                 |  deployed                  |
-| Backend                  |  deployed                  |
-| Database                 | Neon PostgreSQL            |
-| Hugging Face Integration | Configured for project use |
+| Service | Status | Platform |
+| --- | --- | --- |
+| Frontend | Deployed | Vercel |
+| Backend | Deployed | Render |
+| Database | Active | Neon PostgreSQL |
+| Hugging Face Hub | Connected | HF Model & Dataset Repos |
 
 ---
 
 ## ⭐ Repository
 
-For more information and source code:
-
-**HDFC Bank Custom LLM Development Pipeline**
-
-`https://github.com/ankush0710/hdfc-custom-llm-dev-pipeline`
-
----
+**HDFC Bank Custom LLM Development Pipeline**  
+[https://github.com/ankush0710/hdfc-custom-llm-dev-pipeline](https://github.com/ankush0710/hdfc-custom-llm-dev-pipeline)
