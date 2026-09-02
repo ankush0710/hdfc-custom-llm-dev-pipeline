@@ -1,437 +1,345 @@
 # HDFC Custom LLM Development Pipeline: Project Requirements Specification
-**Document Type:** Projectional Requirements Specification Document  
-**Version:** 1.0.0  
-**Project:** HDFC Custom LLM Development Pipeline (`hdfc-custom-llm-dev-pipeline`)  
-**Status:** Approved for Implementation  
+
+> **Document Type:** Production Requirements Specification Document (PRD)  
+> **Version:** 2.0.0 (Synchronized with Actual Production Architecture)  
+> **Project:** HDFC Bank Custom LLM Development Pipeline (`hdfc-custom-llm-dev-pipeline`)  
+> **Status:** Fully Aligned with Implementation  
+> **Target Frameworks:** Next.js 16.3.0 (App Router) / FastAPI 0.141.1 / Neon PostgreSQL / PyTorch & PEFT  
 
 ---
 
-## 1. Executive Summary & Document Scope
+## 📌 Table of Contents
 
-The **HDFC Custom LLM Development Pipeline** is an enterprise-grade platform designed for managing, fine-tuning, evaluating, deploying, and monitoring proprietary Large Language Models (LLMs). 
-
-This document defines the system requirements using a **Projectional Requirements Architecture**. A projectional specification decomposes system requirements into distinct multi-dimensional views (projections)—mapping core business capabilities directly across the technology stack layers: **Frontend**, **Backend**, **Data Layer**, **User Interface**, and **API Interfaces**.
+1. [Executive Summary & Document Scope](#1-executive-summary--document-scope)
+2. [Technology Stack & Platform Architecture](#2-technology-stack--platform-architecture)
+3. [System Architecture & Projectional Model](#3-system-architecture--projectional-model)
+4. [Multi-Dimensional Module Requirements](#4-multi-dimensional-module-requirements)
+   * [Module 1: Authentication & Role-Based Access Control (RBAC)](#module-1-authentication--role-based-access-control-rbac)
+   * [Module 2: Dataset Management & Multi-Format Ingestion](#module-2-dataset-management--multi-format-ingestion)
+   * [Module 3: Data Quality Processing & PII De-Identification](#module-3-data-quality-processing--pii-de-identification)
+   * [Module 4: Supervised Fine-Tuning (SFT / LoRA) & Live Training Telemetry](#module-4-supervised-fine-tuning-sft--lora--live-training-telemetry)
+   * [Module 5: Automated Benchmark Evaluation & Safety Guardrails](#module-5-automated-benchmark-evaluation--safety-guardrails)
+   * [Module 6: Model Registry & 360° Lineage Management](#module-6-model-registry--360-lineage-management)
+   * [Module 7: Model Deployment & Quality Gate Serving](#module-7-model-deployment--quality-gate-serving)
+   * [Module 8: Interactive AI Playground & Multi-Turn Inference](#module-8-interactive-ai-playground--multi-turn-inference)
+   * [Module 9: Executive Dashboard & Pipeline Lineage Tracking](#module-9-executive-dashboard--pipeline-lineage-tracking)
+5. [Non-Functional Requirements & Enterprise SLAs](#5-non-functional-requirements--enterprise-slas)
+6. [Directory Structure & Implementation Mapping](#6-directory-structure--implementation-mapping)
+7. [Verification & Acceptance Criteria](#7-verification--acceptance-criteria)
 
 ---
 
-## 2. Technology Stack & Platform Architecture
+# 1. Executive Summary & Document Scope
+
+The **HDFC Bank Custom LLM Development Pipeline** is an enterprise MLOps governance platform purpose-built for the banking sector. It manages the entire lifecycle of proprietary, domain-specialized Large Language Models:
+
+1. **Governed Data Ingestion:** Uploading banking datasets, versioning, PII detection/sanitization, and Hugging Face Hub synchronization.
+2. **LoRA Fine-Tuning Orchestration:** Fine-tuning foundation models (`Qwen/Qwen2.5-1.5B-Instruct`, `Qwen/Qwen3-0.6B`, `HuggingFaceTB/SmolLM2-1.7B-Instruct`) with live step-level loss and learning rate telemetry streaming.
+3. **Rigorous Quality Gate Benchmarking:** Automated multi-dimensional evaluation (intent classification, structured response accuracy, citation fidelity, escalation detection, and safety violation checks).
+4. **Governed Deployment & Inference:** Quality-gated deployment lifecycle (Rollback, Reload, Restart) and real-time inference playground with banking policy context.
+5. **Enterprise Security:** JWT-based stateless authentication, bcrypt password hashing, and granular 4-tier Role-Based Access Control (`ADMIN`, `DS`, `REVIEWER`, `VIEWER`).
+
+---
+
+# 2. Technology Stack & Platform Architecture
 
 ### 2.1 Core Stack Breakdown
 
-```
-+---------------------------------------------------------------------------------------+
-|                                    FRONTEND LAYER                                     |
-|  [ Next.js (App Router) ]  [ JavaScript (ES6+) ]  [ Tailwind CSS ]  [ Lucide-React ]  |
-|                        [ Axios ]                  [ Recharts ]                        |
-+---------------------------------------------------------------------------------------+
-                                           | HTTP / REST / WebSockets
-                                           v
-+---------------------------------------------------------------------------------------+
-|                                    BACKEND LAYER                                      |
-|            [ FastAPI Framework ]    [ Pydantic Schemas ]    [ Async Drivers ]         |
-+---------------------------------------------------------------------------------------+
-                                           | Async Engine / SQL Connection
-                                           v
-+---------------------------------------------------------------------------------------+
-|                                     DATA LAYER                                        |
-|                         [ PostgreSQL Relational Database ]                            |
-+---------------------------------------------------------------------------------------+
+```text
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│                                    FRONTEND LAYER                                     │
+│  [ Next.js 16.3.0 (App Router) ]  [ React 19.2.8 ]  [ Tailwind CSS v4 ]               │
+│  [ Lucide React Icons ]           [ Recharts 3.10 ]  [ Axios 1.19.0 ]  [ Sonner ]     │
+└──────────────────────────────────────────┬────────────────────────────────────────────┘
+                                           │ HTTP / REST (JWT Bearer Auth)
+                                           ▼
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│                                    BACKEND LAYER                                      │
+│  [ FastAPI 0.141.1 ]  [ Pydantic v2 ]  [ PyTorch 2.13 ]  [ PEFT 0.20 ]  [ Uvicorn ]   │
+│  [ Hugging Face Hub SDK ]  [ PyJWT + Bcrypt ]  [ BackgroundTasks & Threads ]          │
+└──────────────────────────────────────────┬────────────────────────────────────────────┘
+                                           │ SQLAlchemy 2.0 (Psycopg2 Pool)
+                                           ▼
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│                                     DATA LAYER                                        │
+│  [ Neon Serverless PostgreSQL 16 ]  [ Local Cache Storage ]  [ Hugging Face Repos ]   │
+└───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Domain | Technology | Core Responsibilities & Use Cases |
-| :--- | :--- | :--- |
-| **Frontend Framework** | **Next.js** | Server-Side Rendering (SSR), App Router layout, static site generation for documentation, dynamic routing for pipelines, optimal bundle chunking. |
-| **Language** | **JavaScript (ES6+)** | Dynamic UI interactions, async/await pipeline handlers, state logic, stream processing for LLM tokens. |
-| **Styling & UI Design** | **Tailwind CSS** | Custom design system, enterprise dark/light theme, glassmorphism card designs, responsive layout grids. |
-| **Data Fetching** | **Axios** | Standardized HTTP requests, API request/response interceptors, auth token injection, error handling, SSE response streaming. |
-| **Data Visualization** | **Recharts** | Real-time graphs for LLM training loss, validation accuracy, token throughput, GPU memory usage, radar charts for model evaluations. |
-| **Iconography** | **Lucide React** | Consistent visual language for status indicators, pipeline controls, model status badges, and interactive controls. |
-| **Backend API** | **FastAPI** | High-performance asynchronous RESTful APIs, automatic OpenAPI/Swagger spec generation, background task orchestration. |
-| **Data Validation** | **Pydantic** | Strict type enforcement, payload serialization/deserialization, environment configuration management, runtime error handling. |
-| **Database** | **PostgreSQL** | Relational storage for user accounts, datasets, model registry metadata, training logs, evaluation benchmarks, audit records. |
+| Domain / Layer | Technology | Actual Version | Core Responsibilities & Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Frontend Framework** | **Next.js** | `16.3.0` | App Router routing, dynamic routes (`[id]`), SSR shell, asset optimization. |
+| **UI Library** | **React / React DOM**| `19.2.8` | Declarative UI rendering, hooks lifecycle (`useState`, `useEffect`, `useCallback`). |
+| **Styling & Theme** | **Tailwind CSS** | `^4.0.0` | Utility-first styling, Merriweather Serif font variable, HDFC brand color tokens. |
+| **Data Fetching** | **Axios** | `^1.19.0` | Centralized `apiClient.js`, Bearer JWT injection, multipart form-data boundary handling. |
+| **Data Visualization**| **Recharts** | `^3.10.1` | Step-level training loss sparklines, evaluation metric radars, and throughput bars. |
+| **Iconography** | **Lucide React** | `^1.30.0` | Vector icons for navigation, status badges, and interactive controls. |
+| **Notifications** | **Sonner** | `^2.0.8` | Rich toast notifications for API success, error handling, and permission alerts. |
+| **Backend API** | **FastAPI** | `0.141.1` | Asynchronous REST routing, OpenAPI 3.1 documentation, dependency injection. |
+| **Data Validation** | **Pydantic** | `^2.13.4` | Strict request parsing, coercion, schema validation, and error serialization. |
+| **AI / ML Runtime** | **PyTorch / PEFT** | `^2.13.0` / `^0.20.0`| SFT LoRA fine-tuning, tokenizer chat templating, model inference execution. |
+| **Database Engine** | **Neon PostgreSQL** | PostgreSQL 16 | Relational persistence for datasets, runs, evaluations, models, deployments, users. |
+| **ORM & Migrations**| **SQLAlchemy / Alembic**| `^2.0.52` / `^1.19.1`| Declarative database mapping, connection pooling, and migration tracking. |
 
 ---
 
-## 3. High-Level System Architecture Projection
+# 3. System Architecture & Projectional Model
 
 ```mermaid
 graph TD
-    subgraph Client ["Frontend View Projection (Next.js + JS)"]
-        UI[Next.js App Router Views]
-        Tailwind[Tailwind CSS Styling]
-        Icons[Lucide React Icons]
-        RechartsComp[Recharts Data Visualization]
-        AxiosClient[Axios API Client Layer]
+    subgraph Client ["Frontend View Projection (Next.js 16 + React 19)"]
+        UI["Next.js App Router Pages"]
+        AuthCtx["AuthContext & RBAC Guard"]
+        AxiosClient["apiClient.js (Axios)"]
+        Charts["Recharts Visualizations"]
     end
 
     subgraph Server ["Backend Service Projection (FastAPI)"]
-        Router[FastAPI API Router]
-        Middleware[Auth & Middleware Layer]
-        Schemas[Pydantic Validation Schemas]
-        Services[LLM Pipeline Services]
+        Router["FastAPI Routers (11 Modules)"]
+        AuthDep["auth_dependency.py (JWT + RBAC)"]
+        Services["Domain Business Services"]
+        AIAdapters["AI Training & Inference Adapters"]
     end
 
-    subgraph Storage ["Data Persistence Projection (PostgreSQL)"]
-        DB[(PostgreSQL Database)]
-        ModelsTable[(models & checkpoints)]
-        RunsTable[(training_runs & metrics)]
-        EvalTable[(evaluation_runs)]
+    subgraph Storage ["Data Persistence Projection (Neon PostgreSQL & HF Hub)"]
+        DB[("Neon Managed PostgreSQL")]
+        HFHub["☁️ Hugging Face Hub (Datasets & Models)"]
+        Disk["Local File Storage (uploads/ & cache)"]
     end
 
-    UI --> AxiosClient
-    RechartsComp --> AxiosClient
-    AxiosClient -->|REST API Requests| Router
-    Router --> Middleware
-    Middleware --> Schemas
-    Schemas --> Services
+    UI --> AuthCtx
+    AuthCtx --> AxiosClient
+    Charts --> AxiosClient
+    AxiosClient -->|REST API Requests (Bearer Token)| Router
+    Router --> AuthDep
+    AuthDep --> Services
+    Services --> AIAdapters
     Services --> DB
-    DB --- ModelsTable
-    DB --- RunsTable
-    DB --- EvalTable
+    Services --> Disk
+    Services --> HFHub
 ```
 
 ---
 
-## 4. Multi-Dimensional Projectional Specifications
-
-In a projectional requirements format, each functional module is projected across **5 core dimensions**:
-1. **Frontend View Projection** (Next.js Page & Components)
-2. **UI & Visualization Projection** (Tailwind CSS, Recharts, Lucide React)
-3. **API Client & Request Projection** (Axios Protocol)
-4. **Backend Validation & Logic Projection** (FastAPI & Pydantic)
-5. **Database Storage Projection** (PostgreSQL Schemas)
+# 4. Multi-Dimensional Module Requirements
 
 ---
 
-### Projection 1: Real-Time Model Training & Monitoring
+### Module 1: Authentication & Role-Based Access Control (RBAC)
 
 #### Description
-Provides real-time visibility into active fine-tuning jobs for custom LLMs, displaying loss curves, epoch progress, GPU metrics, and hyperparameter logs.
+Stateless JWT Bearer token authentication with bcrypt password hashing and 4-tier Role-Based Access Control (`ADMIN`, `DS`, `REVIEWER`, `VIEWER`).
 
-#### 1. Frontend View Projection
-- **Route:** `/training/[id]`
-- **Next.js Strategy:** Server Component shell with Client Component wrappers for real-time chart polling (`useClient`).
-- **Core Components:** `TrainingDashboardShell`, `LossCurveChart`, `EpochProgressBar`, `MetricsSummaryCards`, `HyperparameterPanel`.
-
-#### 2. UI & Visualization Projection
-- **Icons (`Lucide React`):** `Play`, `Pause`, `Square`, `Activity`, `CheckCircle2`, `AlertTriangle`, `Cpu`, `Clock`.
-- **Styling (`Tailwind CSS`):** Dark slate theme (`bg-slate-900`), status glowing accents (`shadow-emerald-500/20`), responsive grid layout (`grid grid-cols-12 gap-6`).
-- **Analytics (`Recharts`):**
-  - `ResponsiveContainer` + `LineChart` for **Training vs. Validation Loss** over steps.
-  - `AreaChart` for **Learning Rate Decay**.
-  - Custom tooltips formatted with dark background and colored legend dots.
-
-#### 3. API Client & Request Projection (`Axios`)
-- **API Call:** `Axios.get('/api/v1/training/runs/{run_id}/metrics')`
-- **Polling / Stream:** Interceptor-backed long polling or SSE (Server-Sent Events) adapter.
-- **Error Handling:** Retries on HTTP 503/504 with exponential backoff using custom Axios response interceptor.
-
-#### 4. Backend Validation & Logic Projection (`FastAPI` & `Pydantic`)
-- **FastAPI Endpoint:** `GET /api/v1/training/runs/{run_id}/metrics`
-- **HTTP Method:** `GET`
-- **Pydantic Response Schema:**
-```python
-class TrainingMetricItem(BaseModel):
-    step: int
-    epoch: float
-    training_loss: float
-    validation_loss: Optional[float] = None
-    learning_rate: float
-    gpu_memory_usage_gb: float
-    timestamp: datetime
-
-class TrainingRunStatusResponse(BaseModel):
-    run_id: str
-    model_name: str
-    status: Literal["QUEUED", "RUNNING", "COMPLETED", "FAILED", "STOPPED"]
-    current_step: int
-    total_steps: int
-    metrics_history: List[TrainingMetricItem]
-```
-
-#### 5. Database Storage Projection (`PostgreSQL`)
-- **Tables Involved:** `training_runs`, `training_metrics`
-- **Schema Mapping:**
-```sql
-CREATE TABLE training_runs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    model_id UUID NOT NULL REFERENCES models(id),
-    status VARCHAR(50) NOT NULL DEFAULT 'QUEUED',
-    hyperparameters JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE training_metrics (
-    id BIGSERIAL PRIMARY KEY,
-    run_id UUID NOT NULL REFERENCES training_runs(id) ON DELETE CASCADE,
-    step INT NOT NULL,
-    epoch NUMERIC(6, 3) NOT NULL,
-    training_loss NUMERIC(8, 6) NOT NULL,
-    validation_loss NUMERIC(8, 6),
-    learning_rate NUMERIC(10, 8) NOT NULL,
-    gpu_memory_gb NUMERIC(5, 2),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX idx_training_metrics_run_step ON training_metrics(run_id, step);
-```
+* **Frontend View:** `/login`, `/signup`, `/admin/users` (Protected with `allowedRoles={["ADMIN"]}`).
+* **UI Components:** `src/components/auth/ProtectedRoute.jsx`, `src/components/layout/Navbar.jsx` (Role Badge), `Sidebar.jsx` (Admin Menu Filter).
+* **API Endpoints:**
+  * `POST /auth/signup` (201 Created)
+  * `POST /auth/login` (200 OK — Returns `access_token` and user object)
+  * `GET /auth/me` (200 OK — Returns current user profile)
+  * `POST /auth/logout` (200 OK)
+  * `GET /auth/users` (200 OK — `ADMIN` only)
+  * `PUT /auth/users/{user_id}/role` (200 OK — `ADMIN` only)
+  * `PATCH /auth/users/{user_id}/status` (200 OK — `ADMIN` only)
+* **Database Entity (`users` table):**
+  * `id` (PK Integer), `full_name` (String), `email` (Unique String), `password_hash` (String), `role` (String), `is_active` (Boolean), `created_at`, `updated_at`.
 
 ---
 
-### Projection 2: Model Evaluation & Benchmark Comparison
+### Module 2: Dataset Management & Multi-Format Ingestion
 
 #### Description
-Enables developers to benchmark multiple model versions against standard evaluation datasets (e.g., MMLU, GSM8K, custom enterprise QA benchmarks) across key metrics.
+Ingest multi-format banking datasets (`.csv`, `.xlsx`, `.json`, `.jsonl`), create immutable dataset versions, and synchronize automatically with Hugging Face Hub (`HF_DATASET_REPO`).
 
-#### 1. Frontend View Projection
-- **Route:** `/evaluation`
-- **Next.js Strategy:** Dynamic route `/evaluation/compare?models=id1,id2`.
-- **Core Components:** `EvalComparisonMatrix`, `RadarMetricsOverview`, `BenchmarkTable`, `ModelSelectorDropdown`.
-
-#### 2. UI & Visualization Projection
-- **Icons (`Lucide React`):** `BarChart3`, `Target`, `Zap`, `ShieldCheck`, `GitCompare`, `Download`, `Layers`.
-- **Styling (`Tailwind CSS`):** Comparison tables with sticky headers (`sticky top-0 bg-slate-800`), badge colors for highest performance metrics (`bg-emerald-500/10 text-emerald-400`).
-- **Analytics (`Recharts`):**
-  - `RadarChart` + `Radar` + `PolarGrid` mapping metrics: Accuracy, Perplexity, Latency, hallucination score, and Safety score.
-  - `BarChart` comparing Token Throughput (tokens/sec).
-
-#### 3. API Client & Request Projection (`Axios`)
-- **API Call:** `Axios.post('/api/v1/evaluations/compare', { model_ids: [...] })`
-- **Payload Handling:** JSON body containing target `model_ids` and target `benchmark_ids`.
-
-#### 4. Backend Validation & Logic Projection (`FastAPI` & `Pydantic`)
-- **FastAPI Endpoint:** `POST /api/v1/evaluations/compare`
-- **Pydantic Schemas:**
-```python
-class EvaluationCompareRequest(BaseModel):
-    model_ids: List[str] = Field(..., min_items=1, max_items=5)
-    benchmark_id: str
-
-class BenchmarkMetricResult(BaseModel):
-    metric_name: str  # e.g., BLEU, ROUGE-L, Latency_P95, Hallucination_Rate
-    score: float
-    unit: str
-
-class ModelEvalSummary(BaseModel):
-    model_id: str
-    model_name: str
-    overall_score: float
-    metrics: List[BenchmarkMetricResult]
-
-class EvaluationCompareResponse(BaseModel):
-    benchmark_id: str
-    benchmark_name: str
-    timestamp: datetime
-    comparisons: List[ModelEvalSummary]
-```
-
-#### 5. Database Storage Projection (`PostgreSQL`)
-- **Tables Involved:** `evaluation_runs`, `evaluation_results`
-- **Schema Mapping:**
-```sql
-CREATE TABLE evaluation_runs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    benchmark_name VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE evaluation_results (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    evaluation_run_id UUID NOT NULL REFERENCES evaluation_runs(id) ON DELETE CASCADE,
-    model_id UUID NOT NULL REFERENCES models(id),
-    metric_name VARCHAR(100) NOT NULL,
-    score NUMERIC(8, 4) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-```
+* **Frontend View:** `/dataset`, `/dataset/uploadDataset`, `/dataset/[id]`.
+* **UI Components:** `FileUpload.jsx`, `DatasetTableColumns`, `Breadcrumbs.jsx`, `StatCard.jsx`.
+* **API Endpoints:**
+  * `POST /datasets/upload-dataset` (Multipart Form Upload)
+  * `GET /datasets` (List all datasets & versions)
+  * `GET /datasets/{dataset_id}` (Get dataset by ID)
+  * `GET /datasets/{dataset_id}/download` (Stream/download dataset file)
+  * `DELETE /datasets/{dataset_id}` (Delete dataset & versions)
+  * `GET /datasets/{dataset_id}/versions` (List versions of dataset)
+  * `GET /datasets/versions/{version_id}/download` (Download specific version)
+* **Database Entities:** `dataset` (Parent) and `dataset_version` (Version child with `file_hash`, `huggingface_repo`, `huggingface_path`, `commit_hash`, `is_safe_for_training`).
 
 ---
 
-### Projection 3: Interactive LLM Prompt & Inference Playground
+### Module 3: Data Quality Processing & PII De-Identification
 
 #### Description
-An interactive testing playground for evaluating model responses, tuning prompt system messages, context window sizes, temperature, and top_p parameters.
+Pre-training data sanitization pipeline. Scans sensitive banking entities (Account Numbers, Credit Cards, Phone Numbers, PAN, Aadhaar), de-identifies PII, removes duplicate rows, and computes quality scores.
 
-#### 1. Frontend View Projection
-- **Route:** `/playground`
-- **Next.js Strategy:** Client-heavy stateful interface using React hooks (`useState`, `useCallback`, `useRef`).
-- **Core Components:** `SystemPromptEditor`, `ChatHistoryList`, `HyperparameterSidebar`, `TokenCounterBadge`.
-
-#### 2. UI & Visualization Projection
-- **Icons (`Lucide React`):** `Send`, `Sparkles`, `SlidersHorizontal`, `Copy`, `RotateCcw`, `MessageSquare`, `Bot`, `User`.
-- **Styling (`Tailwind CSS`):** Split pane layout (`flex flex-row h-screen`), chat message bubbles (`bg-indigo-600` for user, `bg-slate-800` for LLM), custom scrollbars.
-- **Analytics (`Recharts`):** Token generation speed gauge or latency breakdown bar inside response inspector.
-
-#### 3. API Client & Request Projection (`Axios`)
-- **API Call:** `Axios.post('/api/v1/inference/generate', payload, { responseType: 'stream' })`
-- **Streaming:** Chunked processing for real-time token rendering.
-
-#### 4. Backend Validation & Logic Projection (`FastAPI` & `Pydantic`)
-- **FastAPI Endpoint:** `POST /api/v1/inference/generate`
-- **Pydantic Schemas:**
-```python
-class InferenceRequestPayload(BaseModel):
-    model_id: str
-    system_prompt: Optional[str] = "You are a helpful HDFC Enterprise Assistant."
-    user_prompt: str = Field(..., min_length=1)
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    top_p: float = Field(default=0.9, ge=0.0, le=1.0)
-    max_tokens: int = Field(default=512, ge=1, le=4096)
-
-class InferenceResponsePayload(BaseModel):
-    response_id: str
-    model_id: str
-    output_text: str
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    latency_ms: float
-```
-
-#### 5. Database Storage Projection (`PostgreSQL`)
-- **Tables Involved:** `prompt_histories`
-- **Schema Mapping:**
-```sql
-CREATE TABLE prompt_histories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    model_id UUID NOT NULL REFERENCES models(id),
-    system_prompt TEXT,
-    user_prompt TEXT NOT NULL,
-    generated_response TEXT NOT NULL,
-    temperature NUMERIC(3,2),
-    prompt_tokens INT NOT NULL,
-    completion_tokens INT NOT NULL,
-    latency_ms NUMERIC(8,2) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-```
+* **Frontend View:** Embedded inside `/dataset/[id]`.
+* **UI Components:** `QualityMetrics.jsx`, PII instance tags, `is_safe_for_training` status badge.
+* **API Endpoints:**
+  * `POST /data-processing/jobs` (Trigger PII & cleaning pipeline)
+  * `GET /data-processing/jobs/{job_id}` (Get job execution status)
+  * `GET /data-processing/versions/{version_id}/metrics` (Get statistical metrics & quality score)
+* **Database Entities:** `processing_job` (Job run) and `quality_metrics` (Stores `total_rows`, `duplicate_rows`, `quality_score`, `pii_instances_detected`, `pii_types_detected`, `records_sanitized`, `is_safe_for_training`).
 
 ---
 
-### Projection 4: Model Registry & Artifact Management
+### Module 4: Supervised Fine-Tuning (SFT / LoRA) & Live Training Telemetry
 
 #### Description
-Central catalog for registered LLM weights, base checkpoints (e.g., Llama-3, Mistral, custom HDFC fine-tunes), deployment states, and metadata.
+Orchestrates Parameter-Efficient Fine-Tuning (PEFT / LoRA) on validated foundation models. Persists step-level loss, learning rate, and progress to PostgreSQL, and uploads fine-tuned LoRA adapters to Hugging Face Hub (`HF_MODEL_REPO`).
 
-#### 1. Frontend View Projection
-- **Route:** `/models`
-- **Next.js Strategy:** Server Component with static initial data and dynamic search filtering.
-- **Core Components:** `ModelGridCard`, `ModelFilterBar`, `DeploymentStatusBadge`, `ArtifactDownloadModal`.
-
-#### 2. UI & Visualization Projection
-- **Icons (`Lucide React`):** `Box`, `Database`, `Tag`, `UploadCloud`, `CheckCircle`, `Server`, `HardDrive`, `ExternalLink`.
-- **Styling (`Tailwind CSS`):** Card grid with hover transform (`hover:-translate-y-1 transition-all duration-200`), border gradients, status pill badges.
-
-#### 3. API Client & Request Projection (`Axios`)
-- **API Call:** `Axios.get('/api/v1/models', { params: { status: 'ACTIVE' } })`
-
-#### 4. Backend Validation & Logic Projection (`FastAPI` & `Pydantic`)
-- **FastAPI Endpoint:** `GET /api/v1/models`
-- **Pydantic Schemas:**
-```python
-class ModelItemResponse(BaseModel):
-    id: str
-    name: str
-    version: str
-    base_model: str
-    parameter_count: str  # e.g., "7B", "70B"
-    framework: str        # PyTorch, ONNX, vLLM
-    file_size_gb: float
-    status: Literal["READY", "TRAINING", "DEPLOYED", "ARCHIVED"]
-    created_at: datetime
-```
-
-#### 5. Database Storage Projection (`PostgreSQL`)
-- **Tables Involved:** `models`
-- **Schema Mapping:**
-```sql
-CREATE TABLE models (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    version VARCHAR(50) NOT NULL,
-    base_model VARCHAR(255) NOT NULL,
-    parameter_count VARCHAR(50) NOT NULL,
-    framework VARCHAR(50) NOT NULL,
-    storage_path TEXT NOT NULL,
-    file_size_gb NUMERIC(6,2) NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'READY',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_model_version UNIQUE (name, version)
-);
-```
+* **Supported Base Models:** `qwen2_5_1_5b_instruct`, `qwen3_0_6b`, `smollm2_1_7b_instruct`.
+* **Frontend View:** `/training`, `/training/[id]` (Live step-level training loss telemetry dashboard).
+* **UI Components:** `NewTrainingModal.jsx`, `LineChart.jsx`, `TrainingJobStats.jsx`, real-time progress bar.
+* **API Endpoints:**
+  * `POST /training/runs` (Create training run configuration)
+  * `POST /training/runs/{run_id}/start` (Launch background training worker)
+  * `POST /training/runs/{run_id}/stop` (Graceful thread-safe cancellation)
+  * `GET /training/runs` (List all runs)
+  * `GET /training/runs/{run_id}` (Get run summary)
+  * `GET /training/runs/{run_id}/detail` (Get enriched training metrics & step loss history)
+  * `GET /training/runs/{run_id}/logs` (Get formatted training logs)
+  * `GET /training-jobs` & `GET /training-jobs/{job_id}` (Worker job queries)
+* **Database Entities:** `training_run` and `training_job` (Stores `train_loss`, `current_lr`, `current_step`, `max_steps`, `log_entries` JSON array).
 
 ---
 
-## 5. Non-Functional Projectional Requirements
+### Module 5: Automated Benchmark Evaluation & Safety Guardrails
 
-### 5.1 Performance & Latency SLA
-- **Frontend (Next.js):** First Contentful Paint (FCP) `< 1.2s`, Time to Interactive (TTI) `< 2.0s`.
-- **Data Visualizations (Recharts):** Smooth 60 FPS rendering for datasets up to 10,000 metric data points via data downsampling algorithms.
-- **Backend API (FastAPI):** Non-streaming endpoint response time P95 `< 80ms`.
-- **Database (PostgreSQL):** Metric log insertion handling up to 1,000 writes/second with indexed query performance `< 15ms`.
+#### Description
+Scores fine-tuned models against benchmark test fixtures across intent classification, structured answer fidelity, citation accuracy, policy escalation, and critical safety violations (e.g. phishing link clicks).
 
-### 5.2 Security & Compliance Projection
-- **Frontend Protection:** Content Security Policy (CSP), HTTP-only Secure Cookies for JWT storage, XSS protection.
-- **API Security:** FastAPI OAuth2 + JWT Bearer token authentication middleware, strict CORS policy configuration.
-- **Data Security:** PostgreSQL connection enforced over SSL/TLS (TLS v1.3), data-at-rest encryption via AES-256 for model metadata and prompts.
-
-### 5.3 Reliability & Resilience
-- **Axios Resiliency:** Request timeouts configured at 15s (standard) and 300s (long-running LLM tasks). Automatic retry logic for HTTP 502/503/504 errors.
-- **PostgreSQL Connection Pool:** Async SQLAlchemy engine connection pooling (Pool Size: 20, Max Overflow: 10, Recycles idle connections after 1800s).
+* **Frontend View:** `/evaluation`, `/evaluation/[id]`.
+* **UI Components:** `NewEvaluationModal.jsx`, `EvaluationMetricsGrid.jsx`, `EvaluationOverallScoreCard.jsx`, `EvaluationBenchmarkBreakdownCard.jsx`.
+* **API Endpoints:**
+  * `POST /evaluations` (Create & auto-start benchmark scoring)
+  * `GET /evaluations/stats` (Aggregate evaluation statistics)
+  * `GET /evaluations` (List evaluation runs)
+  * `GET /evaluations/{evaluation_id}` (Get evaluation summary)
+  * `GET /evaluations/{evaluation_id}/detail` (Get detailed multi-metric breakdown)
+  * `POST /evaluations/{evaluation_id}/start` (Manual start trigger)
+* **Database Entity (`evaluation` table):** Stores `intent_json_validity`, `intent_structured_accuracy`, `answer_accuracy`, `citation_accuracy`, `policy_flag_accuracy`, `escalation_accuracy`, `critical_safety_failures`, `infrastructure_errors`, `average_latency_seconds`.
 
 ---
 
-## 6. Directory Structure & File Projection
+### Module 6: Model Registry & 360° Lineage Management
 
-```
+#### Description
+Central catalog and governance gatekeeper for fine-tuned LoRA adapters and model checkpoints. Enforces lifecycle status states (`CREATED`, `READY`, `ACTIVE`, `ARCHIVED`).
+
+* **Frontend View:** `/model`, `/model/[id]`.
+* **UI Components:** `ModelsTable.jsx`, `ModelDetailsDrawer.jsx`, `ModelOverviewCard.jsx`, `ModelPerformanceMetricsCard.jsx`, `ModelLogsModal.jsx`.
+* **API Endpoints:**
+  * `POST /models` (Register model / LoRA adapter)
+  * `GET /models` (List all registered models)
+  * `GET /models/{model_id}` (Get model by ID)
+  * `GET /models/{model_id}/detail` (Get 360° model card with dataset lineage and loss history)
+  * `PATCH /models/{model_id}/status` (Update lifecycle status)
+* **Database Entity (`model_registry` table):** Stores `model_name`, `version`, `base_model`, `artifact_path`, `adapter_path`, `huggingface_repo`, `huggingface_path`, `commit_hash`, `model_size`, `training_job_id`, `evaluation_id`, `status`.
+
+---
+
+### Module 7: Model Deployment & Quality Gate Serving
+
+#### Description
+Manages model serving endpoints across `development`, `staging`, and `production`. Validates that models satisfy the Quality Gate policy before permitting deployment.
+
+* **Quality Gate Policy:** Enforces `VALID_DEPLOYABLE_STATUSES = {"READY", "APPROVED", "DEPLOYED"}`. Blocks `REJECTED` or `FAILED` models.
+* **Frontend View:** `/deployment`, `/deployment/[id]`.
+* **UI Components:** `DeployNewModelModal.jsx`, `DeploymentOverviewCard.jsx`, `DeploymentAdminActionsCard.jsx`, `DeploymentHealthMetricsCard.jsx`.
+* **API Endpoints:**
+  * `POST /deployments` (Deploy model to target environment)
+  * `GET /deployments` (List deployments)
+  * `GET /deployments/{deployment_id}` (Get deployment details)
+  * `POST /deployments/{deployment_id}/rollback` (Rollback to previous stable version)
+  * `POST /deployments/{deployment_id}/undeploy` (Deactivate endpoint)
+  * `POST /deployments/{deployment_id}/reload` (Reload model weights)
+  * `POST /deployments/{deployment_id}/restart` (Restart serving instance)
+  * `DELETE /deployments/{deployment_id}` (Delete deployment record)
+* **Database Entity (`deployment` table):** Stores `model_id`, `version`, `environment`, `status`, `endpoint`.
+
+---
+
+### Module 8: Interactive AI Playground & Multi-Turn Inference
+
+#### Description
+Interactive chat sandbox targeting deployed fine-tuned model endpoints with prompt template formatting, context injection, and hyperparameter controls.
+
+* **Frontend View:** `/playground`.
+* **UI Components:** `PlaygroundChatWindow.jsx`, `PlaygroundParametersPanel.jsx` (Sliders for `temperature`, `top_p`, `max_tokens`, and system role persona selection).
+* **API Endpoints:**
+  * `POST /inference/predict` (Predict using database-registered model ID)
+  * `GET /inference/models` (List loaded models in memory)
+  * `POST /inference/unload` (Free GPU memory)
+  * `POST /ai/generate` (Direct inference via model key)
+
+---
+
+### Module 9: Executive Dashboard & Pipeline Lineage Tracking
+
+#### Description
+Central monitoring hub providing live aggregate statistics, active deployment tables, recent activity timeline, and end-to-end dataset lineage snapshots.
+
+* **Frontend View:** `/` (Main Dashboard).
+* **UI Components:** `StatCard.jsx`, `LineChart.jsx`, `ModelsTable.jsx`, `ActivityCard.jsx`.
+* **API Endpoints:**
+  * `GET /pipeline/dashboard/stats` (Live aggregate counts & recent activity feed)
+  * `GET /pipeline/status/{dataset_version_id}` (Full version lineage snapshot: `dataset -> processing -> training -> model -> evaluation -> deployment`)
+
+---
+
+# 5. Non-Functional Requirements & Enterprise SLAs
+
+### 5.1 Performance & Latency
+* **Frontend Responsiveness:** First Contentful Paint (FCP) `< 1.2s`, Time to Interactive (TTI) `< 1.8s`.
+* **Telemetry Streaming:** Training step loss and progress polling interval set to **3–5 seconds** with low overhead.
+* **Database Operations:** P95 response time `< 25ms` for indexed queries using connection pooling (`pool_size=5`, `max_overflow=10`, `pool_recycle=300`).
+
+### 5.2 Enterprise Security & Compliance
+* **Data Privacy:** Raw datasets cannot be used for model training until PII scanning and de-identification is completed (`is_safe_for_training=True`).
+* **Authentication:** Stateless HMAC-SHA256 JWT tokens with 24-hour expiration (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440`).
+* **Password Hashing:** Passwords hashed with `bcrypt` using salted one-way derivation.
+* **CORS Governance:** Explicit whitelisting of trusted origins (`http://localhost:3000`, `ALLOW_ORIGIN`).
+
+---
+
+# 6. Directory Structure & Implementation Mapping
+
+```text
 hdfc-custom-llm-dev-pipeline/
-├── frontend/                        # Next.js Frontend Application
+├── frontend/                        # Next.js 16 App Router Application
 │   ├── src/
-│   │   ├── app/                     # Next.js App Router Pages
-│   │   │   ├── dashboard/page.js
-│   │   │   ├── models/page.js
-│   │   │   ├── training/[id]/page.js
-│   │   │   ├── evaluation/page.js
-│   │   │   └── playground/page.js
-│   │   ├── components/              # React Components
-│   │   │   ├── charts/              # Recharts wrappers (Loss, Radar, Gauges)
-│   │   │   ├── ui/                  # Tailwind + Lucide UI widgets
-│   │   │   └── playground/          # Interactive prompt components
-│   │   ├── lib/
-│   │   │   └── api.js               # Axios instance & interceptors setup
-│   │   └── styles/
-│   │       └── globals.css          # Tailwind directives & CSS variable tokens
-│   ├── package.json                 # Front-end dependencies (next, react, recharts, lucide-react, axios, tailwindcss)
-│   └── tailwind.config.js           # Custom theme colors and extension
+│   │   ├── app/                     # Page Routes (/, /dataset, /training, /evaluation, /model, /deployment, /playground, /admin)
+│   │   │   ├── context/             # AuthContext.jsx
+│   │   │   ├── services/            # apiClient.js & Domain Service Modules
+│   │   │   ├── globals.css          # Tailwind CSS v4 directives
+│   │   │   └── layout.js            # Root layout shell
+│   │   └── components/              # UI Primitives, Modals, Forms, Tables, Charts
+│   └── package.json                 # Dependencies (next, react, tailwindcss, recharts, axios, sonner, lucide-react)
 │
 ├── backend/                         # FastAPI Backend Service
 │   ├── app/
-│   │   ├── main.py                  # FastAPI instantiation & CORS initialization
-│   │   ├── api/                     # Router endpoints
-│   │   │   ├── v1/
-│   │   │   │   ├── models.py
-│   │   │   │   ├── training.py
-│   │   │   │   ├── evaluation.py
-│   │   │   │   └── inference.py
-│   │   ├── schemas/                 # Pydantic data validation models
-│   │   │   ├── model_schema.py
-│   │   │   ├── training_schema.py
-│   │   │   └── evaluation_schema.py
-│   │   ├── db/                      # PostgreSQL connection pool & session
-│   │   │   ├── session.py
-│   │   │   └── models.py            # ORM metadata definitions
-│   │   └── services/                # Business logic & pipeline drivers
-├── docs/                            # Requirements and Architecture Specs
-│   └── requirements/
-│       └── project_requirements.md  # [THIS DOCUMENT]
-└── README.md
+│   │   ├── main.py                  # App entrypoint, CORS, Seed Admin, Router inclusion
+│   │   ├── core/                    # auth_dependency.py, config.py
+│   │   ├── dbConfig/                # database_config.py (Neon SQLAlchemy engine)
+│   │   ├── model/                   # 11 Declarative ORM entities
+│   │   ├── processor/               # PII detector, cleaner, quality calculator
+│   │   ├── routes/                  # 11 Domain API routers
+│   │   ├── schema/                  # Pydantic v2 validation schemas
+│   │   ├── services/                # Business domain services & HF storage
+│   │   └── ai/                      # AI training, evaluation & inference adapters
+│   └── requirements.txt             # Backend dependencies
+│
+├── docs/                            # Project Documentation
+│   ├── api_contract/                # API_CONTRACT.md
+│   ├── backend_architecture/        # BACKEND_ARCHITECTURE.md
+│   ├── frontend_architecture/       # FRONTEND_ARCHITECTURE.md, COMPONENT_GUIDELINES.md, UI_GUIDELINES.md
+│   └── requirements/                # project_requirements.md [THIS SPECIFICATION]
+└── README.md                        # Master Project Documentation
 ```
 
 ---
 
-## 7. Verification & Sign-off Criteria
+# 7. Verification & Acceptance Criteria
 
-1. **Frontend Integrity:** All Next.js pages render cleanly with JavaScript, formatted with Tailwind CSS, utilizing Lucide React icons, fetching via Axios, and displaying accurate Recharts graphs.
-2. **Backend API Compliance:** FastAPI endpoints strictly validate inputs and outputs against Pydantic models.
-3. **Database Consistency:** PostgreSQL tables properly enforce primary keys, foreign key constraints, and indices for query performance.
-4. **End-to-End Flow:** Verified pipeline execution from UI user trigger to backend FastAPI controller, persisted in PostgreSQL, and streamed back to the client.
+1. **Authentication & RBAC Integrity:** All protected routes require a valid JWT Bearer token; privileged admin endpoints reject non-admin users with `403 Forbidden`.
+2. **Dataset Safety Guard:** Training runs reject un-sanitized raw datasets with `400 Bad Request` until PII cleaning is completed.
+3. **Training & Hub Push:** Completed training runs successfully persist step telemetry and push `.safetensors` LoRA adapters to Hugging Face Hub (`ankush0710/hdfc-llm-models`).
+4. **Quality Gate Verification:** Models with `REJECTED` or `FAILED` evaluation scores cannot be deployed to active endpoints.
+5. **Real-Time UI Telemetry:** Training loss curves and evaluation benchmarks render dynamically using Recharts without UI freezing.
