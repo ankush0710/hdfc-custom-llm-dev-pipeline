@@ -329,7 +329,7 @@ export default function Training() {
           <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl border border-gray-200">
             <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mb-3" />
             <p className="text-gray-600 text-sm font-medium">
-              Loading training runs from server...
+              Loading training runs. Please wait...
             </p>
           </div>
         ) : runs.length === 0 ? (

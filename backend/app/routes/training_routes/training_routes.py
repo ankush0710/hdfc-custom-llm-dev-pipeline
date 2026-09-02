@@ -77,6 +77,15 @@ class TrainingRunDetailResponse(BaseModel):
     current_lr: Optional[float] = None
     token_accuracy: Optional[float] = None
     metric_history: List[TrainingMetricPoint] = []
+    # Dynamic runtime tracking fields
+    creator_name: Optional[str] = "HDFC Data Scientist"
+    started_time_ago: Optional[str] = None
+    current_step: Optional[int] = None
+    total_steps: Optional[int] = None
+    current_epoch: Optional[int] = None
+    total_epochs: Optional[int] = None
+    time_remaining_formatted: Optional[str] = None
+    elapsed_formatted: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -272,13 +281,35 @@ def get_run_detail(
         prog = 100
 
     total_epochs = training_run.epochs or 1
-    # Use real step counts from DB if available; otherwise estimate
+    # Use real step counts from DB if available; otherwise check log_entries, otherwise estimate
     if job and job.max_steps:
         total_steps = job.max_steps
-        current_step = job.current_step or int((prog / 100.0) * total_steps)
+        if str(training_run.status).upper() == "COMPLETED":
+            current_step = total_steps
+        elif job.current_step is not None:
+            current_step = job.current_step
+        else:
+            current_step = int((prog / 100.0) * total_steps)
+    elif job and job.log_entries:
+        try:
+            entries = json.loads(job.log_entries)
+            if entries and isinstance(entries, list):
+                last_step = entries[-1].get("step")
+                if last_step:
+                    total_steps = max(last_step, int(last_step / (prog / 100.0))) if prog > 0 else last_step
+                    current_step = total_steps if str(training_run.status).upper() == "COMPLETED" else last_step
+                else:
+                    total_steps = max(500, int(total_epochs * 1500))
+                    current_step = total_steps if str(training_run.status).upper() == "COMPLETED" else int((prog / 100.0) * total_steps)
+            else:
+                total_steps = max(500, int(total_epochs * 1500))
+                current_step = total_steps if str(training_run.status).upper() == "COMPLETED" else int((prog / 100.0) * total_steps)
+        except Exception:
+            total_steps = max(500, int(total_epochs * 1500))
+            current_step = total_steps if str(training_run.status).upper() == "COMPLETED" else int((prog / 100.0) * total_steps)
     else:
         total_steps = max(500, int(total_epochs * 1500))
-        current_step = int((prog / 100.0) * total_steps)
+        current_step = total_steps if str(training_run.status).upper() == "COMPLETED" else int((prog / 100.0) * total_steps)
     if prog >= 100:
         current_epoch = total_epochs
     elif prog > 0:

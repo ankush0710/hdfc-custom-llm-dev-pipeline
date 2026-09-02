@@ -18,6 +18,8 @@ class Deployment_Response(BaseModel):
     environment: str
     status: str
     endpoint: str | None = None
+    average_latency_ms: float | None = None
+    latency: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
 

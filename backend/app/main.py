@@ -1,11 +1,22 @@
 # pyrefly: ignore [missing-import]
 import logging
 import os
+import sys
+from pathlib import Path
 
-from fastapi import FastAPI
+# Ensure repo root and backend directory are in sys.path
+_repo_root = str(Path(__file__).resolve().parent.parent.parent)
+_backend_root = str(Path(__file__).resolve().parent.parent)
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+if _backend_root not in sys.path:
+    sys.path.insert(0, _backend_root)
+
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import OperationalError
 import app.model  # noqa: F401 — registers all ORM models with Base
 
 from app.routes.dataset_routes.dataset_routes import router as dataset_router
@@ -74,6 +85,7 @@ def _seed_initial_admin():
                 updated = True
             if updated:
                 db.commit()
+                
     except Exception as exc:
         _logger.error("Admin seed failed: %s", exc)
         db.rollback()
@@ -135,6 +147,18 @@ app.include_router(deployment_router)
 app.include_router(inference_router)
 app.include_router(ai_router)
 app.include_router(pipeline_router)
+
+
+# ---------------------------------------------------------------------------
+# Global Exception Handlers
+# ---------------------------------------------------------------------------
+@app.exception_handler(OperationalError)
+async def db_operational_error_handler(request: Request, exc: OperationalError):
+    _logger.error(f"Database operational error: {exc}")
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database connection is temporarily unreachable. Please retry shortly."},
+    )
 
 
 # ---------------------------------------------------------------------------

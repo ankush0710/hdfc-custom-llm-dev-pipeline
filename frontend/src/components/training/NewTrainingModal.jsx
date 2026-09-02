@@ -211,7 +211,7 @@ export default function NewTrainingModal({ isOpen, onClose, onRunCreated }) {
             {loadingDatasets ? (
               <div className="flex items-center gap-2 text-xs text-gray-500 py-2">
                 <Loader2 size={14} className="animate-spin text-blue-600" />
-                <span>Loading available datasets...</span>
+                <span>Loading datasets. Please wait...</span>
               </div>
             ) : datasets.length === 0 ? (
               <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg text-xs text-amber-800 border border-amber-200">

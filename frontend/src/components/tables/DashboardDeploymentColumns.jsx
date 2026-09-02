@@ -92,7 +92,7 @@ export const DashboardModelColumns = [
     label: "Avg. Latency",
     render: (model) => (
       <span className="font-mono text-xs text-gray-700">
-        {model.latency || "—"}
+        {model.latency && model.latency !== "—" ? model.latency : "N/A"}
       </span>
     ),
   },

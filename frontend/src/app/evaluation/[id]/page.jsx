@@ -78,7 +78,7 @@ export default function EvaluationDetailPage() {
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-[#002B55]" />
           <p className="text-gray-600 text-sm font-medium">
-            Loading evaluation details...
+            Loading evaluation details. Please wait...
           </p>
         </div>
       </main>
