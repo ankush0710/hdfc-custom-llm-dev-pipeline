@@ -1,0 +1,14 @@
+{
+  "model_id": "qwen3_0_6b",
+  "model_name": "Qwen/Qwen3-0.6B",
+  "fine_tuned": true,
+  "task_type": "intent_classification",
+  "question": "Can I get another card?",
+  "context": null,
+  "response": {
+    "intent_category": "getting_spare_card"
+  },
+  "raw_response": "{\"intent_category\": \"getting_spare_card\"}",
+  "latency_seconds": 1.479,
+  "device": "cuda"
+}

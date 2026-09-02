@@ -51,8 +51,8 @@ class GenerationConfig:
     def __post_init__(self) -> None:
         if self.max_new_tokens <= 0:
             raise ValueError("max_new_tokens must be a positive integer.")
-        if not (0.0 <= self.temperature <= 2.0):
-            raise ValueError("temperature must be in the range [0.0, 2.0].")
+        if not (0.0 < self.temperature <= 2.0):
+            raise ValueError("temperature must be in the range (0, 2.0].")
         if not (0.0 < self.top_p <= 1.0):
             raise ValueError("top_p must be in the range (0, 1.0].")
 
@@ -108,17 +108,15 @@ def generate(
     inputs = encoded.to(device)
     input_length = inputs["input_ids"].shape[1]
 
-    eos_token_id = tokenizer.eos_token_id
-    pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else eos_token_id
-
     gen_kwargs: Dict[str, Any] = {
         "max_new_tokens": config.max_new_tokens,
         "do_sample": config.do_sample,
-        "pad_token_id": pad_token_id,
-        "eos_token_id": eos_token_id,
+        "pad_token_id": tokenizer.pad_token_id
+        if tokenizer.pad_token_id is not None
+        else tokenizer.eos_token_id,
     }
     if config.do_sample:
-        gen_kwargs["temperature"] = max(config.temperature, 0.01)
+        gen_kwargs["temperature"] = config.temperature
         gen_kwargs["top_p"] = config.top_p
 
     start = time.perf_counter()

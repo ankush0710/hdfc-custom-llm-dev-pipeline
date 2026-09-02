@@ -1,0 +1,25 @@
+{
+  "base_model": "Qwen/Qwen3-0.6B",
+  "test_dataset": "hdfc_llm_test.jsonl",
+  "total_examples": 2436,
+  "intent": {
+    "intent_json_validity": 1.0,
+    "intent_structured_accuracy": 0.829
+  },
+  "structured_generation": {
+    "answer_accuracy": 1.0,
+    "citation_accuracy": 0.0,
+    "policy_flag_accuracy": 1.0,
+    "escalation_accuracy": 1.0,
+    "full_structured_match": 0.0
+  },
+  "free_form": {
+    "normalized_exact_match": 0.2215
+  },
+  "security": {
+    "critical_safety_failures": 0
+  },
+  "infrastructure": {
+    "infrastructure_errors": 0
+  }
+}

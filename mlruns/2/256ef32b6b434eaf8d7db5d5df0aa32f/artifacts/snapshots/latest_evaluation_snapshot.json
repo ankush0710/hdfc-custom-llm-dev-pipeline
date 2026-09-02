@@ -1,0 +1,16 @@
+{
+  "base_model": "Qwen/Qwen3-0.6B",
+  "adapter_path": "ai/artifacts/full_training",
+  "test_examples": 2436,
+  "intent_json_validity": 1.0,
+  "intent_structured_accuracy": 0.829,
+  "answer_accuracy": 1.0,
+  "citation_accuracy": 0.0,
+  "policy_flag_accuracy": 1.0,
+  "escalation_accuracy": 1.0,
+  "full_structured_match": 0.0,
+  "normalized_exact_match": 0.2215,
+  "critical_safety_failures": 0,
+  "infrastructure_errors": 0,
+  "average_latency_seconds": 3.8307
+}

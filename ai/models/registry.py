@@ -52,7 +52,7 @@ def load_model_registry():
 
 
 def load_registry():
-    return load_model_registry
+    return load_model_registry()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,14 @@
+{
+  "success": false,
+  "error": {
+    "code": "CUDA_OUT_OF_MEMORY",
+    "message": "GPU memory is insufficient for the requested operation.",
+    "details": {
+      "model_id": "qwen3_0_6b"
+    },
+    "pipeline_step": "MODEL_LOADING",
+    "timestamp": "2026-08-19T10:20:00Z",
+    "run_id": null,
+    "retryable": true
+  }
+}
