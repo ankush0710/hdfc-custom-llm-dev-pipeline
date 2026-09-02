@@ -1,0 +1,38 @@
+{
+  "dataset_name": "HDFC_Custom_LLM_All_11_Datasets_Unified_Suite",
+  "pipeline_version": "v2.0-complete",
+  "total_records_processed": 24346,
+  "duplicates_removed": 4725,
+  "pii_redactions_applied": 2359,
+  "splits": {
+    "train_count": 19476,
+    "val_count": 2434,
+    "test_count": 2436
+  },
+  "sources_summary": {
+    "HDFC_Custom_LLM_7000rows_Dataset_Suite-v2.xlsx": 7000,
+    "HDFC_Faq.xlsx": 2237,
+    "BANKING77_Real_Banking_Dataset.xlsx": 13071,
+    "banking_knowledge_base_1000.xlsx": 1000,
+    "bank_faq.xlsx": 750,
+    "customer_queries.xlsx": 288,
+    "customers.xlsx": 10000,
+    "accounts.xlsx": 5000,
+    "credit_cards.xlsx": 5000,
+    "loans.xlsx": 5000,
+    "transactions.xlsx": 10000
+  },
+  "cleaned_excel_output": {
+    "HDFC_Custom_LLM_7000rows_Dataset_Suite-v2_cleaned.xlsx": 7000,
+    "HDFC_Faq_cleaned.xlsx": 2241,
+    "BANKING77_Real_Banking_Dataset_cleaned.xlsx": 13083,
+    "banking_knowledge_base_1000_cleaned.xlsx": 1000,
+    "bank_faq_cleaned.xlsx": 750,
+    "customer_queries_cleaned.xlsx": 5000,
+    "customers_cleaned.xlsx": 10000,
+    "accounts_cleaned.xlsx": 15000,
+    "credit_cards_cleaned.xlsx": 5000,
+    "loans_cleaned.xlsx": 5000,
+    "transactions_cleaned.xlsx": 100000
+  }
+}
