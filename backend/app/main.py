@@ -96,40 +96,24 @@ def _seed_initial_admin():
 _seed_initial_admin()
 
 # ---------------------------------------------------------------------------
-# CORS — explicit origins from env in production
+# CORS Configuration
 # ---------------------------------------------------------------------------
-_extra_origins = [
-    o.strip().rstrip("/") for o in os.getenv("ALLOW_ORIGIN", "").split(",") if o.strip()
-]
-
-_DEV_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
-]
-
+_raw_origins = os.getenv("ALLOW_ORIGINS") or os.getenv("ALLOW_ORIGIN") or ""
 _allowed_origins = [
-    *(_DEV_ORIGINS if not _is_production else []),
-    *_extra_origins,
+    origin.strip().rstrip("/")
+    for origin in _raw_origins.split(",")
+    if origin.strip()
 ]
 
-_env_origin_regex = os.getenv("ALLOW_ORIGIN_REGEX", "").strip() or None
-_origin_regex = (
-    _env_origin_regex
-    if _is_production
-    else (_env_origin_regex or r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$")
-)
+_raw_origin_regex = (os.getenv("ALLOW_ORIGIN_REGEX") or "").strip()
+_origin_regex = _raw_origin_regex if _raw_origin_regex else None
 
-if _is_production and not _allowed_origins and not _origin_regex:
+if not _allowed_origins and not _origin_regex:
     _logger.warning(
-        "ALLOW_ORIGIN / ALLOW_ORIGIN_REGEX is not configured for production. "
-        "Frontend requests from external origins will be blocked by CORS."
+        "Neither ALLOW_ORIGINS nor ALLOW_ORIGIN_REGEX is configured. "
+        "Browser requests from external frontend origins will be blocked by CORS."
     )
 
-# ---------------------------------------------------------------------------
-# Application
-# ---------------------------------------------------------------------------
 app = FastAPI(
     title="HDFC Custom LLM Development Pipeline API",
     version="1.0.0",

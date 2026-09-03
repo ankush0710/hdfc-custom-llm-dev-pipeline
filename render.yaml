@@ -19,7 +19,7 @@ services:
         value: ankush0710/hdfc-llm-datasets
       - key: HF_MODEL_REPO
         value: ankush0710/hdfc-llm-models
-      - key: ALLOW_ORIGIN
+      - key: ALLOW_ORIGINS
         sync: false
       - key: ALLOW_ORIGIN_REGEX
         sync: false
