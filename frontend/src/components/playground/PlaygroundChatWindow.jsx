@@ -16,6 +16,7 @@ import {
   Layers,
 } from "lucide-react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 export default function PlaygroundChatWindow({
   activeModel,
@@ -128,9 +129,31 @@ export default function PlaygroundChatWindow({
                   )}
 
                   {/* Message Content */}
-                  <div className="whitespace-pre-wrap font-sans space-y-2">
+                  <div className="font-sans space-y-2">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => (
+                        <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>
+                      ),
+                      strong: ({ children }) => (
+                        <strong className="font-bold">{children}</strong>
+                      ),
+                      code: ({ children }) => (
+                        <code className="rounded bg-slate-200 px-1 py-0.5 text-[11px]">
+                          {children}
+                        </code>
+                      ),
+                    }}
+                  >
                     {msg.content}
-                  </div>
+                  </ReactMarkdown>
+                </div>
 
                   {/* Latency & Actions for Assistant */}
                   {!isUser && (

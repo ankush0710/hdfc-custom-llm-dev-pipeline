@@ -110,7 +110,7 @@ export default function EvaluationDetailPage() {
   }
 
   const rawStatus = (evaluation.status || "QUEUED").toUpperCase();
-  const isPassed = rawStatus === "PASSED" || rawStatus === "COMPLETED";
+  const isPassed = rawStatus === "PASSED";
 
   return (
     <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px] pb-16">
@@ -142,13 +142,15 @@ export default function EvaluationDetailPage() {
                 Export Report
               </Button>
 
-              <Button
-                variant="primary"
-                icon={Boxes}
-                onClick={handleRegisterModel}
-              >
-                Register Model
-              </Button>
+              {isPassed && (
+                <Button
+                  variant="primary"
+                  icon={Boxes}
+                  onClick={handleRegisterModel}
+                >
+                  Register Model
+                </Button>
+              )}
             </>
           }
         />

@@ -6,8 +6,7 @@ export default function EvaluationOverallScoreCard({
   score = null,
   status = "QUEUED",
 }) {
-  const isPassed = String(status).toUpperCase() === "PASSED" || String(status).toUpperCase() === "COMPLETED";
-  const numScore = score !== null && score !== undefined ? (typeof score === "number" ? score : parseFloat(score) || 0) : null;
+  const isPassed = String(status).toUpperCase() === "PASSED";  const numScore = score !== null && score !== undefined ? (typeof score === "number" ? score : parseFloat(score) || 0) : null;
   const displayScore = numScore !== null ? `${numScore.toFixed(1)}%` : "—";
   
   // Calculate SVG stroke circle parameters
@@ -87,7 +86,7 @@ export default function EvaluationOverallScoreCard({
       {/* Footer Info */}
       <div className="rounded-xl bg-[#FAFBFE] border border-gray-100 px-4 py-2.5 flex items-center justify-between text-xs">
         <span className="text-gray-500 font-medium">Quality Target</span>
-        <span className="font-mono font-bold text-gray-900">&ge; 85.0%</span>
+        <span className="font-mono font-bold text-gray-900">&ge; 70.0%</span>
       </div>
     </div>
   );

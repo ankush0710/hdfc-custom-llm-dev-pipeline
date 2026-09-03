@@ -44,5 +44,6 @@ class Processing_Model(Base):
     quality_metrics = relationship(
         "Quality_Model",
         back_populates="processing_job",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        uselist=False
     )

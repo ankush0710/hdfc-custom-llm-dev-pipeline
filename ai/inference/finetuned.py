@@ -313,6 +313,7 @@ def _render_generation_prompt(
             messages,
             tokenize=False,
             add_generation_prompt=True,
+            enable_thinking=False,
         )
     except Exception:
         # Fallback if tokenizer does not support chat template
