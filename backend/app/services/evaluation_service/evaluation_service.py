@@ -265,6 +265,24 @@ def get_evaluation_detail(db: Session, evaluation_id: int):
             "category": "Safety Alignment",
         })
 
+    # Process status: completed when evaluation execution finished successfully.
+    # 'failed' is reserved exclusively for actual process crashes or backend system errors.
+    db_status = (evaluation.evaluation_status or "QUEUED").upper()
+    if db_status in ("COMPLETED", "PASSED"):
+        process_status = "completed"
+    elif db_status == "FAILED":
+        process_status = "failed"
+    elif db_status == "RUNNING":
+        process_status = "running"
+    else:
+        process_status = "queued"
+
+    # Evaluation performance threshold (kept separate from process status)
+    from app.constants.quality_gate_config import MIN_OVERALL_SCORE
+    target_met = None
+    if overall is not None:
+        target_met = bool(overall >= MIN_OVERALL_SCORE)
+
     return {
         "evaluation_id": evaluation.evaluation_id,
         "display_id": evaluation.display_id,
@@ -276,7 +294,9 @@ def get_evaluation_detail(db: Session, evaluation_id: int):
         "dataset_name": evaluation.dataset_name,
         "dataset_version": evaluation.dataset_version,
         "date_formatted": date_str,
-        "status": evaluation.evaluation_status,
+        "status": process_status,
+        "target_met": target_met,
+        "threshold": MIN_OVERALL_SCORE,
         "overall_score": overall,
         "overall_score_str": overall_str,
         "accuracy": ans_acc_pct,

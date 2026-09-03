@@ -87,8 +87,68 @@ class TestEvaluationMetrics(unittest.TestCase):
         self.assertEqual(detail["accuracy"], 85.0)
         self.assertEqual(detail["precision"], 80.0)
         self.assertEqual(detail["recall"], 90.0)
-        self.assertEqual(detail["f1_score"], 75.0)
-        self.assertEqual(len(detail["benchmark_breakdown"]), 3)
+        self.assertEqual(detail["status"], "completed")
+        self.assertTrue(detail["target_met"])
+        self.assertEqual(detail["threshold"], 70.0)
+
+    def test_get_evaluation_detail_below_threshold_is_completed_not_failed(self):
+        mock_db = MagicMock()
+        eval_item = Evaluation_Model(
+            evaluation_id=2,
+            run_id=1,
+            model_id=1,
+            test_dataset_id=1,
+            evaluation_status="COMPLETED",
+            answer_accuracy=0.65,
+            intent_structured_accuracy=0.65,
+            policy_flag_accuracy=0.65,
+            full_structured_match=0.65,
+            average_latency_seconds=1.2,
+            total_examples=10,
+            critical_safety_failures=0,
+            created_at=datetime.now(timezone.utc),
+        )
+
+        def mock_query(model_cls):
+            mock_q = MagicMock()
+            if model_cls == Evaluation_Model:
+                mock_q.filter.return_value.first.return_value = eval_item
+            else:
+                mock_q.filter.return_value.first.return_value = None
+            return mock_q
+
+        mock_db.query.side_effect = mock_query
+
+        detail = get_evaluation_detail(mock_db, 2)
+        self.assertEqual(detail["status"], "completed")
+        self.assertEqual(detail["overall_score"], 65.0)
+        self.assertFalse(detail["target_met"])
+        self.assertEqual(detail["threshold"], 70.0)
+
+    def test_get_evaluation_detail_technical_crash_is_failed(self):
+        mock_db = MagicMock()
+        eval_item = Evaluation_Model(
+            evaluation_id=3,
+            run_id=1,
+            model_id=1,
+            test_dataset_id=1,
+            evaluation_status="FAILED",
+            error_message="Runtime out of memory error during inference worker",
+            created_at=datetime.now(timezone.utc),
+        )
+
+        def mock_query(model_cls):
+            mock_q = MagicMock()
+            if model_cls == Evaluation_Model:
+                mock_q.filter.return_value.first.return_value = eval_item
+            else:
+                mock_q.filter.return_value.first.return_value = None
+            return mock_q
+
+        mock_db.query.side_effect = mock_query
+
+        detail = get_evaluation_detail(mock_db, 3)
+        self.assertEqual(detail["status"], "failed")
 
 
 if __name__ == "__main__":

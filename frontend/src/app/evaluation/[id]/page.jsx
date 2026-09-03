@@ -109,8 +109,24 @@ export default function EvaluationDetailPage() {
     );
   }
 
-  const rawStatus = (evaluation.status || "QUEUED").toUpperCase();
-  const isPassed = rawStatus === "PASSED";
+  const rawStatus = (evaluation.status || "QUEUED").toLowerCase();
+  const isCompleted = rawStatus === "completed" || rawStatus === "passed";
+  const isFailed = rawStatus === "failed";
+  const isRunning = rawStatus === "running";
+
+  const badges = [
+    {
+      label: isCompleted ? "completed" : isFailed ? "failed" : rawStatus,
+      variant: isCompleted ? "success" : isFailed ? "failed" : isRunning ? "running" : "default",
+    },
+  ];
+
+  if (isCompleted && evaluation.target_met !== undefined && evaluation.target_met !== null) {
+    badges.push({
+      label: evaluation.target_met ? "target met" : "below target",
+      variant: evaluation.target_met ? "success" : "warning",
+    });
+  }
 
   return (
     <main className="flex flex-col mt-10 pt-10 lg:pt-15 px-2 lg:px-8 lg:ml-[280px] pb-16">
@@ -126,12 +142,7 @@ export default function EvaluationDetailPage() {
       <div className="px-3 lg:px-0 mb-6">
         <DetailHeader
           title={`Evaluation Details: ${evaluation.display_id || `EV-${evaluation.evaluation_id}`}`}
-          badges={[
-            {
-              label: isPassed ? "PASSED" : evaluation.status,
-              variant: isPassed ? "success" : "danger",
-            },
-          ]}
+          badges={badges}
           actions={
             <>
               <Button
@@ -142,7 +153,7 @@ export default function EvaluationDetailPage() {
                 Export Report
               </Button>
 
-              {isPassed && (
+              {isCompleted && (
                 <Button
                   variant="primary"
                   icon={Boxes}
@@ -176,7 +187,9 @@ export default function EvaluationDetailPage() {
         {/* Left: Radial Progress Overall Score */}
         <EvaluationOverallScoreCard
           score={evaluation.overall_score}
-          status={evaluation.status}
+          status={isCompleted ? "completed" : isFailed ? "failed" : rawStatus}
+          targetMet={evaluation.target_met}
+          threshold={evaluation.threshold}
         />
 
         {/* Right: Accuracy, Precision, Recall, F1 */}

@@ -59,7 +59,7 @@ export default function EvaluationPage() {
   const filterOptions = useMemo(
     () => [
       { label: "All Statuses", value: "ALL" },
-      { label: "Passed", value: "PASSED" },
+      { label: "Completed", value: "COMPLETED" },
       { label: "Running", value: "RUNNING" },
       { label: "Queued", value: "QUEUED" },
       { label: "Failed", value: "FAILED" },
@@ -73,8 +73,8 @@ export default function EvaluationPage() {
 
     return evaluations.filter((item) => {
       const itemStatus = (item.evaluation_status || "").toUpperCase();
-      if (statusFilter === "PASSED") {
-        return itemStatus === "PASSED" || itemStatus === "COMPLETED";
+      if (statusFilter === "COMPLETED" || statusFilter === "PASSED") {
+        return itemStatus === "COMPLETED" || itemStatus === "PASSED";
       }
       return itemStatus === statusFilter;
     });

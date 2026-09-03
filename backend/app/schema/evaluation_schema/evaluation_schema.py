@@ -107,5 +107,7 @@ class EvaluationDetailResponse(BaseModel):
     total_examples: int = 0
     created_at: datetime
     completed_at: Optional[datetime] = None
+    target_met: Optional[bool] = None
+    threshold: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -610,8 +610,8 @@ export default function TrainingDetailPage({ params: pageParams }) {
               </div>
             </div>
 
-            {/* 3 Metric Charts side by side */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Metric Charts */}
+            <div className={`grid grid-cols-1 ${typeof trainingRun.token_accuracy === "number" ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4`}>
               {/* Metric 1: Training Loss */}
               <div>
                 <div className="flex items-baseline justify-between mb-2">
@@ -652,25 +652,25 @@ export default function TrainingDetailPage({ params: pageParams }) {
                 </div>
               </div>
 
-              {/* Metric 3: Token Accuracy — not produced by SFTTrainer */}
-              <div>
-                <div className="flex items-baseline justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Token Accuracy</span>
-                  <span className="text-lg font-bold text-slate-900">
-                    {typeof trainingRun.token_accuracy === "number"
-                      ? `${trainingRun.token_accuracy.toFixed(1)}%`
-                      : <span className="text-slate-400 font-mono text-sm">—</span>}
-                  </span>
+              {/* Metric 3: Token Accuracy — rendered only if real numeric data is provided by backend */}
+              {typeof trainingRun.token_accuracy === "number" && (
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-xs text-slate-500 font-medium">Token Accuracy</span>
+                    <span className="text-lg font-bold text-slate-900">
+                      {`${trainingRun.token_accuracy.toFixed(1)}%`}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-28 p-2 overflow-hidden flex items-end">
+                    <MetricLineChart
+                      data={trainingRun.metric_history}
+                      dataKey="accuracy"
+                      stroke="#8b5cf6"
+                      name="Token Accuracy"
+                    />
+                  </div>
                 </div>
-                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/60 h-28 p-2 overflow-hidden flex items-end">
-                  <MetricLineChart
-                    data={trainingRun.metric_history}
-                    dataKey="accuracy"
-                    stroke="#8b5cf6"
-                    name="Token Accuracy"
-                  />
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
