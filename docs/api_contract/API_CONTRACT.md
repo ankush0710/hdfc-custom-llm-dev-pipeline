@@ -52,9 +52,9 @@ The **HDFC Bank Custom LLM Development Pipeline API** provides a governed, enter
 | Environment | Base URL | Interactive API Docs |
 | :--- | :--- | :--- |
 | **Local Development** | `http://localhost:8000` | Swagger UI: `http://localhost:8000/docs`<br/>ReDoc: `http://localhost:8000/redoc` |
-| **Production** | *Configured via host deployment (e.g., Render/AWS)* | *Disabled by default when `ENVIRONMENT=production`* |
+| **Production** | Render (`https://hdfc-custom-llm-backend.onrender.com` or custom domain) | *Disabled by default when `ENVIRONMENT=production`* |
 
-> **CORS Policy:** Allowed development origins include `http://localhost:3000`, `http://127.0.0.1:3000`, `http://localhost:3001`, and `http://127.0.0.1:3001`. Production environments require explicit origin configuration via the `ALLOW_ORIGIN` environment variable.
+> **CORS Policy:** Production-ready and environment-based. Configured via the `ALLOW_ORIGINS` environment variable (comma-separated list of origins, e.g. `http://localhost:3000,https://hdfc-custom-llm-frontend.vercel.app`) and optional `ALLOW_ORIGIN_REGEX` (e.g. `https:\/\/.*\.vercel\.app`). Whitespaces and trailing slashes are safely normalized. If neither variable is set, cross-origin browser requests are blocked by default for security.
 
 ---
 
@@ -706,7 +706,9 @@ FastAPI returns detailed validation error arrays when request payloads fail sche
   "dataset_name": "HDFC Customer FAQs",
   "dataset_version": "1.0.0",
   "date_formatted": "Sep 02, 2026",
-  "status": "COMPLETED",
+  "status": "completed",
+  "target_met": true,
+  "threshold": 70.0,
   "overall_score": 91.5,
   "overall_score_str": "91.5%",
   "accuracy": 91.5,
@@ -724,6 +726,12 @@ FastAPI returns detailed validation error arrays when request payloads fail sche
   "completed_at": "2026-09-02T12:06:00Z"
 }
 ```
+
+> **Evaluation Process Status vs. Quality Gate Performance:**
+> * `status`: Reflects technical execution lifecycle (`"completed"`, `"failed"`, `"running"`, `"queued"`). Successfully finished evaluations always have `status: "completed"`, regardless of whether the overall score is above or below 70.0%.
+> * `target_met`: Boolean (`true`/`false`) indicating whether the model passed the quality gate (`overall_score >= threshold` and 0 critical safety failures).
+> * `threshold`: Real backend threshold value (`70.0%`, driven by `MIN_OVERALL_SCORE` in `quality_gate_config.py`).
+> * `failed`: Strictly reserved for technical runtime failures, exceptions, or process crashes.
 
 ---
 

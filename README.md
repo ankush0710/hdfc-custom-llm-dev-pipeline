@@ -800,34 +800,36 @@ The application is deployed across cloud infrastructure:
 ```mermaid
 flowchart TB
 
-    User["👤 Users"]
+    User["👤 Users (Browser)"]
 
-    Vercel["Frontend Hosting<br/>Vercel"]
+    Vercel["Frontend Hosting<br/>Vercel (Next.js 16)"]
 
-    Render["Backend Hosting<br/>Render"]
+    RenderBackend["Backend API Hosting<br/>Render (FastAPI)"]
 
-    Neon["Neon PostgreSQL"]
+    RenderML["ML Service Hosting<br/>Render (FastAPI / PyTorch)"]
 
-    HF["Hugging Face Hub"]
+    Neon["Neon PostgreSQL<br/>(Serverless Database)"]
+
+    HF["Hugging Face Hub<br/>(Models & Datasets)"]
 
     User --> Vercel
-
-    Vercel --> Render
-
-    Render --> Neon
-
-    Render --> HF
+    Vercel -->|"REST API (JWT Bearer)"| RenderBackend
+    RenderBackend -->|"SQLAlchemy ORM"| Neon
+    RenderBackend -->|"HTTP / Training Jobs"| RenderML
+    RenderBackend -->|"HF Hub SDK"| HF
+    RenderML -->|"Model Weights / Adapters"| HF
 ```
 
 ## Deployment Platform Mapping
 
-| Component | Platform | Description |
-| --------- | -------- | ----------- |
-| Frontend | Vercel | Production Next.js edge deployment |
-| Backend | Render | FastAPI containerized web service |
-| Database | Neon PostgreSQL | Serverless cloud PostgreSQL |
-| AI Models | Hugging Face Hub | Model repository & adapter storage |
-| Datasets | Hugging Face Hub | Dataset repository & versioning |
+| Component | Platform | Configuration & Runtime | Description |
+| --------- | -------- | ----------------------- | ----------- |
+| **Frontend** | **Vercel** | Root: `frontend`<br/>Build: `npm run build`<br/>Output: Next.js Default | Production Next.js 16 App Router deployment (`https://hdfc-custom-llm-frontend.vercel.app`) |
+| **Backend** | **Render** | Root: `backend`<br/>Build: `pip install -r requirements-api.txt && alembic upgrade head`<br/>Start: `python start_prod.py` | FastAPI application (`https://hdfc-custom-llm-backend.onrender.com`) |
+| **ML Service** | **Render** | Root: `ml-service`<br/>Start: `python run_server.py` | Standalone FastAPI worker executing fine-tuning, evaluation, and inference |
+| **Database** | **Neon PostgreSQL** | Serverless PostgreSQL 16 (`?sslmode=require`) | Central relational database for users, datasets, jobs, models, and evaluations |
+| **AI Models** | **Hugging Face Hub** | `ankush0710/hdfc-llm-models` | Cloud repository for fine-tuned LoRA adapter weights and model cards |
+| **Datasets** | **Hugging Face Hub** | `ankush0710/hdfc-llm-datasets` | Remote dataset storage and version synchronization |
 
 ---
 
@@ -846,10 +848,11 @@ Always use `.env.example` templates and configure environment secrets directly i
 
 # 🛠️ Troubleshooting
 
-## Frontend Cannot Connect to Backend
-* Verify FastAPI is running at `http://localhost:8000`.
-* Check `NEXT_PUBLIC_API_URL` in `.env.local`.
-* Confirm backend `ALLOW_ORIGIN` includes the frontend URL (`http://localhost:3000`).
+## Frontend Cannot Connect to Backend (CORS / Network)
+* Verify FastAPI is running and reachable.
+* Check `NEXT_PUBLIC_API_URL` in `.env.local` / Vercel settings.
+* Confirm backend `ALLOW_ORIGINS` includes the frontend URL (`http://localhost:3000,https://hdfc-custom-llm-frontend.vercel.app`).
+* For preview deployments, ensure `ALLOW_ORIGIN_REGEX` is configured (e.g. `https:\/\/.*\.vercel\.app`).
 
 ## Database Connection Error
 * Check `DATABASE_URL` connection string and credentials.
@@ -890,18 +893,18 @@ main
 ---
 
 # 📚 Documentation
+ 
+Detailed sub-module specifications and guides:
 
-Detailed sub-module documentation:
-
-```text
-docs/
-├── api/                    # API request & response schemas
-├── architecture/           # Deep-dive architecture specs
-├── backend/                # Backend service design
-├── data-engineering/       # Dataset pipelines & validation
-├── frontend/               # UI components & state patterns
-└── requirements/           # Functional specifications
-```
+* [**API Contract Specification**](./docs/api_contract/API_CONTRACT.md) — Comprehensive REST API endpoints, schemas, RBAC matrix, and error formats
+* [**Backend Architecture**](./docs/backend_architecture/BACKEND_ARCHITECTURE.md) — FastAPI layered architecture, SQLAlchemy models, and background workers
+* [**Frontend Architecture**](./docs/frontend_architecture/FRONTEND_ARCHITECTURE.md) — Next.js 16 App Router hierarchy, state flow, and routing
+* [**Component Guidelines**](./docs/frontend_architecture/COMPONENT_GUIDELINES.md) — Reusable UI design patterns and props contracts
+* [**UI Guidelines**](./docs/frontend_architecture/UI_GUIDELINES.md) — HDFC design tokens, theme palette, typography, and accessibility
+* [**AI Architecture**](./docs/ai_architecture/AI_ARCHITECTURE.md) — PyTorch runtime, SFTTrainer fine-tuning, and Hugging Face adapters
+* [**Frontend Architecture (Quick Link)**](./docs/frontend-architecture.md)
+* [**Backend Architecture (Quick Link)**](./docs/backend-architecture.md)
+* [**API Contract (Quick Link)**](./docs/api-contract.md)
 
 ---
 

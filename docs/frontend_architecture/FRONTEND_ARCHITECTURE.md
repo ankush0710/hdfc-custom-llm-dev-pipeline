@@ -253,18 +253,23 @@ The application uses **Next.js 16 App Router**. Every directory under `src/app` 
 
 | Route Path | Page Component | Access Guard | Functional Scope |
 | :--- | :--- | :--- | :--- |
-| **`/`** | `src/app/page.jsx` | Protected (`Authenticated`) | Live pipeline dashboard, KPI summary, training loss chart, and deployments |
+| **`/`** | `src/app/page.jsx` | Protected (`Authenticated`) | Live pipeline dashboard, KPI summary, training loss chart, deployments, and "New Pipeline" launcher |
 | **`/login`** | `src/app/login/page.jsx` | Public (Anonymous only) | User authentication, email/password validation, token acquisition |
 | **`/signup`** | `src/app/signup/page.jsx` | Public (Anonymous only) | New user registration, role selection (`DS`, `REVIEWER`, `VIEWER`) |
 | **`/dataset`** | `src/app/dataset/page.jsx` | Protected (`Authenticated`) | Dataset catalog table, file size, format, and safe-for-training status |
 | **`/dataset/uploadDataset`** | `src/app/dataset/uploadDataset/page.jsx` | Protected (`ADMIN`, `DS`) | Multipart file ingestion form (`.csv`, `.xlsx`, `.json`, `.jsonl`) |
 | **`/dataset/[id]`** | `src/app/dataset/[id]/page.jsx` | Protected (`Authenticated`) | Dataset versioning, PII sanitization trigger, quality score metrics |
+| **`/datasetupload`** | `src/app/datasetupload/page.jsx` | Protected (`ADMIN`, `DS`) | Route alias redirecting to `/dataset/uploadDataset` |
 | **`/training`** | `src/app/training/page.jsx` | Protected (`Authenticated`) | Active & completed training runs, status filtering, new run modal |
-| **`/training/[id]`** | `src/app/training/[id]/page.jsx` | Protected (`Authenticated`) | Live step-level loss progress, learning rate schedule, training cancellation |
+| **`/training/[id]`** | `src/app/training/[id]/page.jsx` | Protected (`Authenticated`) | Real-time step loss progress, learning rate schedule, artifact inspection |
 | **`/evaluation`** | `src/app/evaluation/page.jsx` | Protected (`Authenticated`) | Evaluation run history, aggregate accuracy cards, new benchmark modal |
-| **`/evaluation/[id]`** | `src/app/evaluation/[id]/page.jsx` | Protected (`Authenticated`) | Detailed evaluation report, radar breakdowns, safety violation checks |
+| **`/evaluation/[id]`** | `src/app/evaluation/[id]/page.jsx` | Protected (`Authenticated`) | Evaluation details, quality gate assessment (`target met` / `below target`), benchmark breakdown |
+| **`/evaluation-details/[id]`** | `src/app/evaluation-details/[id]/page.jsx` | Protected (`Authenticated`) | Route alias to `/evaluation/[id]` |
 | **`/model`** | `src/app/model/page.jsx` | Protected (`Authenticated`) | Model Registry catalog table, status filter (`READY`, `ACTIVE`, `ARCHIVED`) |
 | **`/model/[id]`** | `src/app/model/[id]/page.jsx` | Protected (`Authenticated`) | 360° Model detail view, deployment target, LoRA commit hash, audit logs |
+| **`/model_registry`** | `src/app/model_registry/page.jsx` | Protected (`Authenticated`) | Route alias to `/model` |
+| **`/model_registry/[id]`** | `src/app/model_registry/[id]/page.jsx` | Protected (`Authenticated`) | Route alias to `/model/[id]` |
+| **`/pipeline`** | `src/app/pipeline/page.jsx` | Protected (`Authenticated`) | New pipeline creation workflow and pipeline history overview |
 | **`/deployment`** | `src/app/deployment/page.jsx` | Protected (`Authenticated`) | Active serving endpoints, deployment modal, rollback & reload actions |
 | **`/deployment/[id]`** | `src/app/deployment/[id]/page.jsx`| Protected (`Authenticated`) | Deployment health metrics, environment variables, latency tracking |
 | **`/playground`** | `src/app/playground/page.jsx` | Protected (`Authenticated`) | Interactive multi-turn chat sandbox targeting deployed model endpoints |
@@ -544,9 +549,15 @@ The frontend is configured via `.env.local` or `.env.production`:
 
 # 19. Build & Deployment Architecture
 
-* **Build Engine:** Next.js Compiler (`next build`).
-* **Asset Output:** Static chunks and optimized assets generated to `.next/`.
-* **Deployment Target:** Compatible with Node.js container runtimes, Vercel, or AWS Amplify.
+* **Build Engine:** Next.js Compiler (`next build` with Turbopack).
+* **Asset Output:** Production bundles generated to `.next/`.
+* **Hosting Platform:** **Vercel** (`https://hdfc-custom-llm-frontend.vercel.app`).
+* **Root Directory on Vercel:** `frontend`.
+* **Build Command:** `npm run build`.
+* **Output Directory:** Default Next.js output directory.
+* **Environment Variables:**
+  * `NEXT_PUBLIC_API_URL`: Points to Render FastAPI backend (`https://hdfc-custom-llm-backend.onrender.com`).
+* **Asset Path Normalization:** Standardized lowercase `/images/` directory with next.config.js rewrite rule ensuring case-insensitive handling for `/Images/:path*` -> `/images/:path*`.
 
 ---
 
