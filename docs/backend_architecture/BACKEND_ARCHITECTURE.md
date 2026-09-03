@@ -730,6 +730,12 @@ The evaluation framework scores models across multiple dimensions:
 5. **NLP Token Metrics:** Token-level Precision, Recall, and F1 score against ground-truth fixture data.
 6. **Latency Profiling:** Measures inference response duration per test example.
 
+### Evaluation Status vs. Quality Target Separation
+The evaluation architecture strictly separates the **execution lifecycle status** from the **model performance result**:
+* **Process Status (`status`):** Can be `completed`, `failed`, `running`, or `queued`. Whenever evaluation scoring finishes normally, `status` is set to `"completed"` — even if the overall score is below the 70.0% quality target. Technical `status = "failed"` is reserved exclusively for unhandled exceptions, worker crashes, or pipeline infrastructure errors.
+* **Quality Gate Assessment (`target_met`):** A boolean evaluated independently against `MIN_OVERALL_SCORE = 70.0%`, `MIN_ACCURACY = 65.0%`, zero critical safety failures, and zero infrastructure errors.
+* **Configurable Thresholds (`threshold`):** Threshold values are exposed directly from backend configuration (`quality_gate_config.py`), preventing hardcoded client-side evaluations.
+
 ---
 
 # 17. Model Registry Architecture
@@ -845,10 +851,16 @@ Environment configuration is managed via `.env` files using `python-dotenv`:
 | **Hugging Face** | `HF_DATASET_REPO` | `"ankush0710/hdfc-llm-datasets"` | Remote dataset repository ID |
 | **Hugging Face** | `HF_MODEL_REPO` | `"ankush0710/hdfc-llm-models"` | Remote model artifact repository ID |
 | **Hugging Face** | `HF_UPLOAD_TIMEOUT_SECONDS` | `900` | Maximum artifact upload timeout (seconds) |
-| **Quality Gate** | `QUALITY_GATE_MIN_OVERALL_SCORE` | `70.0` | Minimum score required for deployment gate |
-| **Quality Gate** | `QUALITY_GATE_MIN_ACCURACY` | `65.0` | Minimum accuracy required for deployment gate |
+| **Quality Gate** | `QUALITY_GATE_MIN_OVERALL_SCORE` | `70.0` | Minimum score required for deployment quality gate |
+| **Quality Gate** | `QUALITY_GATE_MIN_ACCURACY` | `65.0` | Minimum accuracy required for deployment quality gate |
 | **Application** | `ENVIRONMENT` | `"development"` | Set to `"production"` to disable `/docs` and `/redoc` |
-| **Application** | `ALLOW_ORIGIN` | `"http://localhost:3000"` | Comma-separated CORS allowed origin list |
+| **CORS** | `ALLOW_ORIGINS` | `"http://localhost:3000,https://hdfc-custom-llm-frontend.vercel.app"` | Comma-separated list of allowed frontend origins |
+| **CORS** | `ALLOW_ORIGIN_REGEX` | `"https:\/\/.*\.vercel\.app"` | Optional regex pattern for origin matching (e.g. Vercel previews) |
+| **ML Service** | `ML_SERVICE_URL` | `"https://hdfc-custom-llm-ml-service.onrender.com"` | URL of separate FastAPI ML worker on Render |
+| **ML Service** | `ML_SERVICE_API_KEY` | *(Optional secret)* | Inter-service authentication key for ML worker |
+| **Admin Seed** | `INITIAL_ADMIN_EMAIL` | *(Optional admin email)* | Email for automated initial admin seeding on startup |
+| **Admin Seed** | `INITIAL_ADMIN_PASSWORD` | *(Optional admin password)* | Password for automated initial admin seeding |
+| **Admin Seed** | `INITIAL_ADMIN_NAME` | `"System Admin"` | Display name for seeded system administrator |
 
 ---
 
