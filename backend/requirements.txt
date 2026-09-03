@@ -37,5 +37,6 @@ accelerate>=0.28.0
 safetensors>=0.4.0
 PyYAML>=6.0
 huggingface_hub>=0.20.0
+datasets==5.0.1
 trl==1.10.0
 
