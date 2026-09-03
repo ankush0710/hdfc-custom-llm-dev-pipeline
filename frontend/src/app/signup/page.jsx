@@ -360,10 +360,8 @@ export default function SignupPage() {
       </div>
 
       {/* Brand Watermark Bottom Right */}
-      <div className="absolute bottom-4 right-6 z-10 pointer-events-none opacity-40">
-        <span className="text-[10px] font-bold tracking-widest text-white uppercase font-mono">
-          HDFC LLM Forge
-        </span>
+      <div className="absolute bottom-4 right-8 z-10 pointer-events-none">
+        <span className="text-white opacity-50 text-xs font-bold tracking-tight">HDFC Bank</span>
       </div>
     </div>
   );
