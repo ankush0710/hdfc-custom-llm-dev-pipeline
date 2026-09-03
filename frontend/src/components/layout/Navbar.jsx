@@ -39,7 +39,7 @@ export default function Navbar({ onMenuClick }) {
             className="flex items-center gap-2 text-[#000000] font-bold text-lg tracking-tight"
           >
             <img
-              src="./images/HDFC-Bank-Logo.png"
+              src="/images/HDFC-Bank-Logo.png"
               alt="HDFC Bank"
               className="h-14 lg:h-18 w-auto object-contain"
             />

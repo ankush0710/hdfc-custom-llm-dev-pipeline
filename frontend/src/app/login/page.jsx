@@ -73,7 +73,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="h-14 w-35 flex items-center justify-center overflow-hidden">
             <img
-              src="/Images/HDFC-Bank-Logo.png"
+              src="/images/HDFC-Bank-Logo.png"
               alt="HDFC Bank"
               className="h-full w-full object-contain"
             />
@@ -220,7 +220,7 @@ export default function LoginPage() {
       <div className="relative hidden md:flex md:w-1/2 flex-col justify-between p-8 lg:p-12 xl:p-16 bg-slate-950 overflow-hidden min-h-screen">
         {/* Hero image covering 100% of the entire container */}
         <img
-          src="/Images/Hero-img.png"
+          src="/images/Hero-img.png"
           alt="HDFC LLM Pipeline"
           className="absolute inset-0 w-full h-full object-cover object-center"
         />
