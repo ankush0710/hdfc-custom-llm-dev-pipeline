@@ -96,6 +96,8 @@ export default function PlaygroundPage() {
       return;
     }
 
+    if (inferencing) return;
+
     const newMessages = [...messages, { role: "user", content: userPrompt }];
     setMessages(newMessages);
 
@@ -140,14 +142,26 @@ export default function PlaygroundPage() {
       }
     } catch (err) {
       console.error("Inference failed:", err);
-      toast.error(err?.response?.data?.detail || "Inference call failed");
+      const isRateLimit =
+        err?.response?.status === 429 ||
+        err?.message?.includes("429") ||
+        err?.response?.data?.detail?.includes("429") ||
+        err?.response?.data?.detail?.toLowerCase()?.includes("rate") ||
+        err?.response?.data?.detail?.toLowerCase()?.includes("too many requests");
+
+      const errorMsg = isRateLimit
+        ? "The model inference server is currently handling high request volume (429 Too Many Requests). Please wait a few seconds before trying again."
+        : (err?.response?.data?.detail || err?.message || "Inference call failed");
+
+      toast.error(isRateLimit ? "Server Busy (Rate Limited)" : "Inference Failed", {
+        description: errorMsg,
+      });
+
       setMessages([
         ...newMessages,
         {
           role: "assistant",
-          content: `âš ï¸ Failed to generate response: ${
-            err?.response?.data?.detail || err?.message || "Server Error"
-          }`,
+          content: `⚠️ Failed to generate response: ${errorMsg}`,
         },
       ]);
     } finally {

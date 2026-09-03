@@ -5,6 +5,7 @@ HTTP client for communicating between the FastAPI control plane and the dedicate
 Provides authenticated, resilient communication with the ML worker.
 """
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -60,6 +61,11 @@ class MLClient:
                 detail = err_data.get("detail", exc.response.text)
             except Exception:
                 detail = exc.response.text or str(exc)
+            if status == 429:
+                detail = (
+                    "The ML inference service is temporarily rate-limited or experiencing high traffic (429 Too Many Requests). "
+                    "Please wait a few seconds before retrying your query."
+                )
             logger.error("ML Service returned HTTP %d for '%s': %s", status, action, detail)
             raise HTTPException(status_code=status, detail=detail)
         else:
@@ -98,7 +104,7 @@ class MLClient:
         base_model_override: Optional[str] = None,
         huggingface_path: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Call ML Service to execute model inference for a registered model ID."""
+        """Call ML Service to execute model inference for a registered model ID with automatic retry on 429."""
         url = f"{ML_SERVICE_URL}/api/v1/inference/predict"
         payload = {
             "model_id": model_id,
@@ -114,13 +120,32 @@ class MLClient:
             "base_model_override": base_model_override,
             "huggingface_path": huggingface_path,
         }
-        try:
-            with httpx.Client(timeout=ML_SERVICE_TIMEOUT_SECONDS) as client:
-                resp = client.post(url, json=payload, headers=cls._headers())
-                resp.raise_for_status()
-                return resp.json()
-        except Exception as exc:
-            cls._handle_request_error(exc, f"predict(model_id={model_id})")
+        max_retries = 3
+        backoff = 1.5
+        for attempt in range(max_retries):
+            try:
+                with httpx.Client(timeout=ML_SERVICE_TIMEOUT_SECONDS) as client:
+                    resp = client.post(url, json=payload, headers=cls._headers())
+                    if resp.status_code == 429 and attempt < max_retries - 1:
+                        retry_after = resp.headers.get("Retry-After")
+                        delay = float(retry_after) if (retry_after and retry_after.isdigit()) else backoff
+                        logger.warning(
+                            "ML Service returned 429 on attempt %d/%d for predict(model_id=%s). Retrying in %.1fs...",
+                            attempt + 1, max_retries, model_id, delay,
+                        )
+                        time.sleep(delay)
+                        backoff *= 2.0
+                        continue
+                    resp.raise_for_status()
+                    return resp.json()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 429 and attempt < max_retries - 1:
+                    time.sleep(backoff)
+                    backoff *= 2.0
+                    continue
+                cls._handle_request_error(exc, f"predict(model_id={model_id})")
+            except Exception as exc:
+                cls._handle_request_error(exc, f"predict(model_id={model_id})")
 
     @classmethod
     def generate(
@@ -135,7 +160,7 @@ class MLClient:
         do_sample: bool = False,
         seed: int = 42,
     ) -> Dict[str, Any]:
-        """Direct inference by string model identifier (e.g. 'qwen3_0_6b')."""
+        """Direct inference by string model identifier (e.g. 'qwen3_0_6b') with automatic retry on 429."""
         url = f"{ML_SERVICE_URL}/api/v1/inference/generate"
         payload = {
             "model_id": model_id,
@@ -148,13 +173,32 @@ class MLClient:
             "do_sample": do_sample,
             "seed": seed,
         }
-        try:
-            with httpx.Client(timeout=ML_SERVICE_TIMEOUT_SECONDS) as client:
-                resp = client.post(url, json=payload, headers=cls._headers())
-                resp.raise_for_status()
-                return resp.json()
-        except Exception as exc:
-            cls._handle_request_error(exc, f"generate(model_id={model_id})")
+        max_retries = 3
+        backoff = 1.5
+        for attempt in range(max_retries):
+            try:
+                with httpx.Client(timeout=ML_SERVICE_TIMEOUT_SECONDS) as client:
+                    resp = client.post(url, json=payload, headers=cls._headers())
+                    if resp.status_code == 429 and attempt < max_retries - 1:
+                        retry_after = resp.headers.get("Retry-After")
+                        delay = float(retry_after) if (retry_after and retry_after.isdigit()) else backoff
+                        logger.warning(
+                            "ML Service returned 429 on attempt %d/%d for generate(model_id=%s). Retrying in %.1fs...",
+                            attempt + 1, max_retries, model_id, delay,
+                        )
+                        time.sleep(delay)
+                        backoff *= 2.0
+                        continue
+                    resp.raise_for_status()
+                    return resp.json()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 429 and attempt < max_retries - 1:
+                    time.sleep(backoff)
+                    backoff *= 2.0
+                    continue
+                cls._handle_request_error(exc, f"generate(model_id={model_id})")
+            except Exception as exc:
+                cls._handle_request_error(exc, f"generate(model_id={model_id})")
 
     @classmethod
     def list_models(cls) -> List[Dict[str, Any]]:

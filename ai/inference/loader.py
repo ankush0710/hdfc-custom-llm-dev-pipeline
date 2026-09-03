@@ -25,6 +25,8 @@ This module intentionally does NOT:
 from __future__ import annotations
 
 import logging
+import os
+import time
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -37,6 +39,29 @@ from transformers import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _hf_call_with_retry(fn, *args, **kwargs):
+    """Executes a Hugging Face Hub download/call with token authentication and exponential retry on 429 rate limits."""
+    token = os.getenv("HF_TOKEN")
+    if token and "token" not in kwargs:
+        kwargs["token"] = token
+    max_retries = 3
+    delay = 1.5
+    for attempt in range(max_retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            err_str = str(exc)
+            if ("429" in err_str or "Too Many Requests" in err_str) and attempt < max_retries - 1:
+                logger.warning(
+                    "Hugging Face returned 429 Too Many Requests on attempt %d/%d. Waiting %.1fs before retrying...",
+                    attempt + 1, max_retries, delay
+                )
+                time.sleep(delay)
+                delay *= 2.0
+                continue
+            raise
 
 
 class ModelLoadError(RuntimeError):
@@ -197,7 +222,8 @@ class ModelLoader:
             return self._tokenizer
 
         try:
-            tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer = _hf_call_with_retry(
+                AutoTokenizer.from_pretrained,
                 self.model_name,
                 trust_remote_code=self.trust_remote_code,
             )
@@ -238,7 +264,8 @@ class ModelLoader:
         dtype = self._dtype_override or resolved.dtype
 
         try:
-            model = AutoModelForCausalLM.from_pretrained(
+            model = _hf_call_with_retry(
+                AutoModelForCausalLM.from_pretrained,
                 self.model_name,
                 dtype=dtype,
                 low_cpu_mem_usage=True,
