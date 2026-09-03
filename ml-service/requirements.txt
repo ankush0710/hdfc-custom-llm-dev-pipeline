@@ -1,0 +1,21 @@
+# ML Service Requirements (Heavy ML Workloads)
+torch==2.13.0
+transformers==5.15.1
+peft==0.20.0
+accelerate>=0.28.0
+safetensors>=0.4.0
+PyYAML>=6.0
+huggingface_hub>=0.20.0
+datasets==5.0.1
+trl==1.10.0
+
+# API & Worker runtime
+fastapi==0.141.1
+uvicorn==0.52.3
+pydantic==2.13.4
+python-dotenv==1.2.2
+httpx>=0.27.0
+SQLAlchemy==2.0.52
+psycopg2-binary==2.9.12
+pandas==3.0.5
+openpyxl==3.1.5

@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { DashboardModelColumns as ModelColumns } from "@/components/tables/DashboardDeploymentColumns";
 import { useAuth } from "@/app/context/AuthContext";
+import NewPipelineModal from "@/components/pipeline/NewPipelineModal";
 
 // ─── Icon & styling constants (no business data here) ──────────────────────── //
 const STAT_CARD_META = [
@@ -89,6 +90,7 @@ export default function Dashboard() {
   const [currentPerformance, setCurrentPerformance] = useState(null);
   const [selectedRunId, setSelectedRunId] = useState(null);
   const [loadingRun, setLoadingRun] = useState(false);
+  const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
 
   const loadDashboardData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -203,7 +205,11 @@ export default function Dashboard() {
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </Button>
-            <Button icon={Plus} variant="primary">
+            <Button
+              icon={Plus}
+              variant="primary"
+              onClick={() => setIsPipelineModalOpen(true)}
+            >
               New Pipeline
             </Button>
           </div>
@@ -303,6 +309,11 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      <NewPipelineModal
+        isOpen={isPipelineModalOpen}
+        onClose={() => setIsPipelineModalOpen(false)}
+      />
     </>
   );
 }

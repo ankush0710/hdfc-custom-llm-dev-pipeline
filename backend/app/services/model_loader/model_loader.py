@@ -1,17 +1,18 @@
-from typing import Any
+"""
+backend/app/services/model_loader/model_loader.py
 
-from app.ai.inference_adapter.inference_adapter import (
-    AIInferenceAdapter,
-)
+Runtime model state manager for the control plane.
+Queries ML Service for available models.
+"""
+from typing import Any, Optional
+from app.clients.ml_client import MLClient
 
 
 class ModelLoader:
 
     def __init__(self):
-
-        self.loaded_model_id: int | None = None
-
-        self.loaded_model_name: str | None = None
+        self.loaded_model_id: Optional[int] = None
+        self.loaded_model_name: Optional[str] = None
 
     def register_runtime_model(
         self,
@@ -19,7 +20,7 @@ class ModelLoader:
         model_name: str,
     ) -> dict[str, Any]:
 
-        models = AIInferenceAdapter.list_models()
+        models = MLClient.list_models()
 
         ai_model = next(
             (
@@ -31,10 +32,8 @@ class ModelLoader:
         )
 
         if ai_model is None:
-
             raise RuntimeError(
-                f"AI model '{model_name}' "
-                "was not found in AI registry."
+                f"AI model '{model_name}' was not found in AI registry."
             )
 
         self.loaded_model_id = model_id
@@ -43,22 +42,17 @@ class ModelLoader:
         return {
             "model_id": model_id,
             "model_name": model_name,
-            "status": "READY_FOR_INFERENCE",
-            "ai_model": ai_model,
+            "status": "ready",
         }
 
-    def unload(self):
-
-        result = AIInferenceAdapter.unload()
-
+    def unload_runtime_model(self) -> dict[str, Any]:
+        result = MLClient.unload_model()
         self.loaded_model_id = None
         self.loaded_model_name = None
-
         return result
 
-    def is_loaded(
-        self,
-        model_id: int,
-    ) -> bool:
-
-        return self.loaded_model_id == model_id
+    def get_runtime_status(self) -> dict[str, Any]:
+        return {
+            "loaded_model_id": self.loaded_model_id,
+            "loaded_model_name": self.loaded_model_name,
+        }

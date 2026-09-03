@@ -362,7 +362,7 @@ export default function SignupPage() {
       {/* Brand Watermark Bottom Right */}
       <div className="absolute bottom-4 right-8 z-10 pointer-events-none">
         <span className="text-white opacity-50 text-xs font-bold tracking-tight">HDFC Bank</span>
-
       </div>
-      );
+    </div>
+  );
 }

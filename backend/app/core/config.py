@@ -27,3 +27,8 @@ HF_UPLOAD_TIMEOUT_SECONDS = int(os.getenv("HF_UPLOAD_TIMEOUT_SECONDS", "900"))
 
 HF_LOCAL_TEMP_DIR = Path(os.getenv("HF_LOCAL_TEMP_DIR", BACKEND_DIR / "storage" / "temp_hf")).resolve()
 HF_LOCAL_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+# ML Service Communication Configuration
+ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://127.0.0.1:8001").rstrip("/")
+ML_SERVICE_API_KEY = os.getenv("ML_SERVICE_API_KEY", "hdfc-internal-ml-service-key")
+ML_SERVICE_TIMEOUT_SECONDS = float(os.getenv("ML_SERVICE_TIMEOUT_SECONDS", "120.0"))

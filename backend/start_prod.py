@@ -1,35 +1,43 @@
 #!/usr/bin/env python3
 """
 start_prod.py — Production startup script for the HDFC Custom LLM backend.
-
-Key differences from the dev command (uvicorn app.main:app --reload):
-  - --reload is REMOVED: hot-reload evicts the in-memory model cache, causing
-    60-300s cold-start latencies on every file change.
-  - --workers 1: a single Uvicorn worker ensures the ai.inference.service._active
-    model cache is shared across all requests in the same process. Multiple
-    workers would each load their own copy of the model, wasting VRAM.
-  - --log-level warning: suppresses verbose INFO logs in production while
-    retaining WARNING / ERROR output.
-  - ENVIRONMENT=production must be set in the environment (or .env.production)
-    to disable /docs, /redoc, and /openapi.json.
-
-Usage (development):
-    python start_prod.py
-
-Usage (production / Docker):
-    ENVIRONMENT=production ALLOW_ORIGIN=https://your-frontend.com python start_prod.py
-
-Or with gunicorn (recommended for Linux production):
-    gunicorn app.main:app -k uvicorn.workers.UvicornWorker --workers 1 --bind 0.0.0.0:8000
+Automatically re-executes using the project's virtualenv interpreter if called with global python.
 """
 import os
 import sys
+from pathlib import Path
+
+# 1. Auto-detect project virtual environment if run with global python
+_backend_dir = Path(__file__).resolve().parent
+_repo_root = _backend_dir.parent
+
+_venv_candidates = [
+    _backend_dir / ".venv" / ("Scripts" if os.name == "nt" else "bin") / ("python.exe" if os.name == "nt" else "python"),
+    _repo_root / ".venv" / ("Scripts" if os.name == "nt" else "bin") / ("python.exe" if os.name == "nt" else "python"),
+]
+
+_current_exe = Path(sys.executable).resolve()
+_resolved_venvs = [c.resolve() for c in _venv_candidates if c.is_file()]
+
+# If we are already running inside one of the recognized project venvs, do NOT re-launch!
+if _current_exe not in _resolved_venvs and not os.getenv("__RELAUNCHED_VENV"):
+    for _venv_py in _resolved_venvs:
+        import subprocess
+        _env = os.environ.copy()
+        _env["__RELAUNCHED_VENV"] = "1"
+        res = subprocess.run([str(_venv_py)] + sys.argv, cwd=str(_backend_dir), env=_env)
+        sys.exit(res.returncode)
+
+# 2. Add backend directory and repo root to sys.path
+for p in [str(_backend_dir), str(_repo_root)]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 import uvicorn
 
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "warning")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 
 
 if __name__ == "__main__":
@@ -38,8 +46,8 @@ if __name__ == "__main__":
         "app.main:app",
         host=HOST,
         port=PORT,
-        reload=False,           # NEVER enable reload in production — kills model cache
-        workers=1,              # Single worker: preserves the module-level model cache
+        reload=False,
+        workers=1,
         log_level=LOG_LEVEL,
         access_log=True,
         loop="asyncio",

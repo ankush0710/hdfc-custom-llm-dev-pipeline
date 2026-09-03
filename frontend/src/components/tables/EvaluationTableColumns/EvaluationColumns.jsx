@@ -6,10 +6,11 @@ export const createEvaluationColumns = ({ onStartEval } = {}) => [
     key: "display_id",
     label: "EVALUATION ID",
     render: (row) => {
-      const displayId = row.display_id || `EV-${String(row.evaluation_id).padStart(3, "0")}`;
+      const evalId = row.evaluation_id ?? row.id ?? 1;
+      const displayId = row.display_id || `EV-${String(evalId).padStart(3, "0")}`;
       return (
         <Link
-          href={`/evaluation/${row.evaluation_id}`}
+          href={`/evaluation/${evalId}`}
           className="font-mono text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline transition"
         >
           {displayId}
@@ -20,24 +21,27 @@ export const createEvaluationColumns = ({ onStartEval } = {}) => [
   {
     key: "model",
     label: "MODEL",
-    render: (row) => (
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#002B55]">
-          <Cpu size={14} />
+    render: (row) => {
+      const evalId = row.evaluation_id ?? row.id ?? 1;
+      return (
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#002B55]">
+            <Cpu size={14} />
+          </div>
+          <div>
+            <Link
+              href={`/evaluation/${evalId}`}
+              className="font-bold text-xs text-gray-900 block hover:text-blue-700 transition"
+            >
+              {row.model_name || `Model-${row.model_id}`}
+            </Link>
+            <span className="text-[11px] text-gray-400 font-normal">
+              {row.base_model || "Qwen/Qwen3-0.6B"}
+            </span>
+          </div>
         </div>
-        <div>
-          <Link
-            href={`/evaluation/${row.evaluation_id}`}
-            className="font-bold text-xs text-gray-900 block hover:text-blue-700 transition"
-          >
-            {row.model_name || `Model-${row.model_id}`}
-          </Link>
-          <span className="text-[11px] text-gray-400 font-normal">
-            {row.base_model || "Qwen/Qwen3-0.6B"}
-          </span>
-        </div>
-      </div>
-    ),
+      );
+    },
   },
   {
     key: "dataset",
@@ -134,14 +138,17 @@ export const createEvaluationColumns = ({ onStartEval } = {}) => [
     key: "actions",
     label: "ACTIONS",
     align: "right",
-    render: (row) => (
-      <Link
-        href={`/evaluation/${row.evaluation_id}`}
-        className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition cursor-pointer"
-      >
-        <span>View Details</span>
-        <ChevronRight size={13} />
-      </Link>
-    ),
+    render: (row) => {
+      const evalId = row.evaluation_id ?? row.id ?? 1;
+      return (
+        <Link
+          href={`/evaluation/${evalId}`}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition cursor-pointer"
+        >
+          <span>View Details</span>
+          <ChevronRight size={13} />
+        </Link>
+      );
+    },
   },
 ];
