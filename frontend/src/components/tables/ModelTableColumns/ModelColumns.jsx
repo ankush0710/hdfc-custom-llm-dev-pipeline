@@ -38,6 +38,7 @@ export const createModelColumns = ({ onViewDetails } = {}) => [
         : "Type: LLM (Generative)";
 
       const Icon = isEmbedding ? Binary : isClassifier ? Sparkles : Cpu;
+      const modelId = row.id ?? row.model_id ?? 1;
 
       return (
         <div className="flex items-center gap-3">
@@ -46,7 +47,7 @@ export const createModelColumns = ({ onViewDetails } = {}) => [
           </div>
           <div>
             <Link
-              href={`/model/${row.id}`}
+              href={`/model/${modelId}`}
               className="font-bold text-xs text-gray-900 block hover:text-[#002B55] transition"
             >
               {row.model_name}
@@ -139,14 +140,28 @@ export const createModelColumns = ({ onViewDetails } = {}) => [
     key: "actions",
     label: "ACTIONS",
     align: "right",
-    render: (row) => (
-      <Link
-        href={`/model/${row.id}`}
-        className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition cursor-pointer"
-      >
-        <span>View Details</span>
-        <ChevronRight size={13} />
-      </Link>
-    ),
+    render: (row) => {
+      const modelId = row.id ?? row.model_id ?? 1;
+      return (
+        <div className="flex items-center justify-end gap-2">
+          {onViewDetails && (
+            <button
+              type="button"
+              onClick={() => onViewDetails(row)}
+              className="text-xs font-semibold text-slate-600 hover:text-[#002B55] px-2 py-1 rounded hover:bg-slate-100 transition"
+            >
+              Drawer
+            </button>
+          )}
+          <Link
+            href={`/model/${modelId}`}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition cursor-pointer"
+          >
+            <span>View Details</span>
+            <ChevronRight size={13} />
+          </Link>
+        </div>
+      );
+    },
   },
 ];

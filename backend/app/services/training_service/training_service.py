@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 
-from app.ai.training_adapter.training_adapter import AITrainingAdapter
+from app.clients.ml_client import MLClient
 from app.constants.training_status import training_status
 from app.constants.supported_models import resolve_hf_model_id, resolve_model_config
 from app.dbConfig.database_config import SessionLocal
@@ -283,6 +283,7 @@ def _execute_training_run_worker(run_id: int):
                 if progress_db:
                     progress_db.close()
 
+        from app.ai.training_adapter.training_adapter import AITrainingAdapter
         train_result = AITrainingAdapter.train(
             base_model=canonical_base_model,
             dataset_path=ds_path,
@@ -547,12 +548,32 @@ def start_training_run(db: Session, run_id: int, background_tasks: Optional[Back
     # Register cancellation event
     _ACTIVE_TRAINING_EVENTS[run_id] = threading.Event()
 
-    # Launch background worker
-    if background_tasks is not None:
-        background_tasks.add_task(_execute_training_run_worker, run_id)
-    else:
-        thread = threading.Thread(target=_execute_training_run_worker, args=(run_id,), daemon=True)
-        thread.start()
+    # Dispatch asynchronous training job to dedicated ML Service worker
+    try:
+        MLClient.dispatch_training(
+            run_id=training_run.id,
+            base_model=training_run.base_model,
+            dataset_version_id=training_run.dataset_version_id,
+            epochs=float(training_run.epochs),
+            learning_rate=float(training_run.learning_rate),
+            batch_size=int(training_run.batch_size),
+            training_method=training_run.training_method,
+        )
+    except HTTPException:
+        # Re-raise clean HTTP exception
+        raise
+    except Exception as dispatch_err:
+        logger.error("ML Service dispatch failed for run %d: %s", run_id, dispatch_err)
+        training_run.status = training_status.FAILED
+        training_run.error_message = f"Failed to dispatch to ML service: {str(dispatch_err)}"
+        if training_job:
+            training_job.status = training_status.FAILED
+            training_job.error_message = str(dispatch_err)
+        db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not dispatch training run #{run_id} to ML service: {str(dispatch_err)}",
+        )
 
     setattr(training_run, "job_id", training_job.id)
     setattr(training_run, "job_status", training_job.status)
@@ -578,6 +599,12 @@ def stop_training_run(db: Session, run_id: int):
     stop_evt = _ACTIVE_TRAINING_EVENTS.get(run_id)
     if stop_evt:
         stop_evt.set()
+
+    # Notify ML Service to cancel running job
+    try:
+        MLClient.stop_training(run_id)
+    except Exception as stop_err:
+        logger.debug("ML service stop notification for run %d: %s", run_id, stop_err)
 
     now = datetime.utcnow()
     training_run.status = training_status.STOPPED

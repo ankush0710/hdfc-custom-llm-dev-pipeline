@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 
+from app.clients.ml_client import MLClient
 from app.dbConfig.database_config import SessionLocal
 from app.model.dataset_version_model import Dataset_Version_Model
 from app.model.evaluation_run_model import Evaluation_Model
@@ -486,11 +487,24 @@ def start_evaluation(db: Session, evaluation_id: int, background_tasks: Optional
     db.commit()
     db.refresh(evaluation)
 
-    if background_tasks is not None:
-        background_tasks.add_task(_execute_evaluation_worker, evaluation_id)
-    else:
-        thread = threading.Thread(target=_execute_evaluation_worker, args=(evaluation_id,), daemon=True)
-        thread.start()
+    try:
+        MLClient.dispatch_evaluation(
+            evaluation_id=evaluation.evaluation_id,
+            run_id=evaluation.run_id,
+            model_id=evaluation.model_id,
+            test_dataset_id=evaluation.test_dataset_id,
+        )
+    except HTTPException:
+        raise
+    except Exception as dispatch_err:
+        logger.error("ML Service evaluation dispatch failed for eval %d: %s", evaluation_id, dispatch_err)
+        evaluation.evaluation_status = "FAILED"
+        evaluation.error_message = f"Failed to dispatch to ML service: {str(dispatch_err)}"
+        db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not dispatch evaluation #{evaluation_id} to ML service: {str(dispatch_err)}",
+        )
 
     return evaluation
 
