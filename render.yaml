@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: hdfc-custom-llm-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: python start_prod.py
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: HF_DATASET_REPO
+        value: ankush0710/hdfc-llm-datasets
+      - key: HF_MODEL_REPO
+        value: ankush0710/hdfc-llm-models
+      - key: ALLOW_ORIGIN
+        sync: false
+      - key: ALLOW_ORIGIN_REGEX
+        sync: false
+      - key: INITIAL_ADMIN_EMAIL
+        sync: false
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+      - key: INITIAL_ADMIN_NAME
+        value: System Admin
