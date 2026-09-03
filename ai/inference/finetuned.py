@@ -51,7 +51,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -72,6 +74,29 @@ DEFAULT_BASE_MODEL = "Qwen/Qwen3-0.6B"
 DEFAULT_ADAPTER_PATH = PROJECT_ROOT / "ai" / "artifacts" / "full_training"
 DEFAULT_SYSTEM_PROMPT = "You are a helpful and accurate HDFC Bank assistant."
 REQUIRED_ADAPTER_FILES = ("adapter_config.json", "adapter_model.safetensors")
+
+
+def _hf_call_with_retry(fn, *args, **kwargs):
+    """Executes a Hugging Face Hub download/call with token authentication and exponential retry on 429 rate limits."""
+    token = os.getenv("HF_TOKEN")
+    if token and "token" not in kwargs:
+        kwargs["token"] = token
+    max_retries = 3
+    delay = 1.5
+    for attempt in range(max_retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            err_str = str(exc)
+            if ("429" in err_str or "Too Many Requests" in err_str) and attempt < max_retries - 1:
+                logger.warning(
+                    "Hugging Face returned 429 Too Many Requests on attempt %d/%d. Waiting %.1fs before retrying...",
+                    attempt + 1, max_retries, delay
+                )
+                time.sleep(delay)
+                delay *= 2.0
+                continue
+            raise
 
 
 class FinetunedInferenceError(RuntimeError):
@@ -190,7 +215,8 @@ def load_finetuned_model(
     )
 
     try:
-        model = AutoModelForCausalLM.from_pretrained(
+        model = _hf_call_with_retry(
+            AutoModelForCausalLM.from_pretrained,
             base_model,
             dtype=resolved.dtype,
             low_cpu_mem_usage=True,
@@ -218,7 +244,11 @@ def load_finetuned_model(
 
     logger.info("Attaching LoRA adapter from %s...", adapter_path)
     try:
-        model = PeftModel.from_pretrained(model, str(adapter_path))
+        model = _hf_call_with_retry(
+            PeftModel.from_pretrained,
+            model,
+            str(adapter_path),
+        )
     except torch.cuda.OutOfMemoryError as exc:
         raise FinetunedLoadError(
             f"Ran out of GPU memory attaching the LoRA adapter from "
@@ -235,8 +265,10 @@ def load_finetuned_model(
     # exact chat_template.jinja used at training time. Fall back to the
     # base model's tokenizer only if that's unavailable.
     try:
-        tokenizer = AutoTokenizer.from_pretrained(
-            str(adapter_path), trust_remote_code=trust_remote_code
+        tokenizer = _hf_call_with_retry(
+            AutoTokenizer.from_pretrained,
+            str(adapter_path),
+            trust_remote_code=trust_remote_code,
         )
     except OSError:
         logger.warning(
@@ -246,8 +278,10 @@ def load_finetuned_model(
             base_model,
         )
         try:
-            tokenizer = AutoTokenizer.from_pretrained(
-                base_model, trust_remote_code=trust_remote_code
+            tokenizer = _hf_call_with_retry(
+                AutoTokenizer.from_pretrained,
+                base_model,
+                trust_remote_code=trust_remote_code,
             )
         except OSError as exc:
             raise FinetunedLoadError(
