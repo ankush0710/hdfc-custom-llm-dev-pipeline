@@ -40,9 +40,10 @@ export default function PlaygroundChatWindow({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!inputPrompt.trim() || loading) return;
-    onSendMessage(inputPrompt);
+    const prompt = inputPrompt.trim();
+    if (!prompt || loading) return;
     setInputPrompt("");
+    onSendMessage(prompt);
   };
 
   const handleCopy = (text, idx) => {

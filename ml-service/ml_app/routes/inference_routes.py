@@ -6,11 +6,12 @@ Executes actual model loading, LoRA adapter attachment, tokenization, and forwar
 Protected by verify_ml_service_key.
 """
 import logging
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field, field_validator
 
 from ..core.security import verify_ml_service_key
 
@@ -18,6 +19,7 @@ from ai.inference.service import (
     run_model,
     get_available_models,
     unload_model,
+    SUPPORTED_TASKS,
     InferenceServiceError,
     UnknownModelError,
     ModelDisabledError,
@@ -34,6 +36,12 @@ router = APIRouter(
     dependencies=[Depends(verify_ml_service_key)],
 )
 
+# Architecture constraint: ML Service runs as a single Uvicorn process worker (--workers 1)
+# on a dedicated GPU host. A process-level lock serializes inference execution across concurrent
+# worker threads to protect the active loaded model cache (_active) and prevent concurrent
+# PyTorch execution or CUDA out-of-memory crashes.
+_inference_lock = threading.Lock()
+
 
 # ────────────────────────────── Request Schemas ────────────────────────────── #
 
@@ -47,6 +55,16 @@ class DirectGenerateRequest(BaseModel):
     top_p: float = 0.9
     do_sample: bool = False
     seed: int = 42
+
+    @field_validator("task_type")
+    @classmethod
+    def validate_task_type(cls, v: str) -> str:
+        if v not in SUPPORTED_TASKS:
+            raise ValueError(
+                f"The selected task type '{v}' is not supported. "
+                f"Supported task types: {', '.join(sorted(SUPPORTED_TASKS))}"
+            )
+        return v
 
 
 class PredictModelRequest(BaseModel):
@@ -62,6 +80,16 @@ class PredictModelRequest(BaseModel):
     adapter_path_override: Optional[str] = None
     base_model_override: Optional[str] = None
     huggingface_path: Optional[str] = None
+
+    @field_validator("task_type")
+    @classmethod
+    def validate_task_type(cls, v: str) -> str:
+        if v not in SUPPORTED_TASKS:
+            raise ValueError(
+                f"The selected task type '{v}' is not supported. "
+                f"Supported task types: {', '.join(sorted(SUPPORTED_TASKS))}"
+            )
+        return v
 
 
 # ──────────────────────────────── Endpoints ────────────────────────────────── #
@@ -79,16 +107,45 @@ def list_available_models():
 @router.post("/unload")
 def evict_cached_model():
     """Unload the active model from GPU/RAM to free up system memory."""
+    # Synchronize with inference lock so we don't evict a model mid-generation
+    acquired = _inference_lock.acquire(timeout=10.0)
+    if not acquired:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="The inference service is temporarily busy. Cannot unload model during active generation.",
+            headers={"Retry-After": "3"},
+        )
     try:
         return unload_model()
     except Exception as exc:
         logger.exception("Failed to unload model: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        _inference_lock.release()
 
 
 @router.post("/generate")
-def generate_direct(payload: DirectGenerateRequest):
-    """Direct inference by string model identifier."""
+def generate_direct(payload: DirectGenerateRequest, request: Request):
+    """Direct inference by string model identifier with controlled concurrency protection."""
+    request_id = request.headers.get("X-Request-ID") or "unknown"
+    start_time = time.perf_counter()
+    logger.info(
+        "INFERENCE_REQUEST_RECEIVED request_id=%s model_id=%s task_type=%s",
+        request_id, payload.model_id, payload.task_type
+    )
+
+    acquired = _inference_lock.acquire(timeout=10.0)
+    if not acquired:
+        logger.warning(
+            "INFERENCE_CONCURRENCY_LIMIT request_id=%s model_id=%s worker busy",
+            request_id, payload.model_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="The inference service is temporarily busy handling other requests. Please try again in a few seconds.",
+            headers={"Retry-After": "3"},
+        )
+
     try:
         result = run_model(
             model_id=payload.model_id,
@@ -100,6 +157,11 @@ def generate_direct(payload: DirectGenerateRequest):
             top_p=payload.top_p,
             do_sample=payload.do_sample,
             seed=payload.seed,
+        )
+        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        logger.info(
+            "INFERENCE_RESPONSE request_id=%s status_code=200 duration_ms=%.2f",
+            request_id, duration_ms
         )
         return result
     except UnknownModelError as exc:
@@ -113,19 +175,38 @@ def generate_direct(payload: DirectGenerateRequest):
     except CudaOutOfMemoryError as exc:
         raise HTTPException(status_code=507, detail=str(exc))
     except Exception as exc:
-        logger.exception("Inference error in generate_direct: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("Inference error in generate_direct (request_id=%s): %s", request_id, exc)
+        raise HTTPException(status_code=500, detail="Unable to generate a response due to a server error.")
+    finally:
+        _inference_lock.release()
 
 
 @router.post("/predict")
-def predict_registered(payload: PredictModelRequest):
+def predict_registered(payload: PredictModelRequest, request: Request):
     """
-    Execute inference for a registered model ID.
+    Execute inference for a registered model ID with controlled concurrency protection.
     Handles adapter overrides and model weight resolution.
     """
-    try:
-        start_time = time.perf_counter()
+    request_id = request.headers.get("X-Request-ID") or "unknown"
+    start_time = time.perf_counter()
+    logger.info(
+        "INFERENCE_REQUEST_RECEIVED request_id=%s model_id=%s task_type=%s",
+        request_id, payload.model_id, payload.task_type
+    )
 
+    acquired = _inference_lock.acquire(timeout=10.0)
+    if not acquired:
+        logger.warning(
+            "INFERENCE_CONCURRENCY_LIMIT request_id=%s model_id=%s worker busy",
+            request_id, payload.model_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="The inference service is temporarily busy handling other requests. Please try again in a few seconds.",
+            headers={"Retry-After": "3"},
+        )
+
+    try:
         # Resolve model slug
         raw_base = payload.base_model_override or "Qwen/Qwen3-0.6B"
         base_slug = raw_base.split("/")[-1].lower().replace("-", "_").replace(".", "_")
@@ -164,6 +245,11 @@ def predict_registered(payload: PredictModelRequest):
         )
 
         latency = time.perf_counter() - start_time
+        duration_ms = round(latency * 1000, 2)
+        logger.info(
+            "INFERENCE_RESPONSE request_id=%s status_code=200 duration_ms=%.2f",
+            request_id, duration_ms
+        )
 
         # Normalize response
         if isinstance(result, dict):
@@ -209,10 +295,16 @@ def predict_registered(payload: PredictModelRequest):
 
     except UnknownModelError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    except ModelDisabledError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except UnsupportedTaskError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except MissingAdapterError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except CudaOutOfMemoryError as exc:
         raise HTTPException(status_code=507, detail=str(exc))
     except Exception as exc:
-        logger.exception("Inference error in predict_registered: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("Inference error in predict_registered (request_id=%s): %s", request_id, exc)
+        raise HTTPException(status_code=500, detail="Unable to generate a response due to a server error.")
+    finally:
+        _inference_lock.release()

@@ -1,12 +1,24 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.schema.inference_schema.inference_schema import SUPPORTED_TASK_TYPES
 
 
 class AIInferenceRequest(BaseModel):
     model_id: str = "qwen3_0_6b"
 
     task_type: str = "customer_faq_qa"
+
+    @field_validator("task_type")
+    @classmethod
+    def validate_task_type(cls, v: str) -> str:
+        if v not in SUPPORTED_TASK_TYPES:
+            raise ValueError(
+                f"The selected task type '{v}' is not supported. "
+                f"Supported task types: {', '.join(sorted(SUPPORTED_TASK_TYPES))}"
+            )
+        return v
 
     question: str = Field(
         ...,

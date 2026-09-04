@@ -4,7 +4,10 @@ backend/app/routes/inference_routes/inference_routes.py
 Control plane routes for model inference.
 Dispatches heavy model execution to the dedicated ML Service.
 """
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+import time
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.clients.ml_client import MLClient
@@ -16,6 +19,8 @@ from app.schema.inference_schema.inference_schema import (
     InferenceResponse,
 )
 from app.services.inference_service.inference_service import InferenceService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/inference",
@@ -29,12 +34,19 @@ router = APIRouter(
 )
 def predict(
     payload: InferenceRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User_Model = Depends(get_current_user),
 ):
+    request_id = request.headers.get("X-Request-ID") or f"req-{uuid.uuid4().hex[:10]}"
+    start_time = time.perf_counter()
+    logger.info(
+        "INFERENCE_REQUEST_RECEIVED request_id=%s model_id=%s task_type=%s",
+        request_id, payload.model_id, payload.task_type
+    )
     service = InferenceService(db)
     try:
-        return service.predict(
+        result = service.predict(
             model_id=payload.model_id,
             task_type=payload.task_type,
             question=payload.question,
@@ -44,13 +56,32 @@ def predict(
             top_p=payload.top_p,
             do_sample=payload.do_sample,
             seed=payload.seed,
+            request_id=request_id,
         )
+        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        logger.info(
+            "INFERENCE_RESPONSE request_id=%s status_code=200 duration_ms=%.2f",
+            request_id, duration_ms
+        )
+        return result
     except ValueError as exc:
+        logger.warning(
+            "INFERENCE_ERROR request_id=%s status_code=400 error_type=ValidationError upstream=backend detail=%s",
+            request_id, exc
+        )
         raise HTTPException(status_code=400, detail=str(exc))
-    except HTTPException:
+    except HTTPException as exc:
+        logger.warning(
+            "INFERENCE_ERROR request_id=%s status_code=%d error_type=HTTPException upstream=ml_service detail=%s",
+            request_id, exc.status_code, exc.detail
+        )
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception(
+            "INFERENCE_ERROR request_id=%s status_code=500 error_type=UnhandledException upstream=backend detail=%s",
+            request_id, exc
+        )
+        raise HTTPException(status_code=500, detail="Unable to generate a response due to a server error.")
 
 
 @router.get("/models")

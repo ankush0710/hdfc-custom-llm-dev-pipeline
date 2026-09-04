@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import time
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -42,24 +43,25 @@ logger = logging.getLogger(__name__)
 
 
 def _hf_call_with_retry(fn, *args, **kwargs):
-    """Executes a Hugging Face Hub download/call with token authentication and exponential retry on 429 rate limits."""
+    """Executes a Hugging Face Hub download/call with token authentication and bounded exponential retry on 429 rate limits."""
     token = os.getenv("HF_TOKEN")
     if token and "token" not in kwargs:
         kwargs["token"] = token
     max_retries = 3
-    delay = 1.5
+    base_delay = 1.5
     for attempt in range(max_retries):
         try:
             return fn(*args, **kwargs)
         except Exception as exc:
             err_str = str(exc)
             if ("429" in err_str or "Too Many Requests" in err_str) and attempt < max_retries - 1:
+                delay = min(base_delay + random.uniform(0.1, 0.4), 8.0)
                 logger.warning(
                     "Hugging Face returned 429 Too Many Requests on attempt %d/%d. Waiting %.1fs before retrying...",
                     attempt + 1, max_retries, delay
                 )
                 time.sleep(delay)
-                delay *= 2.0
+                base_delay = min(base_delay * 2.0, 6.0)
                 continue
             raise
 
