@@ -5,25 +5,36 @@ import { Sliders, RotateCcw, Save, Sparkles, Check } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { toast } from "sonner";
 
+export const SUPPORTED_TASK_TYPES = [
+  { value: "sft_grounded_generation", label: "SFT Grounded Generation" },
+  { value: "customer_faq_qa", label: "Customer FAQ QA" },
+  { value: "intent_classification", label: "Intent Classification" },
+  { value: "domain_concept_qa", label: "Domain Concept QA" },
+];
+
 export const SYSTEM_ROLE_PRESETS = [
   {
     label: "Strict Compliance Analyst",
     instruction:
       "You are an expert banking compliance AI. Analyze financial inputs strictly against AML/KYC guidelines. Provide structured data tables when applicable.",
+    taskType: "sft_grounded_generation",
   },
   {
     label: "Financial QA & Support",
     instruction:
       "You are a helpful HDFC Bank virtual assistant. Provide clear, accurate answers to account inquiries, loan queries, and credit card terms in a polite, professional tone.",
+    taskType: "customer_faq_qa",
   },
   {
     label: "Risk & Fraud Investigator",
     instruction:
       "You are an enterprise fraud analysis engine. Examine transaction patterns for velocity anomalies, multi-currency risks, and high-frequency transfers. Flag critical alerts immediately.",
+    taskType: "intent_classification",
   },
   {
     label: "Custom",
     instruction: "",
+    taskType: "customer_faq_qa",
   },
 ];
 
@@ -40,10 +51,11 @@ export default function PlaygroundParametersPanel({
   const handlePresetChange = (presetName) => {
     setSelectedPreset(presetName);
     const preset = SYSTEM_ROLE_PRESETS.find((p) => p.label === presetName);
-    if (preset && preset.instruction) {
+    if (preset) {
       onParametersChange({
         ...parameters,
-        systemInstruction: preset.instruction,
+        systemInstruction: preset.instruction !== undefined ? preset.instruction : parameters.systemInstruction,
+        taskType: preset.taskType || parameters.taskType,
       });
     }
   };
@@ -102,6 +114,29 @@ export default function PlaygroundParametersPanel({
             {SYSTEM_ROLE_PRESETS.map((p) => (
               <option key={p.label} value={p.label}>
                 {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 3. Task Type */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
+            Task Type
+          </label>
+          <select
+            value={parameters.taskType || "customer_faq_qa"}
+            onChange={(e) =>
+              onParametersChange({
+                ...parameters,
+                taskType: e.target.value,
+              })
+            }
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+          >
+            {SUPPORTED_TASK_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
               </option>
             ))}
           </select>

@@ -5,7 +5,7 @@ AI Playground: Interactive inference sandbox evaluating active deployed enterpri
 //=======================================================================================//
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, Bot, AlertCircle } from "lucide-react";
 import PlaygroundParametersPanel, {
   SYSTEM_ROLE_PRESETS,
@@ -21,15 +21,17 @@ export default function PlaygroundPage() {
   const [selectedModelId, setSelectedModelId] = useState("");
   const [loadingModels, setLoadingModels] = useState(true);
   const [inferencing, setInferencing] = useState(false);
+  const inferencingRef = useRef(false);
 
   const [parameters, setParameters] = useState({
     temperature: 0.2,
     topP: 0.9,
     maxTokens: 256,
+    taskType: SYSTEM_ROLE_PRESETS[0].taskType || "sft_grounded_generation",
     systemInstruction: SYSTEM_ROLE_PRESETS[0].instruction,
   });
 
-  // Start with empty chat â€” the playground shows real inference results only
+  // Start with empty chat — the playground shows real inference results only
   const [messages, setMessages] = useState([]);
   const [tokenCount, setTokenCount] = useState(0);
 
@@ -89,23 +91,26 @@ export default function PlaygroundPage() {
     (m) => String(m.model_id || m.id) === String(selectedModelId)
   ) || deployedModels[0];
 
-  // Send message to inference API
+  // Send message to inference API with single submission lock ownership
   const handleSendMessage = async (userPrompt) => {
     if (!selectedModelId) {
       toast.error("Please select a deployed model first");
       return;
     }
 
-    if (inferencing) return;
+    // Synchronous submission lock check to prevent duplicate concurrent submissions
+    if (inferencingRef.current) return;
+    inferencingRef.current = true;
+    setInferencing(true);
 
     const newMessages = [...messages, { role: "user", content: userPrompt }];
     setMessages(newMessages);
 
     try {
-      setInferencing(true);
+      const validTaskType = parameters.taskType || "customer_faq_qa";
       const result = await runInference({
         model_id: parseInt(selectedModelId, 10),
-        task_type: "inference",
+        task_type: validTaskType,
         question: userPrompt,
         context: parameters.systemInstruction?.toLowerCase().startsWith("you are") ? "" : parameters.systemInstruction,
         max_new_tokens: parameters.maxTokens,
@@ -142,18 +147,35 @@ export default function PlaygroundPage() {
       }
     } catch (err) {
       console.error("Inference failed:", err);
-      const isRateLimit =
-        err?.response?.status === 429 ||
-        err?.message?.includes("429") ||
-        err?.response?.data?.detail?.includes("429") ||
-        err?.response?.data?.detail?.toLowerCase()?.includes("rate") ||
-        err?.response?.data?.detail?.toLowerCase()?.includes("too many requests");
+      const status = err?.response?.status;
+      const serverDetail = err?.response?.data?.detail;
 
-      const errorMsg = isRateLimit
-        ? "The model inference server is currently handling high request volume (429 Too Many Requests). Please wait a few seconds before trying again."
-        : (err?.response?.data?.detail || err?.message || "Inference call failed");
+      let errorMsg = "Unable to generate a response due to a server error.";
+      let toastTitle = "Inference Failed";
 
-      toast.error(isRateLimit ? "Server Busy (Rate Limited)" : "Inference Failed", {
+      if (status === 429) {
+        toastTitle = "Server Busy (Rate Limited)";
+        errorMsg = "The inference service is temporarily busy. Please try again in a few seconds.";
+      } else if (status === 400 || status === 422) {
+        toastTitle = "Invalid Request";
+        if (typeof serverDetail === "string" && serverDetail.toLowerCase().includes("task type")) {
+          errorMsg = "The selected task type is not supported.";
+        } else if (typeof serverDetail === "string") {
+          errorMsg = serverDetail;
+        } else {
+          errorMsg = "The request parameters are invalid.";
+        }
+      } else if (status === 503) {
+        toastTitle = "Service Unavailable";
+        errorMsg = "The model service is currently unavailable. Please try again shortly.";
+      } else if (status === 504) {
+        toastTitle = "Gateway Timeout";
+        errorMsg = "Inference request timed out. The model may still be initializing.";
+      } else if (typeof serverDetail === "string" && serverDetail.trim() && serverDetail.length < 200) {
+        errorMsg = serverDetail;
+      }
+
+      toast.error(toastTitle, {
         description: errorMsg,
       });
 
@@ -165,6 +187,7 @@ export default function PlaygroundPage() {
         },
       ]);
     } finally {
+      inferencingRef.current = false;
       setInferencing(false);
     }
   };
@@ -180,6 +203,7 @@ export default function PlaygroundPage() {
       temperature: 0.2,
       topP: 0.9,
       maxTokens: 256,
+      taskType: SYSTEM_ROLE_PRESETS[0].taskType || "sft_grounded_generation",
       systemInstruction: SYSTEM_ROLE_PRESETS[0].instruction,
     });
     toast.success("Parameters reset to default");

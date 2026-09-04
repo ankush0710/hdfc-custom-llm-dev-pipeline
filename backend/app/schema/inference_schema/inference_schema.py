@@ -3,6 +3,14 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+SUPPORTED_TASK_TYPES = {
+    "customer_faq_qa",
+    "domain_concept_qa",
+    "intent_classification",
+    "sft_grounded_generation",
+}
+
+
 class InferenceRequest(BaseModel):
     model_id: Union[int, str]
     task_type: str = "sft_grounded_generation"
@@ -38,11 +46,16 @@ class InferenceRequest(BaseModel):
     seed: int = 42
 
     @model_validator(mode="after")
-    def validate_question_or_prompt(self):
+    def validate_request_fields(self):
         if not self.question and not self.prompt:
             raise ValueError("Either 'question' or 'prompt' must be provided.")
         if not self.question and self.prompt:
             self.question = self.prompt
+        if self.task_type not in SUPPORTED_TASK_TYPES:
+            raise ValueError(
+                f"The selected task type '{self.task_type}' is not supported. "
+                f"Supported task types: {', '.join(sorted(SUPPORTED_TASK_TYPES))}"
+            )
         return self
 
 

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.clients.ml_client import MLClient
 from app.core.path_utils import resolve_artifact_path, validate_artifact_directory
 from app.model.model_registry import Model_Registry
+from app.schema.inference_schema.inference_schema import SUPPORTED_TASK_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,15 @@ class InferenceService:
         top_p: float = float(os.getenv("AI_TOP_P", "0.9")),
         do_sample: bool = os.getenv("AI_DO_SAMPLE", "true").lower() == "true",
         seed: int = 42,
+        request_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+
+        # 0. Validate task type
+        if task_type not in SUPPORTED_TASK_TYPES:
+            raise ValueError(
+                f"The selected task type '{task_type}' is not supported. "
+                f"Supported task types: {', '.join(sorted(SUPPORTED_TASK_TYPES))}"
+            )
 
         # 1. Find model in PostgreSQL
         model = (
@@ -82,6 +91,7 @@ class InferenceService:
             adapter_path_override=raw_target_path,
             base_model_override=model.base_model,
             huggingface_path=hf_path,
+            request_id=request_id,
         )
 
         latency = time.perf_counter() - start_time
