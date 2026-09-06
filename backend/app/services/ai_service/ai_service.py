@@ -4,8 +4,12 @@ backend/app/services/ai_service/ai_service.py
 Service for direct AI model inference.
 Dispatches requests to the dedicated ML Service via MLClient.
 """
+import logging
 from typing import Any, Dict, List, Optional
 from app.clients.ml_client import MLClient
+from ai.inference.guardrails import BankingDomainGuardrail
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
@@ -26,6 +30,25 @@ class AIService:
         do_sample: bool = False,
         seed: int = 42,
     ) -> Dict[str, Any]:
+        # Guardrail check: intercept out-of-domain queries before ML dispatch
+        guard_result = BankingDomainGuardrail.validate_query(question)
+        if not guard_result.is_valid_banking_query:
+            refusal_msg = guard_result.refusal_message or "I can only assist with banking and financial-services related queries."
+            logger.info("Guardrail rejected non-banking query in AIService: '%s'", question[:80])
+            return {
+                "model_id": model_id,
+                "model_name": model_id,
+                "fine_tuned": False,
+                "task_type": task_type,
+                "question": question,
+                "context": context,
+                "response": refusal_msg,
+                "raw_response": refusal_msg,
+                "latency_seconds": 0.001,
+                "tokens_generated": 0,
+                "device": "guardrail",
+            }
+
         return MLClient.generate(
             model_id=model_id,
             task_type=task_type,

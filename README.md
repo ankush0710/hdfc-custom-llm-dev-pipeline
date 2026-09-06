@@ -18,6 +18,7 @@
 * [Environment Configuration](#-environment-configuration)
 * [Local Development Setup](#-local-development-setup)
 * [Running the Application](#-running-the-application)
+* [ML Service (Dedicated AI/ML Worker)](#-ml-service-dedicated-aiml-worker)
 * [Database](#-database)
 * [Hugging Face Integration](#-hugging-face-integration)
 * [Authentication and Authorization](#-authentication-and-authorization)
@@ -51,11 +52,12 @@ The platform brings together the major stages of the LLM lifecycle into a centra
 * Role-based access control and enterprise authentication
 * Database-backed application state and audit history
 
-The system consists of three primary layers:
+The system consists of four primary layers:
 
 1. **Frontend** — A Next.js-based modern user interface.
-2. **Backend** — A FastAPI application providing APIs, authentication, database access, and AI/ML orchestration.
-3. **AI/ML Layer** — PyTorch, Transformers, PEFT, Accelerate, and Hugging Face-based model training and inference infrastructure.
+2. **Backend** — A FastAPI application providing core REST APIs, authentication, database access, and job orchestration.
+3. **ML Service (Worker)** — A standalone FastAPI microservice dedicated to heavy AI/ML compute (LoRA fine-tuning, real-time/batch inference, model evaluation, and Hugging Face synchronization).
+4. **AI/ML Layer** — PyTorch, Transformers, PEFT, Accelerate, and Hugging Face-based model training and inference runtime.
 
 ---
 
@@ -267,9 +269,27 @@ sequenceDiagram
 
 ---
 
+## ML Service (Worker)
+
+| Technology       | Purpose                                    |
+| ---------------- | ------------------------------------------ |
+| FastAPI          | Dedicated high-performance microservice    |
+| Uvicorn          | ASGI server runtime (Port 8001)            |
+| PyTorch          | Deep learning & GPU tensor acceleration    |
+| Transformers     | Hugging Face transformer architectures     |
+| PEFT             | Parameter-efficient fine-tuning (LoRA)     |
+| Accelerate       | Distributed & hardware acceleration        |
+| TRL              | Supervised Fine-Tuning (SFTTrainer)        |
+| Datasets         | Hugging Face dataset processing & loading  |
+| Safetensors      | Secure model checkpoint serialization      |
+| HTTPX            | Inter-service async communication          |
+| SQLAlchemy       | Direct database telemetry updates          |
+
+---
+
 # 📁 Repository Structure
 
-The repository follows a multi-layer architecture separating frontend, backend, AI/ML, data, schemas, manifests, and documentation.
+The repository follows a multi-layer architecture separating frontend, backend, ML service worker, AI/ML pipelines, data, schemas, manifests, and documentation.
 
 ```text
 hdfc-custom-llm-dev-pipeline/
@@ -285,17 +305,28 @@ hdfc-custom-llm-dev-pipeline/
 │   ├── training/               # Training pipeline
 │   └── utils/                  # AI/ML utilities
 │
-├── backend/                    # FastAPI backend application
+├── backend/                    # FastAPI backend application (Port 8000)
 │   ├── app/                    # Application source code
 │   ├── tests/                  # All backend tests
 │   ├── requirements.txt        # Python dependencies
 │   └── .env.example            # Environment variable template
 │
-├── frontend/                   # Next.js frontend application
+├── frontend/                   # Next.js frontend application (Port 3000)
 │   ├── app/                    # Next.js application
 │   ├── public/                 # Static assets
 │   ├── package.json            # Node.js dependencies
 │   └── .env.production         # Production environment configuration
+│
+├── ml-service/                 # Dedicated ML microservice worker (Port 8001)
+│   ├── ml_app/                 # ML worker FastAPI application
+│   │   ├── core/               # Configuration & security settings
+│   │   ├── routes/             # Inference, training, & evaluation endpoints
+│   │   └── services/           # Heavy PyTorch/PEFT training & inference logic
+│   ├── requirements.txt        # ML dependencies (PyTorch, PEFT, Transformers)
+│   ├── run_server.py           # Auto-venv runner script for ML worker
+│   ├── run_service.py          # Runner alias wrapper script
+│   ├── start.sh                # Shell script for containerized/Linux startup
+│   └── .env.example            # ML Service environment template
 │
 ├── data/                       # Project data resources
 │
@@ -352,17 +383,16 @@ Next.js Application
 
 ## Backend Layer
 
-The FastAPI backend acts as the central application layer.
+The FastAPI backend acts as the central application orchestrator.
 
 It is responsible for:
 
 * API request handling
 * Request validation
-* Authentication
-* Authorization
-* Database interaction
+* Authentication & RBAC
+* Database interaction (Neon PostgreSQL)
 * File upload handling
-* AI/ML service integration
+* ML service job dispatch & client coordination
 * Hugging Face integration
 
 ```text
@@ -382,9 +412,41 @@ Application Services
        │
        ├──────────────► Neon PostgreSQL
        │
-       ├──────────────► AI/ML Pipeline
+       ├──────────────► ML Service Worker (Port 8001)
        │
        └──────────────► Hugging Face Hub
+```
+
+---
+
+## ML Service Worker Layer
+
+The ML Service acts as the specialized heavy-compute microservice.
+
+It is responsible for:
+
+* LoRA / PEFT model fine-tuning jobs (`/api/v1/training/*`)
+* Live training execution, progress tracking, and cancellation
+* Real-time and batch LLM inference generation (`/api/v1/inference/*`)
+* In-memory model caching and dynamic VRAM unloading
+* Automated model evaluation and benchmark reporting (`/api/v1/evaluation/*`)
+* Direct checkpoint serialization to `safetensors` and push to Hugging Face Model Hub
+* Writing training telemetry and metrics directly to Neon PostgreSQL
+
+```text
+Backend Request (via MLClient + X-ML-Service-Key)
+       │
+       ▼
+   FastAPI ML Worker Router (Port 8001)
+       │
+       ├──────────────► Inference Engine (PyTorch / Safetensors / VRAM Cache)
+       │
+       ├──────────────► Training Pipeline (SFTTrainer / PEFT / Accelerate)
+       │                      │
+       │                      ├──► Neon PostgreSQL (Live Training Telemetry)
+       │                      └──► Hugging Face Model Hub (Checkpoints)
+       │
+       └──────────────► Evaluation Suite (Metrics & Groundedness)
 ```
 
 ---
@@ -474,6 +536,11 @@ HF_MODEL_REPO=your-org/hdfc-custom-model
 # Maximum time a model artifact upload may wait before the run is marked FAILED
 HF_UPLOAD_TIMEOUT_SECONDS=600
 
+# ML Microservice Worker Integration
+ML_SERVICE_URL=http://127.0.0.1:8001
+ML_SERVICE_API_KEY=hdfc-internal-ml-service-key
+ML_SERVICE_TIMEOUT_SECONDS=120.0
+
 # Application Configuration
 ALLOW_ORIGIN=http://localhost:3000
 
@@ -493,9 +560,63 @@ DEBUG=True
 | `HF_DATASET_REPO`           | Hugging Face dataset repository   |
 | `HF_MODEL_REPO`             | Hugging Face model repository     |
 | `HF_UPLOAD_TIMEOUT_SECONDS` | Maximum model upload timeout      |
+| `ML_SERVICE_URL`            | URL of the standalone ML worker microservice (`http://127.0.0.1:8001`) |
+| `ML_SERVICE_API_KEY`        | Pre-shared internal authorization key passed via `X-ML-Service-Key` |
+| `ML_SERVICE_TIMEOUT_SECONDS`| Maximum HTTP client wait timeout for ML worker responses (e.g. `120.0`) |
 | `ALLOW_ORIGIN`              | Allowed frontend origins for CORS |
-| `ENVIRONMENT`               | Application environment           |
+| `ENVIRONMENT`               | Application environment (`development` / `production`) |
 | `DEBUG`                     | Debug configuration flag          |
+
+---
+
+## ML Service Environment Variables
+
+Create a `.env` file inside the `ml-service` directory based on `ml-service/.env.example`. *(Note: `ml-service` automatically falls back to `backend/.env` during local development if `ml-service/.env` is omitted).*
+
+```env
+# ML Service Network Configuration
+PORT=8001
+HOST=0.0.0.0
+
+# Security Key — MUST match ML_SERVICE_API_KEY in backend/.env
+ML_SERVICE_API_KEY=hdfc-internal-ml-service-key
+
+# Neon PostgreSQL Database URL (for direct live training telemetry updates)
+DATABASE_URL=postgresql://<user>:<password>@<host>/<dbname>?sslmode=require
+
+# Hugging Face Hub Credentials & Checkpoint Targets
+HF_TOKEN=hf_your_write_token_here
+HF_DATASET_REPO=ankush0710/hdfc-llm-datasets
+HF_MODEL_REPO=ankush0710/hdfc-llm-models
+HF_UPLOAD_TIMEOUT_SECONDS=900
+
+# Inference & Hardware Acceleration Configuration
+AI_DEVICE=auto
+AI_DEFAULT_MODEL=qwen3_0_6b
+AI_MAX_NEW_TOKENS=256
+AI_TEMPERATURE=0.2
+AI_TOP_P=0.9
+AI_DO_SAMPLE=false
+```
+
+### ML Service Variable Description
+
+| Variable | Description |
+| --- | --- |
+| `PORT` / `ML_SERVICE_PORT` | Port number for the ML worker server (default: `8001`) |
+| `HOST` | Bind address (default: `0.0.0.0`) |
+| `ML_SERVICE_API_KEY` | Shared secret key validated on protected endpoints via `X-ML-Service-Key` header |
+| `DATABASE_URL` | Neon PostgreSQL connection string for writing training telemetry and run status |
+| `HF_TOKEN` | Hugging Face token with write permissions to push model adapter checkpoints |
+| `HF_DATASET_REPO` | Target Hugging Face dataset repository (`ankush0710/hdfc-llm-datasets`) |
+| `HF_MODEL_REPO` | Target Hugging Face repository for fine-tuned LoRA adapters (`ankush0710/hdfc-llm-models`) |
+| `HF_UPLOAD_TIMEOUT_SECONDS` | Timeout for uploading checkpoint safetensors artifacts (default: `900`) |
+| `AI_DEVICE` | Execution target device: `auto`, `cuda`, `mps`, or `cpu` |
+| `AI_DEFAULT_MODEL` | Default base LLM architecture key (default: `qwen3_0_6b`) |
+| `AI_MAX_NEW_TOKENS` | Default maximum generated token count (default: `256`) |
+| `AI_TEMPERATURE` | Sampling temperature for text generation (default: `0.2`) |
+| `AI_TOP_P` | Nucleus sampling probability cutoff (default: `0.9`) |
+| `AI_DO_SAMPLE` | Boolean flag for stochastic sampling vs. greedy decoding (`false`) |
 
 ---
 
@@ -569,31 +690,75 @@ pip install -r requirements.txt
 
 ### Configure Environment Variables
 
-Create your local `backend/.env` file with your Neon and Hugging Face credentials.
+Create your local `backend/.env` file with your Neon, Hugging Face, and ML Service credentials (`ML_SERVICE_URL=http://127.0.0.1:8001`).
 
 > ⚠️ Never commit your `.env` file, Hugging Face token, database credentials, or other secrets to GitHub.
 
 ---
 
+## 4. ML Service Setup
+
+The `ml-service` worker runs heavy PyTorch, Transformers, and PEFT workloads. You can either share the virtual environment created in the backend or set up a dedicated environment.
+
+### Activate Virtual Environment
+
+**Windows:**
+```bash
+# From repository root or ml-service directory:
+cd ml-service
+..\backend\venv\Scripts\activate
+```
+
+**macOS / Linux:**
+```bash
+cd ml-service
+source ../backend/venv/bin/activate
+```
+
+### Install ML Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Configure Environment Variables
+
+Create an optional `ml-service/.env` file based on `.env.example`, or let it automatically inherit your database and Hugging Face tokens from `backend/.env`. Ensure `ML_SERVICE_API_KEY` matches between both `.env` files.
+
+---
+
 # ▶️ Running the Application
 
-The frontend and backend should run in separate terminals.
+For complete local operation including UI, API orchestration, and AI model execution, run the three services in **three separate terminal windows**.
 
-## Terminal 1 — Backend
+```mermaid
+flowchart LR
+    FE["Terminal 1<br/><b>Frontend (Next.js)</b><br/>Port 3000"]
+    BE["Terminal 2<br/><b>Backend (FastAPI)</b><br/>Port 8000"]
+    ML["Terminal 3<br/><b>ML Service Worker</b><br/>Port 8001"]
 
-From the `backend` directory (with virtual environment active):
+    FE -->|"REST API"| BE
+    BE -->|"Internal HTTP<br/>(X-ML-Service-Key)"| ML
+```
+
+---
+
+## Terminal 1 — Backend API
+
+From the `backend` directory (with virtual environment activated):
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-* API Base: `http://localhost:8000`
-* Swagger Docs: `http://localhost:8000/docs`
-* ReDoc: `http://localhost:8000/redoc`
+* **API Base:** `http://localhost:8000`
+* **Swagger Interactive Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **ReDoc Specification:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+* **Health Check:** `http://localhost:8000/health`
 
 ---
 
-## Terminal 2 — Frontend
+## Terminal 2 — Frontend UI
 
 From the `frontend` directory:
 
@@ -601,10 +766,160 @@ From the `frontend` directory:
 npm run dev
 ```
 
-Open:
-```text
-http://localhost:3000
+* **Application UI:** [http://localhost:3000](http://localhost:3000)
+
+---
+
+## Terminal 3 — ML Service (Worker)
+
+The ML Service handles GPU/CPU-intensive tasks such as LoRA fine-tuning jobs, model evaluation, and LLM text generation.
+
+### Option A: Using the Auto-Detecting Runner Script (Recommended)
+`run_server.py` automatically detects and activates the project virtual environment even if executed with global Python:
+
+**Windows (PowerShell or Command Prompt):**
+```bash
+cd ml-service
+python run_server.py
 ```
+
+**macOS / Linux:**
+```bash
+cd ml-service
+python3 run_server.py
+```
+
+*(Note: `python run_service.py` is also available as an alias).*
+
+### Option B: Using Uvicorn Directly
+With your virtual environment active:
+
+```bash
+cd ml-service
+uvicorn ml_app.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+### Option C: Using the Shell Script (Linux / macOS / Container)
+```bash
+cd ml-service
+chmod +x start.sh
+./start.sh
+```
+
+* **ML Service Base:** `http://localhost:8001`
+* **Swagger Interactive Docs:** [http://localhost:8001/docs](http://localhost:8001/docs)
+* **ReDoc Specification:** [http://localhost:8001/redoc](http://localhost:8001/redoc)
+* **Unauthenticated Health Probe:** `http://localhost:8001/health`
+
+---
+
+## Local Services Summary
+
+| Component | Role | Local URL | Port | Health / Docs |
+| --- | --- | --- | --- | --- |
+| **Frontend** | Next.js 16 Web Dashboard | `http://localhost:3000` | `3000` | UI Dashboard |
+| **Backend** | Central FastAPI Orchestrator | `http://localhost:8000` | `8000` | [API Docs](http://localhost:8000/docs) \| `/health` |
+| **ML Service** | PyTorch / PEFT ML Worker | `http://localhost:8001` | `8001` | [ML Docs](http://localhost:8001/docs) \| `/health` |
+
+---
+
+# 🤖 ML Service (Dedicated AI/ML Worker)
+
+## Overview & Architectural Motivation
+
+The **ML Service** (`ml-service/`) is a dedicated microservice worker designed to isolate CPU/GPU-intensive AI workloads from the core backend web API.
+
+```mermaid
+flowchart TB
+    subgraph Client["Web Browser"]
+        UI["Next.js Dashboard"]
+    end
+
+    subgraph CoreBackend["FastAPI Backend (Port 8000)"]
+        API["REST Controllers"]
+        MLClient["MLClient (HTTPX)"]
+        AuthService["JWT / RBAC"]
+    end
+
+    subgraph MLWorker["ML Service Worker (Port 8001)"]
+        MLApp["FastAPI Worker App"]
+        TrainService["Training Engine (PEFT/LoRA)"]
+        InferService["Inference Runtime (Safetensors)"]
+        EvalService["Evaluation Engine (Metrics)"]
+        MemoryMgr["VRAM / Model Cache Manager"]
+    end
+
+    subgraph ExternalServices["Storage & Cloud"]
+        DB["Neon PostgreSQL"]
+        HFHub["Hugging Face Hub"]
+    end
+
+    UI -->|"HTTP API (JWT)"| API
+    API --> MLClient
+    MLClient -->|"HTTP POST/GET<br/>X-ML-Service-Key"| MLApp
+
+    MLApp --> TrainService
+    MLApp --> InferService
+    MLApp --> EvalService
+    MLApp --> MemoryMgr
+
+    TrainService -->|"Stream Progress & Loss"| DB
+    TrainService -->|"Push Adapters & Models"| HFHub
+    InferService -->|"Pull Checkpoints"| HFHub
+```
+
+### Why Decouple the ML Service?
+1. **Prevents Web Thread Starvation:** Fine-tuning an LLM or running large token-generation passes consumes significant memory and CPU/GPU cycles. Separating the worker guarantees the frontend API remains snappy and non-blocking for user interactions.
+2. **Independent Scaling & Hardware Allocation:** The lightweight API backend can scale horizontally on cost-effective CPU instances (e.g. Render Web Services), while the ML worker can be targeted to GPU-accelerated instances (e.g. CUDA-enabled nodes) without duplicating backend code.
+3. **Fault Isolation:** Memory crashes, CUDA out-of-memory (OOM) exceptions, or long model downloads do not bring down the authentication or database services.
+
+---
+
+## Core Capabilities
+
+### 1. 🧠 Parameter-Efficient Fine-Tuning (PEFT / LoRA)
+* Dispatches asynchronous training jobs using Hugging Face `transformers`, `peft`, `accelerate`, and `trl.SFTTrainer`.
+* Implements dynamic job cancellation (`/api/v1/training/stop/{run_id}`) to safely terminate runaway training runs.
+* Serializes checkpoints using `safetensors` for memory-safe and rapid checkpoint loading.
+* Automatically packages adapter weights, tokenizer configs, and model cards, then pushes them directly to Hugging Face Hub (`HF_MODEL_REPO`).
+* Direct telemetry writer logs real-time training loss, step counts, and duration to Neon PostgreSQL.
+
+### 2. ⚡ Multi-Model Real-Time Inference
+* Provides high-throughput text completion (`/api/v1/inference/predict`) and generation (`/api/v1/inference/generate`) with fine-grained sampling controls (`temperature`, `top_p`, `max_new_tokens`, `repetition_penalty`).
+* Maintains an in-memory model catalog (`/api/v1/inference/models`) for instant reuse of loaded base models and LoRA adapters.
+* Dynamic VRAM memory management allows unloading models on demand (`/api/v1/inference/unload`) to free GPU memory before launching training jobs.
+
+### 3. 📊 Model Evaluation & Groundedness
+* Executes benchmark evaluation suites against domain-specific test sets (`/api/v1/evaluation/dispatch`).
+* Evaluates accuracy, latency, token throughput, BLEU, ROUGE, and banking response groundedness.
+* Supports active evaluation termination via `/api/v1/evaluation/stop/{evaluation_id}`.
+
+---
+
+## Inter-Service Communication & Security
+
+* **Communication:** The backend interacts with the ML Service via the asynchronous `MLClient` (`backend/app/clients/ml_client.py`) utilizing `httpx` connection pooling.
+* **Authentication:** Every internal endpoint (excluding `/health` and OpenAPI docs) enforces the `X-ML-Service-Key` header, which must match the pre-shared `ML_SERVICE_API_KEY`.
+* **Config Fallback:** If `ml-service/.env` is not present, `ml-service/ml_app/core/config.py` automatically resolves configuration from `backend/.env`, minimizing configuration drift during local development.
+* **Resilient Timeouts:** Long inference passes and training dispatches use configurable HTTP timeouts (`ML_SERVICE_TIMEOUT_SECONDS`, default: 120s).
+
+---
+
+## ML Service API Endpoints Reference
+
+| Method | Endpoint | Description | Authentication |
+| --- | --- | --- | --- |
+| `GET` | `/health` | Unauthenticated health probe for monitoring & service discovery | Public |
+| `GET` | `/docs` | Interactive Swagger UI for ML service | Public |
+| `GET` | `/redoc` | ReDoc API specification for ML service | Public |
+| `POST` | `/api/v1/inference/predict` | Fast synchronous prompt completion | `X-ML-Service-Key` |
+| `POST` | `/api/v1/inference/generate` | Text generation with sampling parameters | `X-ML-Service-Key` |
+| `GET` | `/api/v1/inference/models` | List currently loaded models and adapters in VRAM | `X-ML-Service-Key` |
+| `POST` | `/api/v1/inference/unload` | Unload model weights from memory to reclaim VRAM | `X-ML-Service-Key` |
+| `POST` | `/api/v1/training/dispatch` | Dispatch background LoRA fine-tuning training run | `X-ML-Service-Key` |
+| `POST` | `/api/v1/training/stop/{run_id}` | Abort and cancel an active training job | `X-ML-Service-Key` |
+| `POST` | `/api/v1/evaluation/dispatch` | Launch model evaluation and benchmark run | `X-ML-Service-Key` |
+| `POST` | `/api/v1/evaluation/stop/{id}` | Abort and cancel an active evaluation run | `X-ML-Service-Key` |
 
 ---
 
@@ -793,6 +1108,18 @@ When the backend is running in `ENVIRONMENT=development`, interactive API docume
 
 ---
 
+## ML Service (Worker)
+
+| Command | Purpose |
+| --- | --- |
+| `pip install -r requirements.txt` | Install heavy PyTorch, PEFT, and Transformers dependencies |
+| `python run_server.py` | Start ML worker with auto-venv detection (Port 8001) |
+| `python run_service.py` | Alias wrapper script to start ML worker |
+| `uvicorn ml_app.main:app --port 8001 --reload` | Start ML worker with live reload |
+| `./start.sh` | Shell script for Linux / Render / Docker startup |
+
+---
+
 # 🌐 Deployment Architecture
 
 The application is deployed across cloud infrastructure:
@@ -940,8 +1267,9 @@ Developed collaboratively by a multidisciplinary team:
 
 | Service | Status | Platform |
 | --- | --- | --- |
-| Frontend | Deployed | Vercel |
-| Backend | Deployed | Render |
+| Frontend | Deployed | Vercel (`https://hdfc-custom-llm-frontend.vercel.app`) |
+| Backend | Deployed | Render (`https://hdfc-custom-llm-backend.onrender.com`) |
+| ML Service | Deployed / Active | Render Worker (`Port 8001`) |
 | Database | Active | Neon PostgreSQL |
 | Hugging Face Hub | Connected | HF Model & Dataset Repos |
 

@@ -6,6 +6,7 @@ Executes actual model loading, LoRA adapter attachment, tokenization, and forwar
 Protected by verify_ml_service_key.
 """
 import logging
+import re
 import threading
 import time
 from typing import Any, Dict, List, Optional
@@ -15,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..core.security import verify_ml_service_key
 
+from ai.inference.guardrails import BankingDomainGuardrail
 from ai.inference.service import (
     run_model,
     get_available_models,
@@ -134,6 +136,26 @@ def generate_direct(payload: DirectGenerateRequest, request: Request):
         request_id, payload.model_id, payload.task_type
     )
 
+    # Pre-generation guardrail validation: reject non-banking queries before acquiring lock or dispatching ML
+    guard_result = BankingDomainGuardrail.validate_query(payload.question)
+    if not guard_result.is_valid_banking_query:
+        refusal_msg = guard_result.refusal_message or "I can only assist with banking and financial-services related queries."
+        logger.info("Guardrail rejected non-banking query in ml-service generate_direct: '%s'", payload.question[:80])
+        return {
+            "model_id": payload.model_id,
+            "model_name": payload.model_id,
+            "fine_tuned": False,
+            "task_type": payload.task_type,
+            "question": payload.question,
+            "context": payload.context,
+            "response": refusal_msg,
+            "raw_response": refusal_msg,
+            "latency_seconds": 0.001,
+            "tokens_generated": 0,
+            "device": "guardrail",
+            "guardrail_rejected": True,
+        }
+
     acquired = _inference_lock.acquire(timeout=10.0)
     if not acquired:
         logger.warning(
@@ -193,6 +215,26 @@ def predict_registered(payload: PredictModelRequest, request: Request):
         "INFERENCE_REQUEST_RECEIVED request_id=%s model_id=%s task_type=%s",
         request_id, payload.model_id, payload.task_type
     )
+
+    # Pre-generation guardrail validation: reject non-banking queries before acquiring lock or dispatching ML
+    guard_result = BankingDomainGuardrail.validate_query(payload.question)
+    if not guard_result.is_valid_banking_query:
+        refusal_msg = guard_result.refusal_message or "I can only assist with banking and financial-services related queries."
+        logger.info("Guardrail rejected non-banking query in ml-service predict_registered: '%s'", payload.question[:80])
+        return {
+            "model_id": payload.model_id,
+            "model_name": f"Model #{payload.model_id}",
+            "fine_tuned": False,
+            "task_type": payload.task_type,
+            "question": payload.question,
+            "context": payload.context,
+            "response": refusal_msg,
+            "raw_response": refusal_msg,
+            "latency_seconds": 0.001,
+            "tokens_generated": 0,
+            "device": "guardrail",
+            "guardrail_rejected": True,
+        }
 
     acquired = _inference_lock.acquire(timeout=10.0)
     if not acquired:
@@ -255,7 +297,12 @@ def predict_registered(payload: PredictModelRequest, request: Request):
         if isinstance(result, dict):
             resp_text = result.get("response", result.get("text", str(result)))
             if isinstance(resp_text, str) and "</think>" in resp_text:
-                resp_text = resp_text.split("</think>")[-1].strip()
+                post_think = resp_text.split("</think>")[-1].strip()
+                if post_think:
+                    resp_text = post_think
+                else:
+                    cleaned = re.sub(r"<think>.*?</think>", "", resp_text, flags=re.DOTALL).strip()
+                    resp_text = cleaned if cleaned else re.sub(r"</?think>", "", resp_text).strip()
 
             tokens_count = result.get("tokens_generated")
             if tokens_count is None and isinstance(resp_text, str):
@@ -270,14 +317,19 @@ def predict_registered(payload: PredictModelRequest, request: Request):
                 "context": payload.context,
                 "response": resp_text,
                 "raw_response": str(result),
-                "latency_seconds": latency,
+                "latency_seconds": round(latency, 4),
                 "tokens_generated": tokens_count,
                 "device": result.get("device"),
             }
 
         resp_str = str(result)
         if "</think>" in resp_str:
-            resp_str = resp_str.split("</think>")[-1].strip()
+            post_think = resp_str.split("</think>")[-1].strip()
+            if post_think:
+                resp_str = post_think
+            else:
+                cleaned = re.sub(r"<think>.*?</think>", "", resp_str, flags=re.DOTALL).strip()
+                resp_str = cleaned if cleaned else re.sub(r"</?think>", "", resp_str).strip()
 
         return {
             "model_id": payload.model_id,
@@ -288,7 +340,7 @@ def predict_registered(payload: PredictModelRequest, request: Request):
             "context": payload.context,
             "response": resp_str,
             "raw_response": str(result),
-            "latency_seconds": latency,
+            "latency_seconds": round(latency, 4),
             "tokens_generated": len(resp_str.split()),
             "device": None,
         }

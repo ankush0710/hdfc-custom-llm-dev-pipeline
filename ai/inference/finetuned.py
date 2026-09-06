@@ -49,9 +49,11 @@ CLI
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import random
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -72,7 +74,7 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASE_MODEL = "Qwen/Qwen3-0.6B"
 DEFAULT_ADAPTER_PATH = PROJECT_ROOT / "ai" / "artifacts" / "full_training"
-DEFAULT_SYSTEM_PROMPT = "You are a helpful and accurate HDFC Bank assistant."
+DEFAULT_SYSTEM_PROMPT = "You are an official HDFC Bank AI Assistant. Provide accurate, domain-specific, policy-grounded, and secure banking assistance using the provided authoritative context."
 REQUIRED_ADAPTER_FILES = ("adapter_config.json", "adapter_model.safetensors")
 
 
@@ -316,19 +318,16 @@ def build_conversation(
     """
     Build the system/user message list in the exact format the HDFC
     adapter was trained on: a system instruction, and a user turn of
-    "Context:\n...\n\nQuestion:\n..." when context is given,
-    or just the raw question otherwise.
+    "Authoritative Context: {context}\n\nQuestion: {question}".
+    Defaults context to "HDFC Support Knowledge Base" when omitted.
     """
     if not question or not isinstance(question, str):
         raise ValueError("question must be a non-empty string.")
 
     q_clean = question.strip()
-    c_clean = context.strip() if context and isinstance(context, str) else ""
+    c_clean = context.strip() if context and isinstance(context, str) else "HDFC Support Knowledge Base"
 
-    if c_clean:
-        user_content = f"Context:\n{c_clean}\n\nQuestion:\n{q_clean}"
-    else:
-        user_content = q_clean
+    user_content = f"Authoritative Context: {c_clean}\n\nQuestion: {q_clean}"
 
     return [
         {"role": "system", "content": system_prompt},
@@ -414,7 +413,15 @@ def generate_finetuned(
 
     resp = raw_result["response"]
     if isinstance(resp, str) and "</think>" in resp:
-        resp = resp.split("</think>")[-1].strip()
+        post_think = resp.split("</think>")[-1].strip()
+        if post_think:
+            resp = post_think
+        else:
+            cleaned_resp = re.sub(r"<think>.*?</think>", "", resp, flags=re.DOTALL).strip()
+            if cleaned_resp:
+                resp = cleaned_resp
+            else:
+                resp = re.sub(r"</?think>", "", raw_result["response"]).strip()
 
     return {
         "base_model": bundle.base_model_name,
@@ -423,6 +430,7 @@ def generate_finetuned(
         "context": context,
         "response": resp,
         "latency_seconds": raw_result["latency_seconds"],
+        "tokens_generated": raw_result.get("tokens_generated", len(resp.split()) if resp else 0),
         "device": raw_result["device"],
         "generation_config": raw_result["generation_config"],
     }

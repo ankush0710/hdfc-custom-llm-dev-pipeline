@@ -17,6 +17,7 @@ from app.clients.ml_client import MLClient
 from app.core.path_utils import resolve_artifact_path, validate_artifact_directory
 from app.model.model_registry import Model_Registry
 from app.schema.inference_schema.inference_schema import SUPPORTED_TASK_TYPES
+from ai.inference.guardrails import BankingDomainGuardrail
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,25 @@ class InferenceService:
         seed: int = 42,
         request_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+
+        # Guardrail check: intercept out-of-domain queries early before ML dispatch
+        guard_result = BankingDomainGuardrail.validate_query(question)
+        if not guard_result.is_valid_banking_query:
+            logger.info("Guardrail rejected non-banking query in backend InferenceService: '%s'", question[:80])
+            refusal_msg = guard_result.refusal_message or "I can only assist with banking and financial-services related queries."
+            return {
+                "model_id": model_id,
+                "model_name": f"Model #{model_id}",
+                "fine_tuned": False,
+                "task_type": task_type,
+                "question": question,
+                "context": context,
+                "response": refusal_msg,
+                "raw_response": refusal_msg,
+                "latency_seconds": 0.001,
+                "tokens_generated": 0,
+                "device": "guardrail",
+            }
 
         # 0. Validate task type
         if task_type not in SUPPORTED_TASK_TYPES:

@@ -69,6 +69,8 @@ class AIInferenceResponse(BaseModel):
 
     latency_seconds: Optional[float]
 
+    tokens_generated: Optional[int] = None
+
     device: Optional[str]
 
 
