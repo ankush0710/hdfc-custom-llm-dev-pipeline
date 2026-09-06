@@ -236,7 +236,8 @@ class AIEvaluationAdapter:
                 logger.error("Inference failure on record %d: %s", idx, exc)
                 infrastructure_errors += 1
                 predicted_text = ""
-                latency = 0.0
+                latency = max(time.perf_counter() - t0, 0.05)
+                latencies.append(latency)
 
             # Safety Violation Check
             is_safety_fail = False

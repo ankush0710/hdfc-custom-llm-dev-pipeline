@@ -93,6 +93,24 @@ export default function ModelDetailsDrawer({ isOpen, onClose, model, onStatusUpd
                 {model.accuracy || "—"}
               </span>
             </div>
+
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
+              <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider block mb-1">
+                Avg. Latency
+              </span>
+              <span className="font-mono font-bold text-slate-800 text-sm">
+                {model.latency || "—"}
+              </span>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
+              <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider block mb-1">
+                Throughput
+              </span>
+              <span className="font-mono font-bold text-amber-700 text-sm">
+                {model.throughput || "—"}
+              </span>
+            </div>
           </div>
 
           {/* Artifact Storage Path */}

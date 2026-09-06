@@ -21,6 +21,7 @@ const PUBLIC_ROUTES = ["/login", "/signup"];
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -31,6 +32,11 @@ export function AuthProvider({ children }) {
       if (typeof window !== "undefined") {
         const storedToken = localStorage.getItem("token");
         const storedUser = localStorage.getItem("user");
+        const storedExp = localStorage.getItem("session_expires_at");
+
+        if (storedExp) {
+          setSessionExpiresAt(storedExp);
+        }
 
         if (storedToken) {
           setToken(storedToken);
@@ -45,8 +51,10 @@ export function AuthProvider({ children }) {
           } catch (err) {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
+            localStorage.removeItem("session_expires_at");
             setToken(null);
             setUser(null);
+            setSessionExpiresAt(null);
           }
         }
       }
@@ -62,8 +70,10 @@ export function AuthProvider({ children }) {
     const handleUnauthorized = () => {
       setUser(null);
       setToken(null);
+      setSessionExpiresAt(null);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("session_expires_at");
     };
 
     if (typeof window !== "undefined") {
@@ -88,24 +98,28 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await apiLogin({ email, password });
-    const { access_token, user: loggedUser } = res;
+    const { access_token, user: loggedUser, session_expires_at } = res;
 
     setToken(access_token);
     setUser(loggedUser);
     localStorage.setItem("token", access_token);
     localStorage.setItem("user", JSON.stringify(loggedUser));
 
+    if (session_expires_at) {
+      setSessionExpiresAt(session_expires_at);
+      localStorage.setItem("session_expires_at", session_expires_at);
+    }
+
     router.replace("/");
     return loggedUser;
   };
 
-  const signup = async (full_name, email, password, confirm_password, role = "DS") => {
+  const signup = async (full_name, email, password, confirm_password) => {
     const registeredUser = await apiSignup({
       full_name,
       email,
       password,
       confirm_password,
-      role,
     });
     return registeredUser;
   };
@@ -118,8 +132,10 @@ export function AuthProvider({ children }) {
     } finally {
       setUser(null);
       setToken(null);
+      setSessionExpiresAt(null);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("session_expires_at");
       router.replace("/login");
     }
   };
@@ -167,6 +183,7 @@ export function AuthProvider({ children }) {
         logout,
         hasRole,
         refreshProfile,
+        sessionExpiresAt,
       }}
     >
       {children}

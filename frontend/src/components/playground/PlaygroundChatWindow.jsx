@@ -53,7 +53,7 @@ export default function PlaygroundChatWindow({
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const modelDisplayName = activeModel?.model_name || "HDFC-Banking-v1.2";
+  const modelDisplayName = activeModel?.model_name || (activeModel?.id ? `Model #${activeModel.id}` : "Select a Deployed Model");
 
   return (
     <div className="h-full bg-white rounded-2xl border border-gray-200/80 shadow-sm flex flex-col justify-between overflow-hidden">
@@ -63,7 +63,7 @@ export default function PlaygroundChatWindow({
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#002B55]">
             <Cpu size={15} />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-sm text-gray-900">
               {modelDisplayName}
             </span>
@@ -71,6 +71,22 @@ export default function PlaygroundChatWindow({
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               DEPLOYED
             </span>
+            {activeModel?.dataset_name ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-medium text-blue-700"
+                title={`Trained on dataset: ${activeModel.dataset_name} (${activeModel.dataset_version || "v1"})`}
+              >
+                <Layers size={11} className="text-blue-500" />
+                <span>Dataset: {activeModel.dataset_name} {activeModel.dataset_version ? `(${activeModel.dataset_version})` : ""}</span>
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-[10px] font-medium text-slate-500"
+              >
+                <Layers size={11} className="text-slate-400" />
+                <span>Dataset: Unlinked / Base Model</span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -125,7 +141,7 @@ export default function PlaygroundChatWindow({
                   {/* Model Header */}
                   {!isUser && (
                     <span className="font-bold text-[11px] text-gray-900 block mb-1">
-                      {modelDisplayName}
+                      {msg.model_name || modelDisplayName}
                     </span>
                   )}
 
@@ -156,14 +172,25 @@ export default function PlaygroundChatWindow({
                   </ReactMarkdown>
                 </div>
 
-                  {/* Latency & Actions for Assistant */}
+                  {/* Latency, Real-time Dataset Lineage & Actions for Assistant */}
                   {!isUser && (
-                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-200/60 text-[11px] text-gray-400">
-                      {msg.latency && (
-                        <span>
-                          Latency: {(msg.latency * 1000).toFixed(0)}ms
-                        </span>
-                      )}
+                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-200/60 text-[11px] text-gray-400 gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {msg.latency !== undefined && (
+                          <span>
+                            Latency: {(msg.latency * 1000).toFixed(0)}ms
+                          </span>
+                        )}
+                        {msg.dataset_name && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded bg-blue-50 text-blue-700 px-1.5 py-0.5 text-[10px] font-medium border border-blue-100"
+                            title={`Trained on dataset: ${msg.dataset_name} (${msg.dataset_version || "v1.0"})`}
+                          >
+                            <Layers size={10} className="text-blue-500" />
+                            <span>Dataset: {msg.dataset_name} {msg.dataset_version ? `(${msg.dataset_version})` : ""}</span>
+                          </span>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-1 ml-auto">
                         <button

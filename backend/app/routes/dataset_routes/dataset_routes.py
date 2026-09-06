@@ -7,7 +7,7 @@ from uuid import uuid4
 from fastapi import (APIRouter, HTTPException, Depends, File, Form, UploadFile)
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from app.core.auth_dependency import get_current_user, require_roles
+from app.core.auth_dependency import get_current_user, require_permission, require_roles
 from app.dbConfig.database_config import get_db
 from app.model.dataset_model import Dataset_Model
 from app.model.user_model import User_Model
@@ -36,7 +36,7 @@ async def upload_dataset(
     description: str | None = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+    current_user: User_Model = Depends(require_permission("dataset:create")),
 ):
     final_dataset_name = datasetName or dataset_name
     if not final_dataset_name:
@@ -85,7 +85,7 @@ async def upload_dataset(
 )
 def get_dataset(
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("dataset:read")),
 ):
     return get_all_datasets(db)
 
@@ -98,7 +98,7 @@ def get_dataset(
 def get_dataset_id(
     dataset_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("dataset:read")),
 ):
     dataset = get_dataset_by_id(db, dataset_id)
 
@@ -115,7 +115,7 @@ def get_dataset_id(
 def download_dataset(
     dataset_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("dataset:download")),
 ):
     dataset = get_dataset_by_id(db, dataset_id)
 
@@ -161,7 +161,7 @@ def download_dataset(
 def delete_dataset_id(
     dataset_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+    current_user: User_Model = Depends(require_permission("dataset:delete")),
 ):
     dataset = delete_dataset_by_id(
         db,
@@ -184,7 +184,8 @@ def delete_dataset_id(
 @router.get("/{dataset_id}/versions")
 def list_dataset_versions(
     dataset_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_permission("dataset:read")),
 ):
     from app.services.dataset_service.dataset_service import get_dataset_versions
     return get_dataset_versions(db, dataset_id)
@@ -193,7 +194,8 @@ def list_dataset_versions(
 @router.get("/versions/{version_id}/download")
 def download_dataset_version(
     version_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_permission("dataset:download")),
 ):
     from app.services.dataset_service.dataset_service import get_dataset_version_by_id
     version = get_dataset_version_by_id(db, version_id)

@@ -1,11 +1,16 @@
+from datetime import datetime, timedelta, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.auth_dependency import (
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
+    STRICT_SESSION_MAX_MINUTES,
+    STRICT_SESSION_ROLES,
     create_access_token,
     get_current_user,
     hash_password,
+    require_permission,
     require_roles,
     verify_password,
 )
@@ -54,11 +59,9 @@ def signup(
             detail=f"An account with email '{payload.email}' already exists.",
         )
 
-    # Assign role: default to DS (Data Scientist) or requested role
-    raw_role = (payload.role or "DS").upper().strip()
-    role = "DS" if raw_role in {"DATA_SCIENTIST", "DS"} else raw_role
-    if role not in VALID_ROLES:
-        role = "DS"
+    # Security: All self-registered users unconditionally receive the VIEWER role.
+    # Privileged roles (DATA_SCIENTIST, REVIEWER, ADMIN) can only be granted by an ADMIN.
+    role = "VIEWER"
 
     user = User_Model(
         full_name=payload.full_name.strip(),
@@ -70,7 +73,6 @@ def signup(
     db.add(user)
     db.commit()
     db.refresh(user)
-
 
     return user
 
@@ -98,11 +100,24 @@ def login(
             detail="User account is deactivated. Contact system administrator.",
         )
 
+    raw_role = (user.role or "").upper().strip()
+    norm_role = "DS" if raw_role in {"DATA_SCIENTIST", "DS"} else raw_role
+    now = datetime.now(timezone.utc)
+
+    if norm_role in STRICT_SESSION_ROLES:
+        session_duration = STRICT_SESSION_MAX_MINUTES
+        session_expires_at = now + timedelta(minutes=STRICT_SESSION_MAX_MINUTES)
+    else:
+        session_duration = JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        session_expires_at = now + timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+
     token = create_access_token({"sub": str(user.id), "email": user.email, "role": user.role})
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": user,
+        "session_expires_at": session_expires_at,
+        "session_duration_minutes": session_duration,
     }
 
 
@@ -111,7 +126,7 @@ def login(
     response_model=UserResponse,
 )
 def get_me(
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("auth:me")),
 ):
     """Return profile details for the currently authenticated user."""
     return current_user
@@ -121,7 +136,7 @@ def get_me(
     "/logout",
 )
 def logout(
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("auth:logout")),
 ):
     """Acknowledge logout for active session."""
     return {"message": "Logged out successfully", "user_id": current_user.id}
@@ -133,7 +148,7 @@ def logout(
 )
 def list_users(
     db: Session = Depends(get_db),
-    admin: User_Model = Depends(require_roles("ADMIN")),
+    admin: User_Model = Depends(require_permission("user:read")),
 ):
     """List all registered platform users (ADMIN only)."""
     return db.query(User_Model).order_by(User_Model.created_at.desc()).all()
@@ -147,7 +162,7 @@ def update_user_role(
     user_id: int,
     payload: RoleUpdate,
     db: Session = Depends(get_db),
-    admin: User_Model = Depends(require_roles("ADMIN")),
+    admin: User_Model = Depends(require_permission("user:role:update")),
 ):
     """Update a user's authorization role (ADMIN only)."""
     raw_role = payload.role.upper().strip()
@@ -193,7 +208,7 @@ def update_user_status(
     user_id: int,
     payload: UserStatusUpdate,
     db: Session = Depends(get_db),
-    admin: User_Model = Depends(require_roles("ADMIN")),
+    admin: User_Model = Depends(require_permission("user:status:update")),
 ):
     """Activate or deactivate a user account (ADMIN only)."""
     user = db.query(User_Model).filter(User_Model.id == user_id).first()

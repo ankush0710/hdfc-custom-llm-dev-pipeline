@@ -8,24 +8,6 @@ import { useAuth } from "@/app/context/AuthContext";
 import { getApiErrorMessage } from "@/app/services/apiClient";
 import { toast } from "sonner";
 
-const ACCOUNT_TYPES = [
-  {
-    value: "DS",
-    label: "Data Scientist",
-    description: "Full access to train, fine-tune models, and manage datasets",
-  },
-  {
-    value: "REVIEWER",
-    label: "Reviewer",
-    description: "Access to evaluate metrics, benchmark models, and review artifacts",
-  },
-  {
-    value: "VIEWER",
-    label: "Viewer / Customer",
-    description: "Read-only access to explore dashboards, play with models, and view stats",
-  },
-];
-
 export default function SignupPage() {
   const router = useRouter();
   const { signup, isAuthenticated, loading: authLoading } = useAuth();
@@ -33,7 +15,6 @@ export default function SignupPage() {
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
-    type: "DS",
     password: "",
     confirm_password: "",
   });
@@ -83,16 +64,11 @@ export default function SignupPage() {
         fullNameClean,
         emailClean,
         passwordClean,
-        confirmPasswordClean,
-        formData.type
+        confirmPasswordClean
       );
 
-
-      const roleLabel =
-        ACCOUNT_TYPES.find((t) => t.value === formData.type)?.label || "User";
-
       toast.success("Account Created Successfully!", {
-        description: `Request registered for ${roleLabel}. You can now log in to the platform.`,
+        description: "Your account has been registered with Viewer access. Privileged roles (Data Scientist, Reviewer) can be granted by an Administrator.",
       });
 
       router.replace("/login");
@@ -200,35 +176,19 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* 3. Account Type (Data Scientist, Reviewer, Viewer/Customer) */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Account Type
-              </label>
-              <div className="relative flex items-center">
-                <ShieldCheck
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  size={16}
-                />
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full pl-10 pr-9 py-2 bg-slate-50 hover:bg-slate-50/80 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#002B55]/20 focus:border-[#002B55] focus:bg-white transition cursor-pointer appearance-none font-medium"
-                >
-                  {ACCOUNT_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  size={15}
-                />
+            {/* Institutional Role Notice */}
+            <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 flex items-start gap-3">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-[#002B55] mt-0.5">
+                <ShieldCheck size={16} />
               </div>
-              <p className="text-[11px] text-slate-500 mt-1 pl-1">
-                {ACCOUNT_TYPES.find((t) => t.value === formData.type)?.description}
-              </p>
+              <div>
+                <span className="text-xs font-bold text-[#002B55] block">
+                  Assigned Role: Viewer
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  Per banking security policy, all self-registered accounts are granted standard Viewer access. Elevated roles (Data Scientist, Reviewer) must be assigned by a System Administrator.
+                </p>
+              </div>
             </div>
 
             {/* 4 & 5. Password and Confirm Password */}

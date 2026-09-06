@@ -86,6 +86,30 @@ export const createModelColumns = ({ onViewDetails } = {}) => [
     },
   },
   {
+    key: "latency",
+    label: "AVG. LATENCY",
+    render: (row) => {
+      const latency = row.latency || "—";
+      return (
+        <span className="font-mono font-bold text-xs text-gray-800">
+          {latency}
+        </span>
+      );
+    },
+  },
+  {
+    key: "throughput",
+    label: "THROUGHPUT",
+    render: (row) => {
+      const throughput = row.throughput || "—";
+      return (
+        <span className="font-mono font-bold text-xs text-gray-800">
+          {throughput}
+        </span>
+      );
+    },
+  },
+  {
     key: "status",
     label: "STATUS",
     render: (row) => {

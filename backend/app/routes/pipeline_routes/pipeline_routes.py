@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
-from app.core.auth_dependency import get_current_user
+from app.core.auth_dependency import require_permission
 from app.dbConfig.database_config import get_db
 from app.model.dataset_processing_model import Processing_Model
 from app.model.dataset_version_model import Dataset_Version_Model
@@ -539,7 +539,7 @@ def _build_training_performance(db: Session, run_id: Optional[int] = None) -> Op
 def get_dashboard_stats(
     limit: int = Query(default=5, ge=1, le=50, description="Number of recent activities to return (default 5)"),
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("monitoring:read")),
 ):
     from app.model.dataset_model import Dataset_Model
 
@@ -621,7 +621,7 @@ def get_all_activities(
     offset: int = Query(default=0, ge=0, description="Offset index"),
     event_type: Optional[str] = Query(default=None, description="Filter by event_type"),
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("monitoring:read")),
 ):
     all_activities = _collect_all_activities(db)
     if event_type:
@@ -649,7 +649,7 @@ def get_all_activities(
 def get_training_performance(
     run_id: Optional[int] = Query(default=None, description="Optional training run ID"),
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("monitoring:read")),
 ):
     return _build_training_performance(db, run_id=run_id)
 
@@ -662,7 +662,7 @@ def get_training_performance(
 )
 def get_training_performance_runs(
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("monitoring:read")),
 ):
     return _get_available_training_runs(db)
 
@@ -680,7 +680,7 @@ def get_training_performance_runs(
 def get_pipeline_status(
     dataset_version_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("monitoring:read")),
 ):
     # ── 1. Dataset version ─────────────────────────────────────────────────
     dv = (

@@ -1,13 +1,40 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Bell, Settings, User, Search, ShieldCheck } from "lucide-react";
+import { Menu, Bell, Settings, User, Search, ShieldCheck, Clock } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 
 export default function Navbar({ onMenuClick }) {
   const pathname = usePathname();
-  const { user, role } = useAuth();
+  const { user, role, sessionExpiresAt } = useAuth();
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    if (!sessionExpiresAt) {
+      setTimeLeft("");
+      return;
+    }
+
+    const updateTimer = () => {
+      const exp = new Date(sessionExpiresAt).getTime();
+      const now = Date.now();
+      const diffSec = Math.floor((exp - now) / 1000);
+
+      if (diffSec <= 0) {
+        setTimeLeft("Expired");
+      } else {
+        const mins = Math.floor(diffSec / 60);
+        const secs = diffSec % 60;
+        setTimeLeft(`${mins}m ${secs < 10 ? "0" : ""}${secs}s`);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [sessionExpiresAt]);
 
   // Hide Navbar on auth pages
   if (pathname === "/login" || pathname === "/signup") {
@@ -73,6 +100,21 @@ export default function Navbar({ onMenuClick }) {
           >
             <Settings className="w-5 h-5" />
           </button>
+
+          {/* Session Limit Indicator for restricted roles */}
+          {timeLeft && (role === "VIEWER" || role === "REVIEWER") && (
+            <div
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
+                timeLeft === "Expired"
+                  ? "bg-red-50 border-red-200 text-red-700"
+                  : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}
+              title="Strict 30-minute institutional session limit. Backend enforces automatic expiry."
+            >
+              <Clock size={12} className={timeLeft === "Expired" ? "text-red-500" : "text-amber-500"} />
+              <span>Session: <strong className="font-mono">{timeLeft}</strong></span>
+            </div>
+          )}
 
           <div className="h-6 w-0.5 bg-gray-300 mx-1"></div>
 

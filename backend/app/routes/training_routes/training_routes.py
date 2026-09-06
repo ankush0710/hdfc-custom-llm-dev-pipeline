@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
-from app.core.auth_dependency import get_current_user, require_roles
+from app.core.auth_dependency import get_current_user, require_permission, require_roles
 from app.dbConfig.database_config import get_db
 from app.model.dataset_version_model import Dataset_Version_Model
 from app.model.training_job_model import TrainingJobModel
@@ -116,7 +116,7 @@ class TrainingRunLogsResponse(BaseModel):
 def create_run(
     training_data: TrainingRunCreate,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+    current_user: User_Model = Depends(require_permission("training:create")),
 ):
     try:
         return create_training_run(db, training_data)
@@ -142,7 +142,7 @@ def start_run(
     run_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+    current_user: User_Model = Depends(require_permission("training:start")),
 ):
     try:
         training_run = start_training_run(
@@ -173,7 +173,7 @@ def start_run(
 def stop_run(
     run_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+    current_user: User_Model = Depends(require_permission("training:cancel")),
 ):
     try:
         return stop_training_run(db=db, run_id=run_id)
@@ -198,7 +198,7 @@ def stop_run(
 )
 def get_all_runs(
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("training:read")),
 ):
     return get_training_runs(db)
 
@@ -210,7 +210,7 @@ def get_all_runs(
 def get_run_by_id(
     run_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("training:read")),
 ):
     training_run = get_training_run_by_id(db, run_id)
 
@@ -230,7 +230,8 @@ def get_run_by_id(
 )
 def get_run_detail(
     run_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_permission("training:read")),
 ):
     from app.model.dataset_model import Dataset_Model
 
@@ -449,7 +450,8 @@ def get_run_detail(
 )
 def get_run_logs(
     run_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_permission("training:read")),
 ):
     training_run = get_training_run_by_id(db, run_id)
     if not training_run:

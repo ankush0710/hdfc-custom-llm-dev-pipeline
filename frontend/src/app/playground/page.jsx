@@ -35,45 +35,31 @@ export default function PlaygroundPage() {
   const [messages, setMessages] = useState([]);
   const [tokenCount, setTokenCount] = useState(0);
 
-  // Fetch only deployed / active models
+  // Fetch only active deployed models
   const fetchDeployedModels = useCallback(async () => {
     try {
       setLoadingModels(true);
-      const [deploymentsData, modelsData] = await Promise.all([
-        getDeployments().catch(() => []),
-        getModels().catch(() => []),
-      ]);
+      const deploymentsData = await getDeployments().catch(() => []);
 
       const activeDeployments = Array.isArray(deploymentsData)
         ? deploymentsData.filter((d) => (d.status || "").toUpperCase() === "ACTIVE")
         : [];
 
-      let availableList = [];
-      if (activeDeployments.length > 0) {
-        availableList = activeDeployments;
-      } else {
-        // Fallback to active/deployed models in registry if deployment table is not populated yet
-        const validModels = Array.isArray(modelsData)
-          ? modelsData.filter((m) =>
-              ["DEPLOYED", "ACTIVE", "READY", "APPROVED", "CREATED"].includes(
-                (m.status || "").toUpperCase()
-              )
-            )
-          : [];
-        availableList = validModels.map((m) => ({
-          id: m.id,
-          model_id: m.id,
-          model_name: m.model_name,
-          version: m.version,
-          environment: "Production",
-          status: "ACTIVE",
-          base_model: m.base_model,
-        }));
+      // Deduplicate by model_id to keep latest active deployment per model
+      const uniqueByModel = [];
+      const seenModels = new Set();
+      for (const d of activeDeployments) {
+        if (!seenModels.has(d.model_id)) {
+          seenModels.add(d.model_id);
+          uniqueByModel.push(d);
+        }
       }
 
-      setDeployedModels(availableList);
-      if (availableList.length > 0) {
-        setSelectedModelId(String(availableList[0].model_id || availableList[0].id));
+      setDeployedModels(uniqueByModel);
+      if (uniqueByModel.length > 0) {
+        setSelectedModelId(String(uniqueByModel[0].model_id));
+      } else {
+        setSelectedModelId("");
       }
     } catch (err) {
       console.error("Failed to load deployed models:", err);
@@ -88,7 +74,7 @@ export default function PlaygroundPage() {
   }, [fetchDeployedModels]);
 
   const activeModel = deployedModels.find(
-    (m) => String(m.model_id || m.id) === String(selectedModelId)
+    (m) => String(m.model_id) === String(selectedModelId)
   ) || deployedModels[0];
 
   // Send message to inference API with single submission lock ownership
@@ -139,6 +125,11 @@ export default function PlaygroundPage() {
           content: assistantText,
           latency: result?.latency_seconds,
           tokens: result?.tokens_generated,
+          model_name: result?.model_name || activeModel?.model_name,
+          dataset_name: result?.dataset_name || activeModel?.dataset_name,
+          dataset_version: result?.dataset_version || activeModel?.dataset_version,
+          dataset_file_name: result?.dataset_file_name || activeModel?.dataset_file_name,
+          training_run_id: result?.training_run_id || activeModel?.training_run_id,
         },
       ]);
       // Update token count from real API response
@@ -253,6 +244,7 @@ export default function PlaygroundPage() {
           <PlaygroundParametersPanel
             deployedModels={deployedModels}
             selectedModelId={selectedModelId}
+            activeModel={activeModel}
             onModelChange={(id) => setSelectedModelId(id)}
             parameters={parameters}
             onParametersChange={(newParams) => setParameters(newParams)}

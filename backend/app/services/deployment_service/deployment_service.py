@@ -63,6 +63,48 @@ class DeploymentService:
             deployment.average_latency_ms = None
             deployment.latency = None
 
+        # Resolve dataset lineage from relational DB chain
+        from app.model.training_job_model import TrainingJobModel
+        from app.model.training_model import Training_Model
+        from app.model.dataset_version_model import Dataset_Version_Model
+        from app.model.dataset_model import Dataset_Model
+
+        training_run_id = None
+        if model:
+            if model.training_job_id:
+                job = self.db.query(TrainingJobModel).filter(TrainingJobModel.id == model.training_job_id).first()
+                if job and job.training_run_id:
+                    training_run_id = job.training_run_id
+                if not training_run_id:
+                    direct_run = self.db.query(Training_Model).filter(Training_Model.id == model.training_job_id).first()
+                    if direct_run:
+                        training_run_id = direct_run.id
+            if not training_run_id and getattr(model, "evaluation_id", None):
+                ev = self.db.query(Evaluation_Model).filter(Evaluation_Model.evaluation_id == model.evaluation_id).first()
+                if ev:
+                    training_run_id = ev.run_id
+
+        dataset_name = None
+        dataset_version = None
+        dataset_file_name = None
+
+        if training_run_id:
+            run = self.db.query(Training_Model).filter(Training_Model.id == training_run_id).first()
+            if run and run.dataset_version_id:
+                dv = self.db.query(Dataset_Version_Model).filter(Dataset_Version_Model.id == run.dataset_version_id).first()
+                if dv:
+                    dataset_version = dv.version
+                    dataset_file_name = dv.file_name
+                    if dv.dataset_id:
+                        ds = self.db.query(Dataset_Model).filter(Dataset_Model.id == dv.dataset_id).first()
+                        if ds:
+                            dataset_name = ds.dataset_name
+
+        deployment.training_run_id = training_run_id
+        deployment.dataset_name = dataset_name
+        deployment.dataset_version = dataset_version
+        deployment.dataset_file_name = dataset_file_name
+
         return deployment
 
     def deploy_model(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sliders, RotateCcw, Save, Sparkles, Check } from "lucide-react";
+import { Sliders, RotateCcw, Save, Sparkles, Check, Database } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { toast } from "sonner";
 
@@ -41,6 +41,7 @@ export const SYSTEM_ROLE_PRESETS = [
 export default function PlaygroundParametersPanel({
   deployedModels = [],
   selectedModelId,
+  activeModel,
   onModelChange,
   parameters,
   onParametersChange,
@@ -83,17 +84,55 @@ export default function PlaygroundParametersPanel({
             Model Version
           </label>
           {deployedModels.length > 0 ? (
-            <select
-              value={selectedModelId}
-              onChange={(e) => onModelChange(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-[#FAFBFE] px-3 py-2.5 text-xs font-semibold text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-            >
-              {deployedModels.map((m) => (
-                <option key={m.id} value={m.model_id || m.id}>
-                  {m.model_name || `Model-${m.id}`} ({m.version || "Active"}) • {m.environment || "Production"}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                value={selectedModelId}
+                onChange={(e) => onModelChange(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-[#FAFBFE] px-3 py-2.5 text-xs font-semibold text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              >
+                {deployedModels.map((m) => (
+                  <option key={m.id} value={m.model_id || m.id}>
+                    {m.model_name || `Model-${m.id}`} ({m.version || "Active"}) • {m.environment || "Production"}
+                  </option>
+                ))}
+              </select>
+
+              {/* Real Trained Dataset Lineage (Display metadata only — never injected into prompt context) */}
+              {activeModel && (
+                <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/50 p-2.5 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-[#002B55] text-[11px] mb-1">
+                    <Database size={13} className="text-blue-600 shrink-0" />
+                    <span>Trained Dataset Lineage</span>
+                  </div>
+                  <div className="space-y-1 text-[11px]">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-slate-500 shrink-0">Dataset:</span>
+                      <span className="font-semibold text-slate-800 truncate text-right">
+                        {activeModel.dataset_name || <span className="text-slate-400 italic">No dataset linked</span>}
+                      </span>
+                    </div>
+                    {activeModel.dataset_version && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Version:</span>
+                        <span className="font-mono text-slate-700">{activeModel.dataset_version}</span>
+                      </div>
+                    )}
+                    {activeModel.dataset_file_name && (
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-500 shrink-0">File:</span>
+                        <span className="font-mono text-slate-700 truncate text-right">{activeModel.dataset_file_name}</span>
+                      </div>
+                    )}
+                    {activeModel.training_run_id && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Training Run:</span>
+                        <span className="font-mono text-slate-700">Run #{activeModel.training_run_id}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800 font-medium">
               No active deployed models found.
