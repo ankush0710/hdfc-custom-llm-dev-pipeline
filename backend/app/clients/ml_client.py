@@ -21,6 +21,7 @@ from app.core.config import (
 logger = logging.getLogger(__name__)
 
 
+
 class MLServiceClientError(HTTPException):
     """Exception raised when communication with ML service fails."""
     def __init__(self, status_code: int, detail: str):
@@ -33,8 +34,10 @@ class MLClient:
     @classmethod
     def _headers(cls, request_id: Optional[str] = None) -> Dict[str, str]:
         headers = {
+
             "X-ML-Service-Key": ML_SERVICE_API_KEY,
             "Content-Type": "application/json",
+            
         }
         if request_id:
             headers["X-Request-ID"] = request_id
