@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -45,6 +45,7 @@ class GenerationConfig:
     max_new_tokens: int = 256
     temperature: float = 0.2
     top_p: float = 0.9
+    repetition_penalty: float = 1.1
     do_sample: bool = False
     seed: int = DEFAULT_SEED
 
@@ -55,6 +56,8 @@ class GenerationConfig:
             raise ValueError("temperature must be in the range (0, 2.0].")
         if not (0.0 < self.top_p <= 1.0):
             raise ValueError("top_p must be in the range (0, 1.0].")
+        if self.repetition_penalty <= 0.0:
+            raise ValueError("repetition_penalty must be a positive float.")
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -96,7 +99,7 @@ def generate(
     Returns
     -------
     dict with keys: prompt, response, model_name, generation_config,
-    latency_seconds, device.
+    latency_seconds, tokens_generated, device.
     """
     if not prompt or not isinstance(prompt, str):
         raise ValueError("prompt must be a non-empty string.")
@@ -108,12 +111,27 @@ def generate(
     inputs = encoded.to(device)
     input_length = inputs["input_ids"].shape[1]
 
+    # Collect EOS token IDs including Qwen chat template termination tokens (<|im_end|>, <|endoftext|>)
+    eos_ids: List[int] = []
+    if tokenizer.eos_token_id is not None:
+        if isinstance(tokenizer.eos_token_id, list):
+            eos_ids.extend(tokenizer.eos_token_id)
+        else:
+            eos_ids.append(tokenizer.eos_token_id)
+    for special_eos in (151645, 151643):
+        if special_eos not in eos_ids:
+            eos_ids.append(special_eos)
+
+    resolved_eos = eos_ids if len(eos_ids) > 1 else (eos_ids[0] if eos_ids else None)
+
     gen_kwargs: Dict[str, Any] = {
         "max_new_tokens": config.max_new_tokens,
         "do_sample": config.do_sample,
+        "repetition_penalty": config.repetition_penalty,
+        "eos_token_id": resolved_eos,
         "pad_token_id": tokenizer.pad_token_id
         if tokenizer.pad_token_id is not None
-        else tokenizer.eos_token_id,
+        else (eos_ids[0] if eos_ids else None),
     }
     if config.do_sample:
         gen_kwargs["temperature"] = config.temperature
@@ -138,5 +156,6 @@ def generate(
         "model_name": model_name,
         "generation_config": config.to_dict(),
         "latency_seconds": round(latency_seconds, 4),
+        "tokens_generated": len(new_tokens),
         "device": device,
     }

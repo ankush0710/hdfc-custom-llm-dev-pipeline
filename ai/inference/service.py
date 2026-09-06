@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import gc
 import json
+import logging
 import os
 import time
 import traceback
@@ -49,6 +50,7 @@ from ai.inference.finetuned import (
     generate_finetuned,
     FinetunedModelBundle,
 )
+from ai.inference.guardrails import BankingDomainGuardrail
 from ai.utils.path_utils import (
     resolve_artifact_path,
     validate_artifact_directory,
@@ -57,6 +59,8 @@ from ai.utils.path_utils import (
 )
 
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------
@@ -455,7 +459,17 @@ def _build_base_model_prompt(
                 messages,
                 tokenize=False,
                 add_generation_prompt=True,
+                enable_thinking=False,
             )
+        except TypeError:
+            try:
+                return tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            except Exception:
+                pass
         except Exception:
             pass  # fall through to the plain-text prompt below
 
@@ -524,23 +538,50 @@ def run_model(
     if task_type not in SUPPORTED_TASKS:
         raise UnsupportedTaskError(task_type, sorted(SUPPORTED_TASKS))
 
+    # Guardrail check: intercept out-of-domain queries before expensive model execution
+    guard_result = BankingDomainGuardrail.validate_query(question)
+    if not guard_result.is_valid_banking_query:
+        refusal_msg = guard_result.refusal_message or "I can only assist with banking and financial-services related queries."
+        logger.info("Guardrail rejected non-banking query in run_model: '%s'", question[:80])
+        return {
+            "model_id": model_id,
+            "model_name": _MODEL_MAP.get(model_id, {}).get("base_model", model_id),
+            "fine_tuned": False,
+            "task_type": task_type,
+            "question": question,
+            "context": context,
+            "response": refusal_msg,
+            "raw_response": refusal_msg,
+            "latency_seconds": 0.001,
+            "tokens_generated": 0,
+            "device": "guardrail",
+            "guardrail_rejected": True,
+        }
+
     # ------------------------------------------------------------------
-    # Resolve model entry — prefer _MODEL_MAP, apply DB-sourced overrides
+    # Resolve model entry — prefer _MODEL_MAP, apply DB-sourced overrides safely
     # ------------------------------------------------------------------
     if model_id in _MODEL_MAP:
         entry = dict(_MODEL_MAP[model_id])          # mutable copy
         if base_model_override:
             entry["base_model"] = base_model_override
         if adapter_path_override:
-            entry["adapter_path"] = adapter_path_override
-            entry["fine_tuned"] = True
+            if os.path.isdir(adapter_path_override):
+                entry["adapter_path"] = adapter_path_override
+                entry["fine_tuned"] = True
+            else:
+                logger.warning(
+                    "adapter_path_override '%s' not found on disk. Retaining canonical adapter '%s'.",
+                    adapter_path_override,
+                    entry.get("adapter_path"),
+                )
     elif base_model_override:
         # Model not yet in _MODEL_MAP — build from DB-sourced fields
         entry = {
             "base_model": base_model_override,
-            "fine_tuned": bool(adapter_path_override),
+            "fine_tuned": bool(adapter_path_override and os.path.isdir(adapter_path_override)),
         }
-        if adapter_path_override:
+        if adapter_path_override and os.path.isdir(adapter_path_override):
             entry["adapter_path"] = adapter_path_override
     else:
         raise UnknownModelError(model_id, sorted(_MODEL_MAP.keys()))
@@ -576,6 +617,7 @@ def run_model(
             response_text = ft_result.get("response")
             latency = ft_result.get("latency_seconds")
             device = ft_result.get("device")
+            tokens_gen = ft_result.get("tokens_generated")
             if response_text is None:
                 raise GenerationError(
                     model_id, "generate_finetuned() returned no 'response' field."
@@ -600,6 +642,7 @@ def run_model(
                 if isinstance(base_result, dict)
                 else None
             )
+            tokens_gen = base_result.get("tokens_generated") if isinstance(base_result, dict) else None
             if response_text is None:
                 raise GenerationError(
                     model_id,
@@ -612,6 +655,9 @@ def run_model(
     except Exception as exc:
         raise GenerationError(model_id, str(exc)) from exc
 
+    if tokens_gen is None and isinstance(response_text, str):
+        tokens_gen = len(response_text.split())
+
     return {
         "model_id": model_id,
         "model_name": model_name,
@@ -621,7 +667,8 @@ def run_model(
         "context": context,
         "response": _parse_response_if_json(response_text),
         "raw_response": response_text,
-        "latency_seconds": round(float(latency), 3) if latency is not None else None,
+        "latency_seconds": round(float(latency), 4) if latency is not None else None,
+        "tokens_generated": tokens_gen,
         "device": device,
     }
 

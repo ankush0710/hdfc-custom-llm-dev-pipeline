@@ -1,7 +1,35 @@
 import axios from "axios";
 import { toast } from "sonner";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+function resolveApiBaseUrl() {
+  const raw = process.env.NEXT_PUBLIC_API_URL;
+  if (!raw || typeof raw !== "string") {
+    return "http://127.0.0.1:8000";
+  }
+
+  // If multiple URLs were entered separated by comma, take the first non-empty URL
+  const candidate = raw.includes(",")
+    ? raw.split(",").map((s) => s.trim()).filter(Boolean)[0]
+    : raw.trim();
+
+  if (!candidate) {
+    return "http://127.0.0.1:8000";
+  }
+
+  // Replace 0.0.0.0 with 127.0.0.1 because browsers cannot route to 0.0.0.0
+  let sanitized = candidate.replace("0.0.0.0", "127.0.0.1").replace(/\/+$/, "");
+
+  // Validate that it forms a valid URL
+  try {
+    new URL(sanitized);
+    return sanitized;
+  } catch {
+    console.warn(`[apiClient] Invalid NEXT_PUBLIC_API_URL "${raw}". Falling back to http://127.0.0.1:8000`);
+    return "http://127.0.0.1:8000";
+  }
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
