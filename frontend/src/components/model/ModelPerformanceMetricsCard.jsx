@@ -13,8 +13,12 @@ export default function ModelPerformanceMetricsCard({
 }) {
   const displayAccuracy = accuracy || "-";
   const displayF1 = f1Score || "-";
-  const displayLatency = latency ? String(latency).replace(/\s*ms/i, "") : "-";
-  const displayThroughput = throughput ? String(throughput).replace(/\s*req\/s/i, "") : "-";
+  const isSeconds = latency && String(latency).trim().endsWith("s") && !String(latency).trim().endsWith("ms");
+  const displayLatency = latency
+    ? String(latency).replace(/\s*(ms|s)/i, "").trim()
+    : "-";
+  const latencyUnit = isSeconds ? "s" : "ms";
+  const displayThroughput = throughput ? String(throughput).replace(/\s*req\/s/i, "").trim() : "-";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm">
@@ -81,7 +85,7 @@ export default function ModelPerformanceMetricsCard({
             <span className="text-3xl font-extrabold text-gray-900 tracking-tight font-mono">
               {displayLatency}
             </span>
-            {latency && <span className="text-sm font-semibold text-gray-500">ms</span>}
+            {latency && <span className="text-sm font-semibold text-gray-500">{latencyUnit}</span>}
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.core.auth_dependency import get_current_user, require_roles
+from app.core.auth_dependency import get_current_user, require_permission, require_roles
 from app.dbConfig.database_config import get_db
 from app.model.user_model import User_Model
 from app.schema.evaluation_schema.evaluation_schema import (
@@ -25,7 +25,7 @@ router = APIRouter(
 def create_evaluation(
     payload: EvaluationCreate,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS", "REVIEWER")),
+    current_user: User_Model = Depends(require_permission("evaluation:create")),
 ):
     try:
         return evaluation_service.create_evaluation(db, payload)
@@ -42,7 +42,7 @@ def create_evaluation(
 )
 def get_evaluation_stats(
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("evaluation:read")),
 ):
     return evaluation_service.get_evaluation_stats(db)
 
@@ -55,7 +55,7 @@ def get_evaluation_stats(
 def list_evaluations(
     run_id: int | None = None,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("evaluation:read")),
 ):
     return evaluation_service.list_evaluation(db, run_id)
 
@@ -68,7 +68,7 @@ def list_evaluations(
 def get_evaluation_by_id(
     evaluation_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("evaluation:read")),
 ):
     evaluation = evaluation_service.get_evaluation_by_id(db, evaluation_id)
     if not evaluation:
@@ -84,7 +84,7 @@ def get_evaluation_by_id(
 def get_evaluation_detail(
     evaluation_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("evaluation:read")),
 ):
     detail = evaluation_service.get_evaluation_detail(db, evaluation_id)
     if not detail:
@@ -101,7 +101,7 @@ def start_evaluation(
     evaluation_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS", "REVIEWER")),
+    current_user: User_Model = Depends(require_permission("evaluation:start")),
 ):
     try:
         return evaluation_service.start_evaluation(

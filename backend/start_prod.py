@@ -46,7 +46,7 @@ if __name__ == "__main__":
         "app.main:app",
         host=HOST,
         port=PORT,
-        reload=False,
+        reload=os.getenv("RELOAD", "true").lower() == "true",
         workers=1,
         log_level=LOG_LEVEL,
         access_log=True,

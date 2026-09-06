@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.clients.ml_client import MLClient
-from app.core.auth_dependency import get_current_user, require_roles
+from app.core.auth_dependency import require_permission
 from app.dbConfig.database_config import get_db
 from app.model.user_model import User_Model
 from app.schema.inference_schema.inference_schema import (
@@ -36,7 +36,7 @@ def predict(
     payload: InferenceRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("inference:execute")),
 ):
     request_id = request.headers.get("X-Request-ID") or f"req-{uuid.uuid4().hex[:10]}"
     start_time = time.perf_counter()
@@ -86,7 +86,7 @@ def predict(
 
 @router.get("/models")
 def list_models(
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("model:read")),
 ):
     try:
         return MLClient.list_models()
@@ -98,7 +98,7 @@ def list_models(
 
 @router.post("/unload")
 def unload_model(
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+    current_user: User_Model = Depends(require_permission("model:deploy")),
 ):
     try:
         return MLClient.unload_model()

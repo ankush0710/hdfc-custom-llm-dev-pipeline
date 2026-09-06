@@ -8,7 +8,8 @@ class UserSignup(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
     confirm_password: str = Field(..., min_length=8, max_length=128)
-    role: Optional[str] = "DS"
+    # Role is strictly server-assigned to VIEWER. Any client-sent role is ignored.
+    role: Optional[str] = None
 
 
 
@@ -32,6 +33,8 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+    session_expires_at: Optional[datetime] = None
+    session_duration_minutes: Optional[int] = None
 
 
 class RoleUpdate(BaseModel):

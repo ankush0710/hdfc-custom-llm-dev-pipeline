@@ -75,4 +75,11 @@ class InferenceResponse(BaseModel):
     tokens_generated: Optional[int] = None
     device: Optional[str] = None
 
+    # Real-time dataset lineage fields
+    dataset_id: Optional[int] = None
+    dataset_name: Optional[str] = None
+    dataset_version: Optional[str] = None
+    dataset_file_name: Optional[str] = None
+    training_run_id: Optional[int] = None
+
     model_config = ConfigDict(from_attributes=True)

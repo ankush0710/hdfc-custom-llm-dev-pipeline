@@ -6,7 +6,7 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
-from app.core.auth_dependency import get_current_user
+from app.core.auth_dependency import get_current_user, require_permission
 from app.dbConfig.database_config import get_db
 from app.model.user_model import User_Model
 from app.schema.training_job_schema.training_job_schema import (
@@ -32,7 +32,7 @@ router = APIRouter(
 )
 def get_jobs(
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("training:read")),
 ):
     return get_training_jobs(db)
 
@@ -45,7 +45,7 @@ def get_jobs(
 def get_job(
     job_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("training:read")),
 ):
     job = get_training_job_by_id(db, job_id)
 

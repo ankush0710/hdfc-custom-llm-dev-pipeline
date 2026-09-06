@@ -5,7 +5,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from app.core.auth_dependency import get_current_user, require_roles
+from app.core.auth_dependency import get_current_user, require_permission, require_roles
 from app.dbConfig.database_config import get_db
 from app.model.user_model import User_Model
 from app.schema.model_registry.model_registry import (
@@ -44,7 +44,7 @@ router = APIRouter(
 def register_model(
     payload: Model_Create,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+    current_user: User_Model = Depends(require_permission("model:register")),
 ):
     try:
         return create_model(
@@ -58,13 +58,69 @@ def register_model(
         )
 
 
+def _format_metrics(eval_record, deployment=None):
+    acc_str = None
+    f1_str = None
+    latency_str = None
+    throughput_str = None
+
+    if eval_record:
+        acc_raw = (
+            eval_record.answer_accuracy
+            if eval_record.answer_accuracy is not None
+            else eval_record.intent_structured_accuracy
+            if eval_record.intent_structured_accuracy is not None
+            else eval_record.full_structured_match
+        )
+        acc_pct = (acc_raw * 100) if (acc_raw is not None and acc_raw <= 1.0) else acc_raw
+        if acc_pct is not None:
+            acc_str = f"{round(acc_pct, 1)}%"
+
+        f1_raw = (
+            eval_record.full_structured_match
+            if eval_record.full_structured_match is not None
+            else eval_record.policy_flag_accuracy
+        )
+        if f1_raw is not None:
+            f1_str = f"{round(f1_raw, 2)}"
+
+        lat_sec = eval_record.average_latency_seconds
+        if lat_sec is None and eval_record.completed_at and (eval_record.started_at or eval_record.created_at) and eval_record.total_examples:
+            dur = (eval_record.completed_at - (eval_record.started_at or eval_record.created_at)).total_seconds()
+            if dur > 0:
+                lat_sec = dur / max(eval_record.total_examples, 1)
+
+        if lat_sec and lat_sec > 0:
+            latency_str = f"{int(round(lat_sec * 1000))} ms"
+            t_val = 1.0 / lat_sec
+            if t_val >= 10:
+                throughput_str = f"{int(round(t_val))} req/s"
+            elif t_val >= 1:
+                throughput_str = f"{round(t_val, 1)} req/s"
+            else:
+                throughput_str = f"{round(t_val, 2)} req/s"
+
+    if not latency_str and deployment and getattr(deployment, "average_latency_ms", None):
+        ms = float(deployment.average_latency_ms)
+        latency_str = f"{int(round(ms))} ms"
+        t_val = 1000.0 / ms
+        if t_val >= 10:
+            throughput_str = f"{int(round(t_val))} req/s"
+        elif t_val >= 1:
+            throughput_str = f"{round(t_val, 1)} req/s"
+        else:
+            throughput_str = f"{round(t_val, 2)} req/s"
+
+    return acc_str, f1_str, latency_str, throughput_str
+
+
 @router.get(
     "",
     response_model=list[Model_Response],
 )
 def get_models(
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("model:read")),
 ):
     models = list_model(db)
     result = []
@@ -81,19 +137,13 @@ def get_models(
                 .filter(Evaluation_Model.evaluation_id == m.evaluation_id)
                 .first()
             )
-
-        acc_str = None
-        if eval_record:
-            acc_raw = (
-                eval_record.answer_accuracy
-                if eval_record.answer_accuracy is not None
-                else eval_record.intent_structured_accuracy
-                if eval_record.intent_structured_accuracy is not None
-                else eval_record.full_structured_match
-            )
-            acc_pct = (acc_raw * 100) if (acc_raw is not None and acc_raw <= 1.0) else acc_raw
-            if acc_pct is not None:
-                acc_str = f"{round(acc_pct, 1)}%"
+        deployment = (
+            db.query(Deployment)
+            .filter(Deployment.model_id == m.id)
+            .order_by(Deployment.id.desc())
+            .first()
+        )
+        acc_str, _, latency_str, throughput_str = _format_metrics(eval_record, deployment)
 
         m_dict = {
             "id": m.id,
@@ -109,6 +159,8 @@ def get_models(
             "training_job_id": m.training_job_id,
             "evaluation_id": m.evaluation_id,
             "accuracy": acc_str,
+            "latency": latency_str,
+            "throughput": throughput_str,
             "status": m.status,
             "created_at": m.created_at,
             "updated_at": m.updated_at,
@@ -125,6 +177,7 @@ def get_models(
 def get_model_by_id(
     model_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_permission("model:read")),
 ):
     model = get_model(
         db,
@@ -135,7 +188,46 @@ def get_model_by_id(
             status_code=404,
             detail="Model not found",
         )
-    return model
+    eval_record = (
+        db.query(Evaluation_Model)
+        .filter(Evaluation_Model.model_id == model.id)
+        .order_by(Evaluation_Model.evaluation_id.desc())
+        .first()
+    )
+    if not eval_record and model.evaluation_id:
+        eval_record = (
+            db.query(Evaluation_Model)
+            .filter(Evaluation_Model.evaluation_id == model.evaluation_id)
+            .first()
+        )
+    deployment = (
+        db.query(Deployment)
+        .filter(Deployment.model_id == model.id)
+        .order_by(Deployment.id.desc())
+        .first()
+    )
+    acc_str, _, latency_str, throughput_str = _format_metrics(eval_record, deployment)
+    m_dict = {
+        "id": model.id,
+        "model_name": model.model_name,
+        "version": model.version,
+        "base_model": model.base_model,
+        "artifact_path": model.artifact_path,
+        "adapter_path": model.adapter_path,
+        "huggingface_repo": model.huggingface_repo,
+        "huggingface_path": model.huggingface_path,
+        "commit_hash": model.commit_hash,
+        "model_size": model.model_size,
+        "training_job_id": model.training_job_id,
+        "evaluation_id": model.evaluation_id,
+        "accuracy": acc_str,
+        "latency": latency_str,
+        "throughput": throughput_str,
+        "status": model.status,
+        "created_at": model.created_at,
+        "updated_at": model.updated_at,
+    }
+    return Model_Response(**m_dict)
 
 
 @router.get(
@@ -145,6 +237,7 @@ def get_model_by_id(
 def get_model_detail(
     model_id: int,
     db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_permission("model:read")),
 ):
     model = get_model(db, model_id)
     if not model:
@@ -227,56 +320,25 @@ def get_model_detail(
             .first()
         )
 
-    if eval_record:
-        # Exact real metrics from database
-        acc_raw = (
-            eval_record.answer_accuracy
-            if eval_record.answer_accuracy is not None
-            else eval_record.intent_structured_accuracy
-            if eval_record.intent_structured_accuracy is not None
-            else eval_record.full_structured_match
-        )
-        acc_pct = (acc_raw * 100) if (acc_raw is not None and acc_raw <= 1.0) else acc_raw
-        acc_str = f"{round(acc_pct, 1)}%" if acc_pct is not None else None
+    acc_str, f1_str, latency_str, throughput_str = _format_metrics(eval_record, deployment)
 
-        f1_raw = (
-            eval_record.full_structured_match
-            if eval_record.full_structured_match is not None
-            else eval_record.policy_flag_accuracy
-        )
-        f1_str = f"{round(f1_raw, 2)}" if f1_raw is not None else None
+    eval_date = (eval_record.completed_at or eval_record.created_at) if eval_record else None
+    last_eval_str = (
+        eval_date.strftime("%b %d, %Y")
+        if eval_date
+        else "Active Deployment" if deployment
+        else "Not evaluated yet"
+    )
 
-        latency_sec = eval_record.average_latency_seconds
-        latency_str = f"{int(latency_sec * 1000)} ms" if latency_sec is not None else None
-        throughput_str = f"{int(1.0 / latency_sec)} req/s" if (latency_sec and latency_sec > 0) else None
-
-        eval_date = eval_record.completed_at or eval_record.created_at
-        last_eval_str = (
-            eval_date.strftime("%b %d, %Y")
-            if eval_date
-            else "Recent run"
-        )
-
-        performance_metrics = ModelPerformanceMetrics(
-            accuracy=acc_str,
-            accuracy_trend="+1.2%" if acc_str else None,
-            f1_score=f1_str,
-            f1_trend="+0.03" if f1_str else None,
-            latency_ms=latency_str,
-            throughput_req_s=throughput_str,
-            last_evaluated=last_eval_str,
-        )
-    else:
-        # Real-time state when no evaluation has run yet for this newly registered model
-        performance_metrics = ModelPerformanceMetrics(
-            accuracy=None,
-            accuracy_trend=None,
-            f1_score=None,
-            f1_trend=None,
-            latency_ms=None,
-            throughput_req_s=None,
-            last_evaluated="Not evaluated yet",
-        )
+    performance_metrics = ModelPerformanceMetrics(
+        accuracy=acc_str,
+        accuracy_trend="+1.2%" if acc_str else None,
+        f1_score=f1_str,
+        f1_trend="+0.03" if f1_str else None,
+        latency_ms=latency_str,
+        throughput_req_s=throughput_str,
+        last_evaluated=last_eval_str,
+    )
 
     # 5. Version History — only real data from DB, no fabricated accuracy/changes
     related_models = (
@@ -353,8 +415,7 @@ def change_model_status(
     model_id: int,
     payload: Model_Update_Status,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS", "REVIEWER")),
-
+    current_user: User_Model = Depends(require_permission("model:status:update")),
 ):
     try:
         return update_status(

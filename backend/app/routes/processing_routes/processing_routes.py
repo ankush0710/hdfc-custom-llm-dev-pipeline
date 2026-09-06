@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.core.auth_dependency import get_current_user, require_roles
+from app.core.auth_dependency import get_current_user, require_permission, require_roles
 from app.dbConfig.database_config import get_db
 from app.model.dataset_processing_model import Processing_Model
 from app.model.user_model import User_Model
@@ -20,7 +20,7 @@ router = APIRouter(
 async def start_processing(
     request: ProcessingRequest,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(require_roles("ADMIN", "DS")),
+    current_user: User_Model = Depends(require_permission("dataset:process")),
 ):
     try:
         job, metrics = process_dataset(
@@ -58,7 +58,7 @@ async def start_processing(
 def get_processing_status(
     job_id: int,
     db: Session = Depends(get_db),
-    current_user: User_Model = Depends(get_current_user),
+    current_user: User_Model = Depends(require_permission("dataset:read")),
 ):
     job = (db.query(Processing_Model).filter(Processing_Model.id == job_id).first())
 
@@ -96,7 +96,8 @@ import os
 @router.get("/versions/{version_id}/metrics")
 def get_version_quality_metrics(
     version_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User_Model = Depends(require_permission("dataset:read")),
 ):
     version = db.query(Dataset_Version_Model).filter(Dataset_Version_Model.id == version_id).first()
     if not version:
