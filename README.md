@@ -1267,9 +1267,9 @@ Developed collaboratively by a multidisciplinary team:
 
 | Service | Status | Platform |
 | --- | --- | --- |
-| Frontend | Deployed | Vercel (`https://hdfc-custom-llm-frontend.vercel.app`) |
-| Backend | Deployed | Render (`https://hdfc-custom-llm-backend.onrender.com`) |
-| ML Service | Deployed / Active | Render Worker (`Port 8001`) |
+| Frontend | Deployed | Vercel (`https://hdfc-custom-llm-frontend.vercel.app/login`) |
+| Backend | Deployed | Render (`https://hdfc-custom-llm-backend-d7yd.onrender.com`) |
+| ML Service | Deployed / Active | Render (`https://hdfc-custom-llm-ml-service.onrender.com`) |
 | Database | Active | Neon PostgreSQL |
 | Hugging Face Hub | Connected | HF Model & Dataset Repos |
 
@@ -1279,3 +1279,7 @@ Developed collaboratively by a multidisciplinary team:
 
 **HDFC Bank Custom LLM Development Pipeline**  
 [https://github.com/ankush0710/hdfc-custom-llm-dev-pipeline](https://github.com/ankush0710/hdfc-custom-llm-dev-pipeline)
+
+**NOTE:-** Model Training and Inference is not working due to free tier limitations of render, for production we need to upgrade the plan. Locally it is working fine with the .env files. 
+
+---

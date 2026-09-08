@@ -101,7 +101,7 @@ def _run_evaluation_worker_thread(
 
             # 3. Get Test Dataset Info
             ds_row = db.execute(
-                text("SELECT file_path, huggingface_path FROM dataset_versions WHERE id = :id"),
+                text("SELECT file_path, huggingface_path FROM dataset_version WHERE id = :id"),
                 {"id": test_dataset_id},
             ).fetchone()
             if ds_row:
