@@ -129,3 +129,10 @@ class Dataset_Version_Model(Base):
         back_populates="dataset_version",
         cascade="all, delete-orphan"
     )
+
+    training_runs = relationship(
+        "Training_Model",
+        back_populates="dataset_version",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

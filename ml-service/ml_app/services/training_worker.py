@@ -98,7 +98,7 @@ def _run_training_worker_thread(
             # Query dataset version file path
             from sqlalchemy import text
             row = db.execute(
-                text("SELECT file_path, huggingface_path, version FROM dataset_versions WHERE id = :id"),
+                text("SELECT file_path, huggingface_path, version FROM dataset_version WHERE id = :id"),
                 {"id": dataset_version_id},
             ).fetchone()
             if row:

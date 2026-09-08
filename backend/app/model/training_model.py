@@ -11,7 +11,7 @@ class Training_Model(Base):
 
     id = Column(Integer, primary_key=True, index=True, nullable=False)
 
-    dataset_version_id = Column(Integer, ForeignKey("dataset_version.id"), nullable=False)
+    dataset_version_id = Column(Integer, ForeignKey("dataset_version.id", ondelete="CASCADE"), nullable=False)
 
     base_model = Column(String, nullable=False)
 
@@ -34,7 +34,11 @@ class Training_Model(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     #relationships
+    dataset_version = relationship("Dataset_Version_Model", back_populates="training_runs")
+    training_jobs = relationship("TrainingJobModel", back_populates="training_run", cascade="all, delete-orphan", passive_deletes=True)
     evaluations = relationship(
         "Evaluation_Model",
-        back_populates="training_run"
+        back_populates="training_run",
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
