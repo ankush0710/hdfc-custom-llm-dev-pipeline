@@ -1152,8 +1152,8 @@ flowchart TB
 | Component | Platform | Configuration & Runtime | Description |
 | --------- | -------- | ----------------------- | ----------- |
 | **Frontend** | **Vercel** | Root: `frontend`<br/>Build: `npm run build`<br/>Output: Next.js Default | Production Next.js 16 App Router deployment (`https://hdfc-custom-llm-frontend.vercel.app`) |
-| **Backend** | **Render** | Root: `backend`<br/>Build: `pip install -r requirements-api.txt && alembic upgrade head`<br/>Start: `python start_prod.py` | FastAPI application (`https://hdfc-custom-llm-backend.onrender.com`) |
-| **ML Service** | **Render** | Root: `ml-service`<br/>Start: `python run_server.py` | Standalone FastAPI worker executing fine-tuning, evaluation, and inference |
+| **Backend** | **Render** | Root: `backend`<br/>Build: `pip install -r requirements-api.txt && alembic upgrade head`<br/>Start: `python start_prod.py` | FastAPI application (`https://hdfc-custom-llm-backend-d7yd.onrender.com`) |
+| **ML Service** | **Render** | Root: `ml-service`<br/>Start: `python run_server.py` | Standalone FastAPI worker executing fine-tuning, evaluation, and inference (`https://hdfc-custom-llm-ml-service.onrender.com`) |
 | **Database** | **Neon PostgreSQL** | Serverless PostgreSQL 16 (`?sslmode=require`) | Central relational database for users, datasets, jobs, models, and evaluations |
 | **AI Models** | **Hugging Face Hub** | `ankush0710/hdfc-llm-models` | Cloud repository for fine-tuned LoRA adapter weights and model cards |
 | **Datasets** | **Hugging Face Hub** | `ankush0710/hdfc-llm-datasets` | Remote dataset storage and version synchronization |
@@ -1267,7 +1267,7 @@ Developed collaboratively by a multidisciplinary team:
 
 | Service | Status | Platform |
 | --- | --- | --- |
-| Frontend | Deployed | Vercel (`https://hdfc-custom-llm-frontend.vercel.app/login`) |
+| Frontend | Deployed | Vercel (`https://hdfc-custom-llm-frontend.vercel.app`) |
 | Backend | Deployed | Render (`https://hdfc-custom-llm-backend-d7yd.onrender.com`) |
 | ML Service | Deployed / Active | Render (`https://hdfc-custom-llm-ml-service.onrender.com`) |
 | Database | Active | Neon PostgreSQL |
