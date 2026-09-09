@@ -23,11 +23,6 @@ export const login = async (payload) => {
         : "",
     };
 
-    console.log("Login payload:", {
-      email: cleanPayload.email,
-      passwordLength: cleanPayload.password.length,
-    });
-
     const response = await apiClient.post("/auth/login", cleanPayload);
 
 

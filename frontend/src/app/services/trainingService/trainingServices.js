@@ -2,15 +2,7 @@ import apiClient from "@/app/services/apiClient";
 const API = apiClient;
 
 export const getTrainingRuns = async () => {
-  const response = await API.get("/training/runs", {
-    headers: {
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-    },
-    params: {
-      _t: Date.now(),
-    },
-  });
+  const response = await API.get("/training/runs");
   return response.data;
 };
 
