@@ -38,17 +38,44 @@ export function AuthProvider({ children }) {
           setSessionExpiresAt(storedExp);
         }
 
-        if (storedToken) {
-          setToken(storedToken);
-          if (storedUser) {
+        if (storedToken && storedUser) {
+          // Trust localStorage immediately — render without blocking on the network.
+          // Set loading=false now so the UI can paint right away.
+          try {
+            setToken(storedToken);
             setUser(JSON.parse(storedUser));
+          } catch {
+            // Corrupt stored user JSON — clear and fall through to loading=false
+            localStorage.removeItem("user");
           }
-          // Verify token validity with backend GET /auth/me
+          // Loading is done as far as the UI is concerned.
+          setLoading(false);
+
+          // Silently verify token validity in the background.
+          // If the server rejects it, clear the session and redirect.
+          getMe()
+            .then((me) => {
+              setUser(me);
+              localStorage.setItem("user", JSON.stringify(me));
+            })
+            .catch(() => {
+              // Token is invalid or expired — clear session
+              localStorage.removeItem("token");
+              localStorage.removeItem("user");
+              localStorage.removeItem("session_expires_at");
+              setToken(null);
+              setUser(null);
+              setSessionExpiresAt(null);
+            });
+          return; // loading already set to false above
+        } else if (storedToken) {
+          // Token exists but no cached user — must verify synchronously
+          setToken(storedToken);
           try {
             const me = await getMe();
             setUser(me);
             localStorage.setItem("user", JSON.stringify(me));
-          } catch (err) {
+          } catch {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
             localStorage.removeItem("session_expires_at");
@@ -128,7 +155,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       await apiLogout();
-    } catch (err) {
+    } catch {
     } finally {
       setUser(null);
       setToken(null);
@@ -148,7 +175,7 @@ export function AuthProvider({ children }) {
         localStorage.setItem("user", JSON.stringify(me));
       }
       return me;
-    } catch (err) {
+    } catch {
       return null;
     }
   }, []);

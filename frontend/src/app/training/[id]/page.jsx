@@ -208,7 +208,7 @@ export default function TrainingDetailPage({ params: pageParams }) {
 
     const intervalId = setInterval(() => {
       fetchDetail(true);
-    }, 2500);
+    }, 5000);
 
     return () => {
       clearInterval(intervalId);

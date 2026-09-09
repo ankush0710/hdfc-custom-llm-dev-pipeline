@@ -12,7 +12,6 @@ import PlaygroundParametersPanel, {
 } from "@/components/playground/PlaygroundParametersPanel";
 import PlaygroundChatWindow from "@/components/playground/PlaygroundChatWindow";
 import { getDeployments } from "@/app/services/deploymentService/deploymentServices";
-import { getModels } from "@/app/services/modelService/modelServices";
 import { runInference } from "@/app/services/inferenceService/inferenceServices";
 import { toast } from "sonner";
 

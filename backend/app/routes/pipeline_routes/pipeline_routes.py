@@ -359,14 +359,26 @@ def _get_available_training_runs(db: Session) -> List[TrainingRunOption]:
         .order_by(Training_Model.id.desc())
         .all()
     )
+    if not all_runs:
+        return []
+
+    # --- Fix 1: Single batched query instead of N+1 per-run queries ---
+    run_ids = [r.id for r in all_runs]
+    all_jobs = (
+        db.query(TrainingJobModel)
+        .filter(TrainingJobModel.training_run_id.in_(run_ids))
+        .order_by(TrainingJobModel.id.desc())
+        .all()
+    )
+    # Build a map: run_id → latest job (jobs are already desc-ordered)
+    latest_job_map: dict = {}
+    for j in all_jobs:
+        if j.training_run_id not in latest_job_map:
+            latest_job_map[j.training_run_id] = j
+
     options: List[TrainingRunOption] = []
     for r in all_runs:
-        job = (
-            db.query(TrainingJobModel)
-            .filter(TrainingJobModel.training_run_id == r.id)
-            .order_by(TrainingJobModel.id.desc())
-            .first()
-        )
+        job = latest_job_map.get(r.id)
         has_tel = False
         steps = None
         final_l = None
@@ -416,62 +428,60 @@ def _build_training_performance(db: Session, run_id: Optional[int] = None) -> Op
         else:
             return None
     else:
-        # First priority: find an active RUNNING training run that has real loss entries
-        running_jobs = (
+        # --- Fix 8: Batch-fetch all training runs and jobs once ---
+        # Reuse the runs already fetched by _get_available_training_runs above
+        training_runs_list = (
+            db.query(Training_Model)
+            .order_by(Training_Model.id.desc())
+            .all()
+        )
+        run_map = {r.id: r for r in training_runs_list}
+
+        all_jobs_ordered = (
             db.query(TrainingJobModel)
-            .filter(TrainingJobModel.status == "RUNNING")
+            .filter(TrainingJobModel.training_run_id.in_(list(run_map.keys())))
             .order_by(TrainingJobModel.id.desc())
             .all()
         )
-        for j in running_jobs:
-            if _has_valid_loss(j.log_entries):
-                r = db.query(Training_Model).filter(Training_Model.id == j.training_run_id).first()
+        latest_job_map: dict = {}
+        for j in all_jobs_ordered:
+            if j.training_run_id not in latest_job_map:
+                latest_job_map[j.training_run_id] = j
+
+        # Priority 1: RUNNING job with real loss data
+        for j in all_jobs_ordered:
+            if j.status == "RUNNING" and _has_valid_loss(j.log_entries):
+                r = run_map.get(j.training_run_id)
                 if r:
                     target_job = j
                     target_run = r
                     break
 
-        # Second priority: find the latest COMPLETED training run with real loss entries
+        # Priority 2: COMPLETED job with real loss data
         if not target_run:
-            candidate_jobs = (
-                db.query(TrainingJobModel)
-                .filter(TrainingJobModel.status == "COMPLETED")
-                .order_by(TrainingJobModel.id.desc())
-                .all()
-            )
-            for j in candidate_jobs:
-                if _has_valid_loss(j.log_entries):
-                    r = db.query(Training_Model).filter(Training_Model.id == j.training_run_id).first()
+            for j in all_jobs_ordered:
+                if j.status == "COMPLETED" and _has_valid_loss(j.log_entries):
+                    r = run_map.get(j.training_run_id)
                     if r:
                         target_job = j
                         target_run = r
                         break
 
-        # Fallback: check any training run with valid loss entries
+        # Priority 3: Any job with valid loss data
         if not target_run:
-            any_jobs = (
-                db.query(TrainingJobModel)
-                .order_by(TrainingJobModel.id.desc())
-                .all()
-            )
-            for j in any_jobs:
+            for j in all_jobs_ordered:
                 if _has_valid_loss(j.log_entries):
-                    r = db.query(Training_Model).filter(Training_Model.id == j.training_run_id).first()
+                    r = run_map.get(j.training_run_id)
                     if r:
                         target_job = j
                         target_run = r
                         break
 
-        # Fallback 2: pick the latest training run overall even if without loss
-        if not target_run and available_runs:
-            target_run = db.query(Training_Model).order_by(Training_Model.id.desc()).first()
+        # Fallback: pick the latest run regardless of telemetry
+        if not target_run and run_map:
+            target_run = training_runs_list[0] if training_runs_list else None
             if target_run:
-                target_job = (
-                    db.query(TrainingJobModel)
-                    .filter(TrainingJobModel.training_run_id == target_run.id)
-                    .order_by(TrainingJobModel.id.desc())
-                    .first()
-                )
+                target_job = latest_job_map.get(target_run.id)
 
     if not target_run:
         return None
