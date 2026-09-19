@@ -88,10 +88,8 @@ apiClient.interceptors.response.use(
       if (status === 401 && !isAuthRoute) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        // Notify AuthContext, which will redirect to /login via Next.js router
         window.dispatchEvent(new Event("auth:unauthorized"));
-        if (!window.location.pathname.startsWith("/login")) {
-          window.location.href = "/login";
-        }
       } else if (status === 403 && !isAuthRoute) {
         const msg = getApiErrorMessage(error, "Access Denied: You do not have permission to perform this action.");
         toast.error("Permission Denied", { description: msg });
