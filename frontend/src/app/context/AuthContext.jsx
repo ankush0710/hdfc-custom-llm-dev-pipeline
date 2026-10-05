@@ -38,44 +38,25 @@ export function AuthProvider({ children }) {
           setSessionExpiresAt(storedExp);
         }
 
-        if (storedToken && storedUser) {
-          // Trust localStorage immediately — render without blocking on the network.
-          // Set loading=false now so the UI can paint right away.
-          try {
-            setToken(storedToken);
-            setUser(JSON.parse(storedUser));
-          } catch {
-            // Corrupt stored user JSON — clear and fall through to loading=false
-            localStorage.removeItem("user");
-          }
-          // Loading is done as far as the UI is concerned.
-          setLoading(false);
-
-          // Silently verify token validity in the background.
-          // If the server rejects it, clear the session and redirect.
-          getMe()
-            .then((me) => {
-              setUser(me);
-              localStorage.setItem("user", JSON.stringify(me));
-            })
-            .catch(() => {
-              // Token is invalid or expired — clear session
-              localStorage.removeItem("token");
-              localStorage.removeItem("user");
-              localStorage.removeItem("session_expires_at");
-              setToken(null);
-              setUser(null);
-              setSessionExpiresAt(null);
-            });
-          return; // loading already set to false above
-        } else if (storedToken) {
-          // Token exists but no cached user — must verify synchronously
+        if (storedToken) {
+          // Always verify the token with the server before marking auth as ready.
+          // This prevents the dashboard from firing API calls with an expired token.
           setToken(storedToken);
+          if (storedUser) {
+            try {
+              setUser(JSON.parse(storedUser));
+            } catch {
+              localStorage.removeItem("user");
+            }
+          }
+
+          // Verify token validity — keep loading=true until this resolves.
           try {
             const me = await getMe();
             setUser(me);
             localStorage.setItem("user", JSON.stringify(me));
           } catch {
+            // Token is invalid or expired — clear session
             localStorage.removeItem("token");
             localStorage.removeItem("user");
             localStorage.removeItem("session_expires_at");
