@@ -123,26 +123,43 @@ def get_models(
     current_user: User_Model = Depends(require_permission("model:read")),
 ):
     models = list_model(db)
+    model_ids = [m.id for m in models]
+    evaluation_ids = [m.evaluation_id for m in models if m.evaluation_id]
+
+    # Fetch related records once for the complete list. The former loop issued
+    # one or two evaluation queries and one deployment query for every model.
+    evaluations_by_model = {}
+    evaluations_by_id = {}
+    if model_ids:
+        evaluations = (
+            db.query(Evaluation_Model)
+            .filter(
+                (Evaluation_Model.model_id.in_(model_ids))
+                | (Evaluation_Model.evaluation_id.in_(evaluation_ids or [-1]))
+            )
+            .order_by(Evaluation_Model.evaluation_id.desc())
+            .all()
+        )
+        for evaluation in evaluations:
+            evaluations_by_id[evaluation.evaluation_id] = evaluation
+            evaluations_by_model.setdefault(evaluation.model_id, evaluation)
+
+    deployments_by_model = {}
+    if model_ids:
+        for deployment in (
+            db.query(Deployment)
+            .filter(Deployment.model_id.in_(model_ids))
+            .order_by(Deployment.id.desc())
+            .all()
+        ):
+            deployments_by_model.setdefault(deployment.model_id, deployment)
+
     result = []
     for m in models:
-        eval_record = (
-            db.query(Evaluation_Model)
-            .filter(Evaluation_Model.model_id == m.id)
-            .order_by(Evaluation_Model.evaluation_id.desc())
-            .first()
-        )
+        eval_record = evaluations_by_model.get(m.id)
         if not eval_record and m.evaluation_id:
-            eval_record = (
-                db.query(Evaluation_Model)
-                .filter(Evaluation_Model.evaluation_id == m.evaluation_id)
-                .first()
-            )
-        deployment = (
-            db.query(Deployment)
-            .filter(Deployment.model_id == m.id)
-            .order_by(Deployment.id.desc())
-            .first()
-        )
+            eval_record = evaluations_by_id.get(m.evaluation_id)
+        deployment = deployments_by_model.get(m.id)
         acc_str, _, latency_str, throughput_str = _format_metrics(eval_record, deployment)
 
         m_dict = {

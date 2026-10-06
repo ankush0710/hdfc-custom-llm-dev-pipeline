@@ -39,9 +39,13 @@ export const apiClient = axios.create({
 });
 
 // Request Interceptor: Attach JWT Bearer Token automatically
+let apiRequestCount = 0;
+
 apiClient.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
+      config.__requestStartedAt = performance.now();
+      config.__requestNumber = ++apiRequestCount;
       const token = localStorage.getItem("token");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -78,9 +82,23 @@ export function getApiErrorMessage(error, fallback = "An unexpected error occurr
 
 // Response Interceptor: Handle 401 Unauthorized & 403 Forbidden globally
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (typeof window !== "undefined" && performance?.now && response.config.__requestStartedAt) {
+      console.debug("[api]", response.config.method?.toUpperCase(), response.config.url, `${Math.round(performance.now() - response.config.__requestStartedAt)}ms`, `#${response.config.__requestNumber}`);
+    }
+    return response;
+  },
   (error) => {
     if (typeof window !== "undefined") {
+      if (performance?.now && error?.config?.__requestStartedAt) {
+        console.debug(
+          "[api error]",
+          error.config.method?.toUpperCase(),
+          error.config.url,
+          `${Math.round(performance.now() - error.config.__requestStartedAt)}ms`,
+          `#${error.config.__requestNumber}`
+        );
+      }
       const status = error?.response?.status;
       const url = error?.config?.url || "";
       const isAuthRoute = url.includes("/auth/login") || url.includes("/auth/signup");

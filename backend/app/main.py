@@ -2,6 +2,7 @@
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 # Ensure repo root and backend directory are in sys.path
@@ -132,6 +133,12 @@ app.add_middleware(
     max_age=600,
 )
 
+@app.middleware("http")
+async def log_request_duration(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    _logger.info("request_duration method=%s path=%s status=%s duration_ms=%.1f", request.method, request.url.path, response.status_code, (time.perf_counter() - started) * 1000)
+    return response
 app.include_router(auth_router)
 app.include_router(dataset_router)
 app.include_router(processing_router)
