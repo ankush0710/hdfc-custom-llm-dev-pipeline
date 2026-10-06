@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import BackgroundTasks, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.clients.ml_client import MLClient
 from app.dbConfig.database_config import SessionLocal
@@ -130,7 +130,38 @@ def list_evaluation(db: Session, run_id: int | None = None):
     if run_id is not None:
         query = query.filter(Evaluation_Model.run_id == run_id)
     items = query.order_by(Evaluation_Model.evaluation_id.desc()).all()
-    return [_enrich_evaluation(db, item) for item in items]
+    if not items:
+        return []
+
+    model_ids = {item.model_id for item in items if item.model_id is not None}
+    version_ids = {item.test_dataset_id for item in items if item.test_dataset_id is not None}
+    models_by_id = {
+        model.id: model
+        for model in db.query(Model_Registry).filter(Model_Registry.id.in_(model_ids)).all()
+    } if model_ids else {}
+    versions_by_id = {
+        version.id: version
+        for version in (
+            db.query(Dataset_Version_Model)
+            .options(joinedload(Dataset_Version_Model.dataset))
+            .filter(Dataset_Version_Model.id.in_(version_ids))
+            .all()
+        )
+    } if version_ids else {}
+
+    # Attach presentation-only fields from batched related records.
+    for item in items:
+        model = models_by_id.get(item.model_id)
+        item.display_id = f"EV-{str(item.evaluation_id).zfill(3)}"
+        item.model_name = f"{model.model_name}-{'v' if not str(model.version).startswith('v') else ''}{model.version}" if model else f"Model #{item.model_id}"
+        item.base_model = model.base_model if model else None
+        version = versions_by_id.get(item.test_dataset_id)
+        item.dataset_name = version.dataset.dataset_name if version and version.dataset else (f"Dataset #{version.dataset_id}" if version else f"Dataset Version #{item.test_dataset_id}")
+        item.dataset_version = f"v{version.version}" if version else None
+        acc = item.answer_accuracy if item.answer_accuracy is not None else (item.full_structured_match if item.full_structured_match is not None else (item.normalized_exact_match if item.normalized_exact_match is not None else item.intent_structured_accuracy))
+        item.score_value = round((acc * 100 if acc <= 1.0 else acc), 1) if acc is not None else None
+        item.score = f"{item.score_value}%" if item.score_value is not None else "-"
+    return items
 
 
 # ================================ evaluation aggregate stats ======================================= #

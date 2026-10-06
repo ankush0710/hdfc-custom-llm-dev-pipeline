@@ -79,22 +79,12 @@ export default function DatasetDetailsPage() {
         setDataset(data);
         setTrainingRuns(Array.isArray(runsData) ? runsData : []);
 
-        // Fetch metrics for versions in parallel and pick the latest valid metrics
-        if (data?.versions && data.versions.length > 0) {
-          const versions = [...data.versions].reverse();
-          const metricsList = await Promise.all(
-            versions.map((ver) => getVersionQualityMetrics(ver.id).catch(() => null))
-          );
-          const resolvedMetrics =
-            metricsList.find(
-              (m) =>
-                m &&
-                (m.total_rows !== undefined ||
-                  m.total_records !== undefined ||
-                  m.quality_score !== undefined)
-            ) || null;
-          setMetricsData(resolvedMetrics);
-        }
+        // The UI displays one metrics summary. Fetch the newest version only,
+        // rather than delaying the page on one request per historical version.
+        const latestVersion = data?.versions?.[data.versions.length - 1];
+        setMetricsData(
+          latestVersion ? await getVersionQualityMetrics(latestVersion.id) : null
+        );
       } catch (err) {
         console.error("Failed to fetch dataset:", err);
         setError(err?.response?.data?.detail || "Failed to load dataset");
